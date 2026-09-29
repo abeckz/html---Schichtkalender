@@ -96,9 +96,10 @@ checks.push([`Titel "BASF Schichtkalender" (${title})`, title === 'BASF Schichtk
 const columnHeads = Array.from(defaultDom.matchAll(/role="columnheader">([^<]*)</g)).map(
   (match) => match[1],
 );
+const dayTableHeadCount = (defaultDom.match(/class="day-table-head"/g) ?? []).length;
 checks.push([
-  `Spaltenköpfe ohne Wo/Nr (${columnHeads.slice(0, 2).join('/')})`,
-  columnHeads[0] === 'Tag' && columnHeads[1] === 'Datum' && !columnHeads.includes('Wo'),
+  `Keine Spaltenkopfzeile über den Tageszeilen (${dayTableHeadCount} Kopfzeilen, ${columnHeads.length} Spaltenköpfe)`,
+  dayTableHeadCount === 0 && columnHeads.length === 0,
 ]);
 
 let failed = 0;

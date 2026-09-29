@@ -2,7 +2,7 @@
  * Strukturverifikation der Bildschirmdarstellung und der Anzeige-Einstellung.
  *
  * Abgesichert werden die Anforderungen, die nur die Oberfläche betreffen:
- * - Spaltenköpfe "Tag" und "Datum" (kein "Wo"/"Nr"),
+ * - keine Spaltenkopfzeile ueber den Tageszeilen,
  * - rosa "F!"-Kästchen bei gesetzlichen Feiertagen in der KW-Spalte,
  * - "F!" als einzige Nennung des Feiertags; ein Kommentar in der Zeile
  *   verdrängt Termin- und Feiertagsnamen vollständig,
@@ -55,14 +55,10 @@ describe('Bildschirmdarstellung', () => {
     expect(container.querySelector('.app-title')?.textContent).toBe('BASF Schichtkalender');
   });
 
-  it('verwendet die Spaltenköpfe Tag und Datum', () => {
+  it('zeigt keine Spaltenkopfzeile über den Tageszeilen', () => {
     const container = render(<App />);
-    const heads = Array.from(container.querySelectorAll('.day-table-head [role="columnheader"]')).map(
-      (head) => head.textContent,
-    );
-    expect(heads.slice(0, 2)).toEqual(['Tag', 'Datum']);
-    expect(heads).not.toContain('Wo');
-    expect(heads).not.toContain('Nr');
+    expect(container.querySelector('.day-table-head')).toBeNull();
+    expect(container.querySelectorAll('[role="columnheader"]').length).toBe(0);
   });
 
   it('startet die Jahresauswahl beim aktuellen Jahr', () => {

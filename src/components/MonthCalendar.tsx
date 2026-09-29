@@ -2,7 +2,8 @@
  * Monatskalender der Bildschirmdarstellung.
  *
  * Der Monat wirkt tabellarisch: jeder Tag ist eine Zeile, die Tage laufen
- * von oben nach unten. Der Kopf zeigt Monatsname und Kennzahlen.
+ * von oben nach unten. Der Kopf zeigt Monatsname und Kennzahlen; auf eine
+ * Spaltenkopfzeile wird bewusst verzichtet.
  */
 
 import type { AnnotationMap, CalendarDay, MonthCalendar as MonthCalendarModel } from '../domain/types';
@@ -31,15 +32,6 @@ export function MonthCalendar({ month, annotations, onOpenEditor }: MonthCalenda
       </header>
 
       <div className="day-table" role="table" aria-label={`Tage im ${month.name}`}>
-        <div className="day-table-head" role="row">
-          <span role="columnheader">Tag</span>
-          <span role="columnheader">Datum</span>
-          <span role="columnheader" className="head-information">
-            Termin / Beschriftung
-          </span>
-          <span role="columnheader">KW</span>
-          <span role="columnheader">T/N</span>
-        </div>
         {month.days.map((day) => (
           <CalendarDayRow
             key={day.dateKey}

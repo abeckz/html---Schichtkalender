@@ -365,32 +365,6 @@ body {
  * Fünf Spalten für fünf Zellen - die Information bekommt den gesamten Rest
  * der Breite und wird nicht mehr abgeschnitten.
  */
-.day-table-head {
-  display: grid;
-  grid-template-columns: 1.6em 1.9em minmax(0, 1fr) 3.2em 2.2em;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  border-bottom: 1px solid var(--color-border);
-}
-
-/* Kopfzeile darf nicht umbrechen: die Spaltenbreiten bestimmen den Text. */
-.day-table-head > span {
-  white-space: nowrap;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.head-information {
-  padding-left: 4px;
-}
-
 .day-row {
   display: grid;
   grid-template-columns: 1.6em 1.9em minmax(0, 1fr) 3.2em 2.2em;
