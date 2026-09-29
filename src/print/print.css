@@ -1,0 +1,323 @@
+/* ====================================================================
+   Druckansicht: A3 Querformat, exakt zwei Seiten, Excel-artig
+   --------------------------------------------------------------------
+   Seite 1: Januar bis Juni als EINE horizontale Reihe (1 x 6)
+   Seite 2: Juli bis Dezember, identische Struktur
+
+   Tage laufen innerhalb eines Monats immer von oben nach unten.
+   Jeder Monat besitzt genau 31 Rasterzeilen, damit alle sechs
+   Monatsblöcke exakt gleich hoch sind und Tag 1 bis Tag 31 aller
+   Monate auf derselben horizontalen Höhe liegen.
+
+   Die Blattfläche wird vollständig ausgenutzt:
+   - Auf dem Bildschirm ist die Vorschau eine A3-Seite fester Größe.
+   - Beim Drucken wird bewusst NICHT verkleinert (kein zoom, keine
+     feste Höhe), sondern der verfügbare Druckbereich auf 100 % Höhe
+     und Breite gedehnt.
+
+   Die Anzeige-Einstellung (Hell/Dunkel) gilt ausschließlich für den
+   Bildschirm; diese Datei verwendet unveränderliche Druckfarben.
+   ==================================================================== */
+
+@page {
+  size: A3 landscape;
+  margin: 5mm;
+}
+
+/* Grundwerte für die Bildschirmvorschau der beiden A3-Seiten. */
+.print-view {
+  --print-page-width: 420mm;
+  --print-page-height: 297mm;
+  --print-cell-font: 7pt;
+  --print-info-font: 7pt;
+  --print-shift-font: 9pt;
+}
+
+.print-page {
+  box-sizing: border-box;
+  width: var(--print-page-width);
+  height: var(--print-page-height);
+  padding: 5mm;
+  margin: 0 auto 8mm;
+  background: #ffffff;
+  color: #000000;
+  display: flex;
+  flex-direction: column;
+  font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* Sichtbare Blattkante in der Vorschau, im Druck natürlich nicht. */
+@media screen {
+  .print-page {
+    box-shadow: 0 0 0 1px #b9bec7, 0 6px 18px rgba(15, 23, 42, 0.16);
+    zoom: 0.96;
+  }
+}
+
+/* ---------------------------------------------------------------- Header */
+
+.print-page-header {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 4mm;
+  padding-bottom: 0.6mm;
+  margin-bottom: 0.6mm;
+  border-bottom: 0.75pt solid #000000;
+  font-size: 8pt;
+  line-height: 1.15;
+}
+
+.print-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  gap: 3mm;
+}
+
+.print-header-title {
+  font-size: 14pt;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.print-header-year {
+  font-size: 14pt;
+  font-weight: 700;
+}
+
+.print-header-shift {
+  font-size: 12pt;
+  font-weight: 700;
+}
+
+.print-header-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 4mm;
+  font-size: 6.5pt;
+  color: #000000;
+  line-height: 1.2;
+}
+
+/* --------------------------------------------- Halbjahr: 1 x 6 Monate */
+
+.print-half-year {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-auto-flow: column;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 1.2mm;
+  border-top: 1pt solid #000000;
+  border-left: 1pt solid #000000;
+}
+/* ---------------------------------------------------------- Monatsblock */
+
+.print-month {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1pt solid #000000;
+  border-bottom: 1pt solid #000000;
+}
+
+.print-month-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.6mm;
+  padding: 0.5mm 0.8mm;
+  border-bottom: 0.75pt solid #000000;
+  background: #eef1f4;
+}
+
+.print-month-name {
+  font-size: 10pt;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.print-month-stat {
+  font-size: 8pt;
+  font-weight: 400;
+  text-align: center;
+}
+
+/* ------------------------------------------------- 31-Zeilen-Raster */
+
+.print-month-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: repeat(31, minmax(0, 1fr));
+}
+
+.print-row {
+  display: grid;
+  grid-template-columns: 6.5mm 8mm 1fr 8mm 5mm;
+  align-items: center;
+  min-height: 0;
+  border-top: 0.25pt solid #c8ccd1;
+  background: #ffffff;
+}
+
+.print-row:first-child {
+  border-top: none;
+}
+
+.print-row > span {
+  padding: 0 0.4mm;
+  border-right: 0.25pt solid #c8ccd1;
+  line-height: 1.05;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+
+.print-row > span:last-child {
+  border-right: none;
+}
+
+.print-row.is-weekend {
+  background: #f1f2f3;
+}
+
+.print-row.is-sunday {
+  background: #e9eaec;
+}
+
+/* Persönliche Farbe hat Vorrang vor Wochenend-Grautönen. */
+.print-row[data-date-key][style] {
+  background-image: none;
+}
+
+.print-row-empty {
+  background: #ffffff;
+}
+
+.print-col-wo,
+.print-col-datum {
+  font-size: 7pt;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.print-col-info {
+  font-size: 7pt;
+  font-weight: 400;
+}
+
+.print-col-kw {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4mm;
+  font-size: 6.5pt;
+  text-align: right;
+}
+
+.print-week {
+  font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Rosa Kästchen "F!" für gesetzliche Feiertage in der KW-Spalte.
+ *
+ * Immer massiv gedruckt (kein Rahmen, keine Transparenz), damit die
+ * Markierung auch ohne Geräteunterstützung für Hintergrundfarben
+ * zuverlässig sichtbar ist.
+ */
+.print-holiday-mark {
+  display: inline-block;
+  flex: 0 0 auto;
+  min-width: 3.2mm;
+  padding: 0 0.3mm;
+  font-size: 5.5pt;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  color: #7a1030;
+  background: #f6cedd;
+}
+
+.print-col-schicht {
+  font-size: 9pt;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------- Druck */
+
+@media print {
+  /* Die Blattfläche wird vollständig genutzt: jede der beiden Seiten füllt
+     den verfügbaren Druckbereich (A3 quer, 5 mm Rand aus @page) in Höhe
+     UND Breite. Entscheidend sind zwei Punkte:
+     1. Eine feste Höhe in mm (nicht "auto"), damit der Browser nicht
+        verkleinert und kein Leerraum entsteht.
+     2. "zoom: 1" unterbindet ein automatisches Skalieren.
+     Der Rasterbereich (.print-half-year) dehnt sich per flex über die
+     verbleibende Höhe, sodass die 31 Tageszeilen die Seite ausfüllen. */
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  /* Bildschirmbereiche werden beim Drucken vollständig ausgeblendet. */
+  .no-print,
+  .toolbar,
+  .legend,
+  .print-controls {
+    display: none !important;
+  }
+
+  .print-view {
+    display: block;
+    margin: 0;
+    padding: 0;
+  }
+
+  .print-page {
+    box-sizing: border-box;
+    /* Volle Blattfläche: Der bedruckbare Bereich ist das Blatt (420 x
+       297 mm) abzüglich der Ränder aus @page (2 x 5 mm) = 410 x 287 mm.
+       Beide Maße werden exakt ausgeschöpft; "zoom: 1" verhindert ein
+       automatisches Verkleinern durch den Browser.
+       Wichtig ist die Breite: ohne sie würde die Bildschirmbreite von
+       420 mm gelten, also 10 mm mehr als der bedruckbare Bereich. Der
+       Browser würde die Seite dann automatisch auf ca. 97 % verkleinern
+       (eine Skalierung, die der Anwender manuell auf 100 % stellen
+       müsste). Mit exakt 410 mm Breite passt die Seite ohne jede
+       Skalierung. */
+    width: 410mm;
+    max-width: none;
+    height: 284mm;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+    zoom: 1;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-page:last-of-type {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

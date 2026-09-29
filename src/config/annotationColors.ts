@@ -1,0 +1,60 @@
+/**
+ * Zentrale Farbpalette der persönlichen Tagesmarkierungen.
+ *
+ * Gespeichert wird ausschließlich die colorId (nicht der Hexwert), damit
+ * die Palette später geändert werden kann, ohne bestehende Annotationen
+ * zu zerstören.
+ *
+ * Die Palette ist bewusst hell, druckfreundlich und mit schwarzem
+ * Kugelschreiber bzw. Bleistift beschreibbar.
+ */
+
+import type { AnnotationColor, AnnotationColorId } from '../domain/types';
+
+export const annotationColors: readonly AnnotationColor[] = [
+  { id: 'yellow', name: 'Gelb', hex: '#FFF2A8' },
+  { id: 'green', name: 'Hellgrün', hex: '#CDECCF' },
+  { id: 'blue', name: 'Hellblau', hex: '#CFE5F6' },
+  { id: 'orange', name: 'Orange', hex: '#FFD7A8' },
+  { id: 'pink', name: 'Rosa', hex: '#F6CEDD' },
+  { id: 'red', name: 'Hellrot', hex: '#F6C5C2' },
+  { id: 'purple', name: 'Lavendel', hex: '#DDD0F2' },
+  { id: 'turquoise', name: 'Türkis', hex: '#C7ECE8' },
+  { id: 'gray', name: 'Grau', hex: '#E3E5E8' },
+];
+
+/** Schnellzugriff colorId -> Farbe. */
+export const annotationColorMap: Record<AnnotationColorId, AnnotationColor> = annotationColors.reduce(
+  (map, color) => {
+    map[color.id] = color;
+    return map;
+  },
+  {} as Record<AnnotationColorId, AnnotationColor>,
+);
+
+export const ANNOTATION_COLOR_IDS: readonly AnnotationColorId[] = annotationColors.map(
+  (color) => color.id,
+);
+
+/** Anzeigename "Keine Farbe" für colorId === null. */
+export const NO_COLOR_NAME = 'Keine Farbe';
+
+/** Prüft, ob ein unbekannter Wert eine gültige colorId ist. */
+export function isAnnotationColorId(value: unknown): value is AnnotationColorId {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(annotationColorMap, value);
+}
+
+/** Deutscher Anzeigename einer colorId (oder "Keine Farbe"). */
+export function getColorName(colorId: AnnotationColorId | null | undefined): string {
+  if (!colorId) return NO_COLOR_NAME;
+  return isAnnotationColorId(colorId) ? annotationColorMap[colorId].name : NO_COLOR_NAME;
+}
+
+/**
+ * Hexwert einer colorId. liefert null, wenn keine (gültige) Farbe gesetzt
+ * ist. Ungültige Werte werden niemals direkt als CSS verwendet.
+ */
+export function getColorHex(colorId: AnnotationColorId | null | undefined): string | null {
+  if (!colorId) return null;
+  return isAnnotationColorId(colorId) ? annotationColorMap[colorId].hex : null;
+}

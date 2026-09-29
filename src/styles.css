@@ -1,0 +1,643 @@
+/* ====================================================================
+   Bildschirm-Grunddarstellung
+   --------------------------------------------------------------------
+   Modern, sachlich, kompakt und tabellarisch. Die Druckdarstellung ist
+   vollständig unabhängig von diesen Regeln (siehe print/print.css).
+
+   Anzeige: Hell ist die Grunddarstellung. Dunkel greift ausschließlich
+   auf die Bildschirmansicht und niemals auf die Druckansicht zu.
+   ==================================================================== */
+
+:root {
+  --color-bg: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #fafbfc;
+  --color-border: #d5dae0;
+  --color-border-strong: #b3bac2;
+  --color-text: #1c2530;
+  --color-text-muted: #5c6672;
+  --color-accent: #1f4e79;
+  --color-accent-soft: #e8eef5;
+  --color-on-accent: #ffffff;
+  --color-weekend: #f5f6f8;
+  --color-sunday: #eef0f3;
+  --color-row-line: #eceff2;
+  /* Feiertagsmarkierung (rosa Kästchen "F!" in der KW-Spalte). */
+  --color-holiday-mark: #f6cedd;
+  --color-holiday-border: #d17d9c;
+  --color-holiday-text: #8a1f4a;
+  --radius: 4px;
+  font-family: 'Segoe UI', system-ui, Arial, Helvetica, sans-serif;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #0b0f14;
+  --color-surface: #151d26;
+  --color-surface-sunken: #10171f;
+  --color-border: #38485a;
+  --color-border-strong: #4f6377;
+  --color-text: #eef4fa;
+  --color-text-muted: #aebbc9;
+  --color-accent: #7cc0f0;
+  --color-accent-soft: #1d3346;
+  --color-on-accent: #06090d;
+  --color-weekend: #1c2733;
+  --color-sunday: #22303e;
+  --color-row-line: #2a3846;
+  --color-holiday-mark: #c2648a;
+  --color-holiday-border: #f0a8c4;
+  --color-holiday-text: #24070f;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app {
+  padding: 12px 16px 48px;
+}
+
+/* ----------------------------------------------------------- Toolbar */
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+  padding: 10px 14px;
+  margin: -12px -16px 14px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.toolbar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 22px;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field,
+.editor-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.editor-field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.field-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.field-hint,
+.field-counter {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.year-select,
+.text-input {
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+}
+
+.text-input {
+  width: 100%;
+}
+
+.icon-button,
+.shift-button,
+.primary-button,
+.secondary-button,
+.color-option,
+.theme-button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.icon-button {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.shift-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.shift-button {
+  min-width: 34px;
+  padding: 5px 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.shift-button.is-active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+/* ------------------------------------------------- Anzeige-Umschalter */
+
+.theme-toggle {
+  gap: 4px;
+}
+
+.theme-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.theme-button.is-active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 600;
+}
+
+.theme-symbol {
+  font-size: 14px;
+  line-height: 1;
+}
+
+@media (max-width: 720px) {
+  .theme-name {
+    display: none;
+  }
+}
+
+.primary-button {
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.secondary-button {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.icon-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.icon-button:focus-visible,
+.shift-button:focus-visible,
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.color-option:focus-visible,
+.theme-button:focus-visible,
+.day-row:focus-visible,
+.year-select:focus-visible,
+.text-input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------ Legende */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-item strong {
+  color: var(--color-text);
+}
+
+/* ------------------------------------- Feiertagsmarkierung ("F!") */
+
+/**
+ * Rosa Kästchen in der KW-Spalte. Farbe und Text stehen immer zusammen,
+ * damit die Information nicht ausschließlich über Farbe transportiert wird.
+ */
+.holiday-mark {
+  display: inline-block;
+  flex: 0 0 auto;
+  min-width: 13px;
+  padding: 0 1px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  color: var(--color-holiday-text);
+  background: var(--color-holiday-mark);
+  border: 1px solid var(--color-holiday-border);
+  border-radius: 2px;
+}
+
+/* ------------------------------------------------------- Jahresansicht */
+
+.year-calendar {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.month-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.month-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--color-accent-soft);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.month-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: center;
+}
+
+.month-stat {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.month-stat:last-child {
+  text-align: right;
+}
+
+.day-table {
+  display: flex;
+  flex-direction: column;
+}
+
+/**
+ * Spaltenraster: Wochentag | Datum | Termin/Beschriftung | KW | T/N.
+ * Fünf Spalten für fünf Zellen - die Information bekommt den gesamten Rest
+ * der Breite und wird nicht mehr abgeschnitten.
+ */
+.day-table-head {
+  display: grid;
+  grid-template-columns: 1.6em 1.9em minmax(0, 1fr) 3.2em 2.2em;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Kopfzeile darf nicht umbrechen: die Spaltenbreiten bestimmen den Text. */
+.day-table-head > span {
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.head-information {
+  padding-left: 4px;
+}
+
+.day-row {
+  display: grid;
+  grid-template-columns: 1.6em 1.9em minmax(0, 1fr) 3.2em 2.2em;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 8px;
+  font-size: 13px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-row-line);
+  border-radius: 0;
+  color: var(--color-text);
+}
+
+.day-row:last-child {
+  border-bottom: none;
+}
+
+.day-row:hover {
+  background: var(--color-accent-soft);
+}
+
+.day-row.is-weekend:not(.has-color) {
+  background: var(--color-weekend);
+}
+
+.day-row.is-sunday:not(.has-color) {
+  background: var(--color-sunday);
+}
+
+.day-row.is-weekend .cell-weekday,
+.day-row.is-sunday .cell-weekday {
+  font-weight: 700;
+}
+
+.cell {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cell-weekday,
+.cell-day {
+  font-variant-numeric: tabular-nums;
+}
+
+.cell-day {
+  font-weight: 600;
+}
+
+.cell-information {
+  padding-left: 4px;
+}
+
+/** ------------------------------------------------------- Feiertagsmarkierung */
+
+/**
+ * Informationstext eines Feiertags. Die Kopie des rosa Kästchenstils macht
+ * die Feiertagsmarkierung auch im Fließtext sofort erkennbar: "F!" steht
+ * einmal im Text und einmal als Kästchen in der KW-Spalte.
+ */
+.cell-information .holiday-mark {
+  margin-right: 4px;
+  vertical-align: 1px;
+}
+
+/**
+ * Der Informationstext eines Feiertags bleibt vollständig lesbar; die
+ * "F!"-Markierung sitzt zusätzlich in der KW-Spalte.
+ */
+.cell-information {
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.cell-kw {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.cell-shift {
+  font-weight: 700;
+  text-align: center;
+}
+
+.month-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+}
+
+
+/* -------------------------------------------------------- DayEditor */
+
+.editor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(18, 24, 33, 0.45);
+}
+
+.day-editor {
+  width: min(420px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 16px 18px 14px;
+  background: var(--color-surface);
+  border-radius: 6px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+}
+
+.day-editor-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.day-facts {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.day-fact {
+  display: flex;
+  gap: 6px;
+}
+
+.day-fact dt {
+  font-weight: 600;
+}
+
+.day-fact dd {
+  margin: 0;
+}
+
+/* -------------------------------------------------------- ColorPicker */
+
+.color-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 6px;
+}
+
+.color-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.color-option.is-selected {
+  border-color: var(--color-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  font-weight: 700;
+}
+
+.color-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 3px;
+  color: var(--color-text);
+}
+
+.color-swatch-none {
+  background: linear-gradient(
+    to top right,
+    var(--color-surface) 47%,
+    #c0392b 47%,
+    #c0392b 53%,
+    var(--color-surface) 53%
+  );
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* ------------------------------------------------- Responsive Raster */
+
+@media (max-width: 1100px) {
+  .year-calendar {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .year-calendar {
+    grid-template-columns: 1fr;
+  }
+
+  .app {
+    padding: 10px 10px 40px;
+  }
+
+  .toolbar {
+    margin: -10px -10px 12px;
+  }
+}
+
+/* ------------------------------------------------- Vorschau-Steuerung */
+
+.print-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.print-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}

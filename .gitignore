@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-ssr
+offline
+*.local
+.vite
+coverage
+*.log
+.DS_Store
+*.tsbuildinfo
+shot-*.png
