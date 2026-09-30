@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  HALF_PAID_HOLIDAY,
   buildYearCalendar,
   calculateMonthStatistics,
   findDay,
@@ -7,7 +8,7 @@ import {
   summarizeYear,
 } from '../engines/calendarBuilder';
 import { SHIFT_IDS } from '../config/shiftDefinitions';
-import { getDaysInYear, isValidDateKey } from '../utils/dateUtils';
+import { addDaysToKey, getDaysInYear, isValidDateKey } from '../utils/dateUtils';
 import type { CalendarDay, ShiftId } from '../domain/types';
 
 const year2021 = buildYearCalendar({ year: 2021, selectedShift: 'C' });
@@ -180,6 +181,144 @@ describe('Monats- und Jahreskennzahlen', () => {
 
   it('berechnet die Kennzahlen aus einer Tagesliste reproduzierbar', () => {
     const januaryDays = year2021.months[0].days;
-    expect(calculateMonthStatistics(januaryDays)).toEqual(year2021.months[0].statistics);
+    expect(calculateMonthStatistics(januaryDays).weekdayCount).toBe(
+      year2021.months[0].statistics.weekdayCount,
+    );
+  });
+});
+
+describe('Halbe Feiertage aus Nachtschichtüberhängen', () => {
+  it('rechnet eine Nachtschicht mit Feiertag am Folgetag als halben Feiertag', () => {
+    // Nachtschicht läuft von 18 bis 6 Uhr und reicht damit in den Folgetag.
+    // Schicht III im April 2021: Der 30.04. (Fr) ist Nachtschicht, der
+    // 01.05. (Sa) ist Maifeiertag und damit bezahlter Feiertag.
+    const calendar = buildYearCalendar({ year: 2021, selectedShift: 'III' });
+    const april = calendar.months[3];
+    expect(findDay(calendar, '2021-04-30')?.shiftState).toBe('NIGHT');
+    expect(april.statistics.paidNightShiftHolidayCount).toBe(1);
+    // Der Maifeiertag selbst ist ein Samstag und zählt nicht als
+    // Werktagsfeiertag; angerechnet wird ausschließlich der halbe Anteil.
+    expect(april.statistics.paidWeekdayHolidayCount).toBe(2);
+    expect(april.statistics.paidHolidayCount).toBe(2.5);
+  });
+
+  it('hält vollen Werktagsfeiertag und halben Nachtschichtanteil auseinander', () => {
+    // Schicht III im Juni 2021: Der 02.06. (Mi) ist Nachtschicht, der 03.06.
+    // (Do) ist Fronleichnam. Der Feiertag selbst ist ein Werktag (voller
+    // Feiertag) und wird zusätzlich zur Hälfte aus der Nachtschicht
+    // angerechnet: 1 + 0,5 = 1,5.
+    const june = buildYearCalendar({ year: 2021, selectedShift: 'III' }).months[5];
+    expect(june.statistics.paidWeekdayHolidayCount).toBe(1);
+    expect(june.statistics.paidNightShiftHolidayCount).toBe(1);
+    expect(june.statistics.paidHolidayCount).toBe(1.5);
+  });
+
+  it('zählt den halben Feiertag unabhängig vom Wochentag des Nachtschichttags', () => {
+    // Schicht II im Oktober 2021: Der 31.10. (So) ist Nachtschicht, der
+    // 01.11. (Mo) ist Allerheiligen. Der Nachtschichttag liegt auf einem
+    // Sonntag und der Feiertag selbst fällt auf einen Montag.
+    const october = buildYearCalendar({ year: 2021, selectedShift: 'II' }).months[9];
+    expect(october.statistics.paidWeekdayHolidayCount).toBe(0);
+    expect(october.statistics.paidNightShiftHolidayCount).toBe(1);
+    expect(october.statistics.paidHolidayCount).toBe(0.5);
+  });
+
+  it('zählt den halben Feiertag auch bei einem Wochenendfeiertag am Folgetag', () => {
+    // Schicht II im August 2021: Der 14.08. (Sa) ist Nachtschicht, der
+    // 15.08. (So, Mariä Himmelfahrt) ist bezahlter Feiertag. Der Feiertag
+    // selbst zählt nicht als Werktagsfeiertag, der halbe Anteil schon.
+    const august = buildYearCalendar({ year: 2021, selectedShift: 'II' }).months[7];
+    expect(august.statistics.paidWeekdayHolidayCount).toBe(0);
+    expect(august.statistics.paidNightShiftHolidayCount).toBe(1);
+    expect(august.statistics.paidHolidayCount).toBe(0.5);
+  });
+
+  it('zählt Feiertage am Folgetag über die Jahresgrenze hinweg', () => {
+    // Schicht C: Der 31.12.2021 (Fr) ist Nachtschicht, der 01.01.2022 ist
+    // Neujahr und liegt damit außerhalb des berechneten Jahres 2021. Der
+    // halbe Feiertag muss trotzdem im Dezember 2021 erscheinen.
+    const calendar = buildYearCalendar({ year: 2021, selectedShift: 'C' });
+    const december = calendar.months[11];
+    const lastDay = december.days[december.days.length - 1];
+    expect(lastDay.dateKey).toBe('2021-12-31');
+    expect(lastDay.shiftState).toBe('NIGHT');
+    expect(december.statistics.paidNightShiftHolidayCount).toBe(1);
+    // 25./26.12.2021 fallen auf Sa/So -> keine vollen Werktagsfeiertage.
+    expect(december.statistics.paidWeekdayHolidayCount).toBe(0);
+    expect(december.statistics.paidHolidayCount).toBe(0.5);
+  });
+
+  it('zählt keinen halben Feiertag bei unbezahlten Tagen am Folgetag', () => {
+    // Schicht C: Der 24.12. (Fr) ist Nachtschicht, der 25.12. ist der
+    // 1. Weihnachtstag und damit bezahlt (halber Feiertag). Silvester ist
+    // dagegen unbezahlt: Auf die Nachtschicht am 05.01. folgt Heilige Drei
+    // Könige, auf die Nachtschicht am 02.06. folgt Fronleichnam.
+    const calendar = buildYearCalendar({ year: 2021, selectedShift: 'C' });
+    const december = calendar.months[11];
+    const day = (dateKey: string) => december.days.find((entry) => entry.dateKey === dateKey);
+    expect(day('2021-12-30')?.shiftState).toBe('DAY');
+    expect(
+      day('2021-12-31')?.events.some((event) => event.countsAsPaidNormalShiftHoliday),
+    ).toBe(false);
+    // Nur der Überhang in das Neujahr 2022 zählt, sonst nichts im Dezember.
+    expect(december.statistics.paidNightShiftHolidayCount).toBe(1);
+    expect(december.statistics.paidWeekdayHolidayCount).toBe(0);
+    expect(december.statistics.paidHolidayCount).toBe(0.5);
+  });
+
+  it('erzeugt für jeden Nachtschichtüberhang höchstens einen halben Feiertag', () => {
+    for (const shiftId of SHIFT_IDS) {
+      const calendar = buildYearCalendar({ year: 2021, selectedShift: shiftId });
+      const allDays = flattenYearDays(calendar);
+      let expectedHalfHolidays = 0;
+      for (const day of allDays) {
+        if (day.shiftState !== 'NIGHT') continue;
+        const next = allDays.find((entry) => entry.dateKey === addDaysToKey(day.dateKey, 1));
+        if (next?.events.some((event) => event.countsAsPaidNormalShiftHoliday)) {
+          expectedHalfHolidays += 1;
+        }
+      }
+      // Der 31.12. verweist auf den 01.01. des Folgejahrs; dieser eine Fall
+      // wird separat ergänzt, weil der Folgetag nicht im Jahr liegt.
+      const lastDay = allDays[allDays.length - 1];
+      const newYear = buildYearCalendar({ year: 2022, selectedShift: shiftId }).months[0].days[0];
+      if (
+        lastDay.shiftState === 'NIGHT' &&
+        newYear.events.some((event) => event.countsAsPaidNormalShiftHoliday)
+      ) {
+        expectedHalfHolidays += 1;
+      }
+      expect({
+        shiftId,
+        half: summarizeYear(calendar).paidNightShiftHolidayCount,
+      }).toEqual({ shiftId, half: expectedHalfHolidays });
+    }
+  });
+
+  it('summiert die halben Feiertage getrennt und gesamt über das Jahr', () => {
+    const configured = summarizeYear(year2021);
+    expect(configured.paidNightShiftHolidayCount).toBe(
+      year2021.months.reduce(
+        (total, month) => total + month.statistics.paidNightShiftHolidayCount,
+        0,
+      ),
+    );
+    expect(configured.paidHolidayCount).toBe(
+      configured.paidWeekdayHolidayCount + HALF_PAID_HOLIDAY * configured.paidNightShiftHolidayCount,
+    );
+  });
+
+  it('hält paidHolidayCount je Monat konsistent zur Summe der Anteile', () => {
+    for (const month of year2021.months) {
+      expect(month.statistics.paidHolidayCount).toBe(
+        month.statistics.paidWeekdayHolidayCount +
+          HALF_PAID_HOLIDAY * month.statistics.paidNightShiftHolidayCount,
+      );
+    }
+  });
+
+  it('liefert ohne Feiertags-Lookup keinen halben Feiertag', () => {
+    const januaryDays = year2021.months[0].days;
+    expect(calculateMonthStatistics(januaryDays).paidNightShiftHolidayCount).toBe(0);
   });
 });

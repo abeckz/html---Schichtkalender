@@ -19,6 +19,7 @@ import { getShiftDefinition } from '../config/shiftDefinitions';
 import {
   MONTH_NAMES,
   MONTH_SHORT_NAMES,
+  addDaysToKey,
   assertValidYear,
   getIsoWeek,
   getIsoWeekday,
@@ -55,25 +56,53 @@ export function buildCalendarDay(
   };
 }
 
+/** Ein halber Feiertag aus einer Nachtschicht mit Feiertag am Folgetag. */
+export const HALF_PAID_HOLIDAY = 0.5;
+
 /**
  * Monatskennzahlen.
  *
  * weekdayCount: alle Tage Montag bis Freitag des Monats; gesetzliche
  * Feiertage werden nicht herausgerechnet, weil die Schicht unabhängig vom
  * Feiertag läuft und der Feiertag separat ausgewiesen wird.
+ *
+ * paidNightShiftHolidayCount: Die Nachtschicht läuft von 18 bis 6 Uhr und
+ * reicht damit in den Folgetag hinein. Liegt am Folgetag ein bezahlter
+ * Feiertag, wird die Nachtschicht zur Hälfte auf den Feiertag angerechnet
+ * (halber Feiertag). Dafür muss der Feiertag des Folgetags auch außerhalb
+ * des übergebenen Monats liegen können; deshalb wird über
+ * isPaidHolidayForDateKey nachgeschlagen und der Folgetag über den
+ * Kalendertagesschlüssel gebildet. So funktioniert die Regel auch über die
+ * Monats- und Jahresgrenze hinweg (z. B. 31.12. -> 01.01.).
  */
-export function calculateMonthStatistics(days: readonly CalendarDay[]): MonthStatistics {
+export function calculateMonthStatistics(
+  days: readonly CalendarDay[],
+  isPaidHolidayForDateKey: (dateKey: string) => boolean = () => false,
+): MonthStatistics {
   let weekdayCount = 0;
   let dayShiftCount = 0;
   let nightShiftCount = 0;
   let paidWeekdayHolidayCount = 0;
+  let paidNightShiftHolidayCount = 0;
 
   for (const day of days) {
     if (day.isoWeekday <= 5) weekdayCount += 1;
     if (day.shiftState === 'DAY') dayShiftCount += 1;
     if (day.shiftState === 'NIGHT') nightShiftCount += 1;
-    if (day.isoWeekday <= 5 && day.events.some((event) => event.countsAsPaidNormalShiftHoliday)) {
+
+    // Voller Werktagsfeiertag: der Feiertag liegt am Werktag selbst.
+    if (
+      day.isoWeekday <= 5 &&
+      day.events.some((event) => event.countsAsPaidNormalShiftHoliday)
+    ) {
       paidWeekdayHolidayCount += 1;
+    }
+
+    // Nachtschichtüberhang: Feiertag am Folgetag -> halber Feiertag.
+    // Die Prüfung ist unabhängig davon, ob der Nachtschichttag selbst ein
+    // Feiertag ist, und unabhängig vom Wochentag des Folgetags.
+    if (day.shiftState === 'NIGHT' && isPaidHolidayForDateKey(addDaysToKey(day.dateKey, 1))) {
+      paidNightShiftHolidayCount += 1;
     }
   }
 
@@ -83,15 +112,24 @@ export function calculateMonthStatistics(days: readonly CalendarDay[]): MonthSta
     nightShiftCount,
     requiredShiftCount: dayShiftCount + nightShiftCount,
     paidWeekdayHolidayCount,
+    paidNightShiftHolidayCount,
+    paidHolidayCount: paidWeekdayHolidayCount + HALF_PAID_HOLIDAY * paidNightShiftHolidayCount,
   };
 }
 
-/** Berechnet einen Monat des Jahres. */
+/**
+ * Berechnet einen Monat des Jahres.
+ *
+ * isPaidHolidayForDateKey liefert die bezahlten Feiertage für die
+ * Nachtschichtüberhänge und kann auf Tage außerhalb des Monats verweisen
+ * (Monats- bzw. Jahresgrenze). Ohne Angabe fällt kein halber Feiertag an.
+ */
 export function buildMonthCalendar(
   year: number,
   month: number,
   shiftId: ShiftId,
   eventsByDateKey: Map<string, CalendarEvent[]>,
+  isPaidHolidayForDateKey: (dateKey: string) => boolean = () => false,
 ): MonthCalendar {
   const days: CalendarDay[] = [];
   const dayCount = getDaysInMonth(year, month);
@@ -108,7 +146,7 @@ export function buildMonthCalendar(
     name: MONTH_NAMES[month - 1],
     shortName: MONTH_SHORT_NAMES[month - 1],
     days,
-    statistics: calculateMonthStatistics(days),
+    statistics: calculateMonthStatistics(days, isPaidHolidayForDateKey),
   };
 }
 
@@ -120,9 +158,31 @@ export function buildYearCalendar(configuration: CalendarConfiguration): YearCal
   getShiftDefinition(selectedShift);
 
   const eventsByDateKey = groupEventsByDateKey(generateCalendarEvents(year));
+
+  // Der Nachtschichtüberhang des 31.12. kann auf einen Feiertag des Folgejahrs
+  // (01.01. = Neujahr) verweisen. Dafür werden die Ereignisse des Folgejahrs
+  // zusätzlich indiziert, ohne in die Tageslisten des berechneten Jahres
+  // einzugehen.
+  const eventsOfNextYear = groupEventsByDateKey(generateCalendarEvents(year + 1));
+  const paidHolidayDateKeys = new Set<string>();
+  for (const [dateKey, events] of eventsByDateKey) {
+    if (events.some((event) => event.countsAsPaidNormalShiftHoliday)) {
+      paidHolidayDateKeys.add(dateKey);
+    }
+  }
+  for (const [dateKey, events] of eventsOfNextYear) {
+    if (events.some((event) => event.countsAsPaidNormalShiftHoliday)) {
+      paidHolidayDateKeys.add(dateKey);
+    }
+  }
+
   const months: MonthCalendar[] = [];
   for (let month = 1; month <= 12; month += 1) {
-    months.push(buildMonthCalendar(year, month, selectedShift, eventsByDateKey));
+    months.push(
+      buildMonthCalendar(year, month, selectedShift, eventsByDateKey, (dateKey) =>
+        paidHolidayDateKeys.has(dateKey),
+      ),
+    );
   }
 
   return { year, selectedShift, months };
@@ -148,6 +208,9 @@ export function summarizeYear(calendar: YearCalendar): MonthStatistics {
       requiredShiftCount: total.requiredShiftCount + month.statistics.requiredShiftCount,
       paidWeekdayHolidayCount:
         total.paidWeekdayHolidayCount + month.statistics.paidWeekdayHolidayCount,
+      paidNightShiftHolidayCount:
+        total.paidNightShiftHolidayCount + month.statistics.paidNightShiftHolidayCount,
+      paidHolidayCount: total.paidHolidayCount + month.statistics.paidHolidayCount,
     }),
     {
       weekdayCount: 0,
@@ -155,6 +218,8 @@ export function summarizeYear(calendar: YearCalendar): MonthStatistics {
       nightShiftCount: 0,
       requiredShiftCount: 0,
       paidWeekdayHolidayCount: 0,
+      paidNightShiftHolidayCount: 0,
+      paidHolidayCount: 0,
     },
   );
 }

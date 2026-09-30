@@ -101,8 +101,32 @@ export interface MonthStatistics {
   nightShiftCount: number;
   /** dayShiftCount + nightShiftCount */
   requiredShiftCount: number;
-  /** Ereignisse mit countsAsPaidNormalShiftHoliday === true. */
+  /**
+   * Ereignisse mit countsAsPaidNormalShiftHoliday === true an Werktagen
+   * (Montag bis Freitag). Samstags- und sonntagsfeiertage zählen nicht mit.
+   */
   paidWeekdayHolidayCount: number;
+  /**
+   * Anzahl halber Feiertage aus Nachtschichtüberhängen.
+   *
+   * Die Nachtschicht läuft von 18 bis 6 Uhr und reicht damit in den Folgetag
+   * hinein. Liegt am Folgetag ein bezahlter Feiertag
+   * (countsAsPaidNormalShiftHoliday === true), wird die Nachtschicht zur
+   * Hälfte auf den Feiertag angerechnet: je Nachtschicht mit Feiertag am
+   * Folgetag zählt ein halber Feiertag.
+   *
+   * Der Wert ist die Summe dieser halben Anteile (z. B. 2 bei vier
+   * betroffenen Nachtschichten) und damit immer ein Vielfaches von 0,5.
+   * Der Feiertag selbst wird zusätzlich über paidWeekdayHolidayCount
+   * erfasst, sofern er auf einen Werktag fällt; der Nachtschichttag kann
+   * unabhängig davon auf ein Wochenende fallen.
+   */
+  paidNightShiftHolidayCount: number;
+  /**
+   * Gesamte bezahlte Feiertage des Monats:
+   * paidWeekdayHolidayCount + 0,5 × paidNightShiftHolidayCount.
+   */
+  paidHolidayCount: number;
 }
 
 /** Ein berechneter Monat. */
