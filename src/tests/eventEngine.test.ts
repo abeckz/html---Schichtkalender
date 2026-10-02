@@ -108,6 +108,9 @@ describe('Bezahlte Feiertage', () => {
   const events = generateCalendarEvents(2021);
 
   it('markiert genau die bezahlten Feiertage', () => {
+    // Bezugsraum ist Rheinland-Pfalz: Nur die dort gesetzlichen Feiertage
+    // sind bezahlte Feiertage. Heilige Drei Könige und Mariä Himmelfahrt
+    // sind dort nicht gesetzlich und werden deshalb nicht gezählt.
     const paid = events
       .filter((event) => event.countsAsPaidNormalShiftHoliday)
       .map((event) => event.name)
@@ -119,10 +122,8 @@ describe('Bezahlte Feiertage', () => {
         'Allerheiligen',
         'Christi Himmelfahrt',
         'Fronleichnam',
-        'Heilige Drei Könige',
         'Karfreitag',
         'Maifeiertag',
-        'Mariä Himmelfahrt',
         'Neujahr',
         'Ostermontag',
         'Pfingstmontag',
@@ -131,8 +132,8 @@ describe('Bezahlte Feiertage', () => {
     );
   });
 
-  it('zählt im Jahr 2021 genau 13 bezahlte Feiertage', () => {
-    expect(events.filter((event) => event.countsAsPaidNormalShiftHoliday)).toHaveLength(13);
+  it('zählt im Jahr 2021 genau 11 bezahlte Feiertage', () => {
+    expect(events.filter((event) => event.countsAsPaidNormalShiftHoliday)).toHaveLength(11);
   });
 
   it('stuft Sommerzeit, Erntedank, Advent und Gedenktage als unbezahlt ein', () => {
@@ -277,12 +278,23 @@ describe('Gesetzliche Feiertage in Rheinland-Pfalz (Markierung "F!")', () => {
     }
   });
 
-  it('behält die bezahlten Feiertage laut Referenz unverändert', () => {
-    // Mariä Himmelfahrt bleibt bezahlter Werktagsfeiertag der Schichtplanung,
-    // in Rheinland-Pfalz aber kein gesetzlicher Feiertag. Beides ist bewusst
-    // getrennt: bezahlte Freistellung und "F!"-Markierung.
-    const assumption = events.find((event) => event.name === 'Mariä Himmelfahrt');
-    expect(assumption?.countsAsPaidNormalShiftHoliday).toBe(true);
-    expect(assumption?.isPublicHoliday).toBe(false);
+  it('führt nicht gesetzliche Feiertage nicht als bezahlte Feiertage', () => {
+    // Heilige Drei Könige und Mariä Himmelfahrt sind in Rheinland-Pfalz
+    // nicht gesetzlich. Sie bleiben als Termin sichtbar, sind aber keine
+    // bezahlten Feiertage der Schichtplanung.
+    for (const name of ['Heilige Drei Könige', 'Mariä Himmelfahrt']) {
+      const matching = events.filter((event) => event.name === name);
+      expect({ name, exists: matching.length > 0 }).toEqual({ name, exists: true });
+      for (const event of matching) {
+        expect({ name, paid: event.countsAsPaidNormalShiftHoliday }).toEqual({
+          name,
+          paid: false,
+        });
+        expect({ name, isPublicHoliday: event.isPublicHoliday }).toEqual({
+          name,
+          isPublicHoliday: false,
+        });
+      }
+    }
   });
 });

@@ -292,4 +292,22 @@ describe('PrintCalendar', () => {
       expect(header.textContent).toBe('BASF Schichtkalender');
     });
   });
+
+  it('führt am Ende der Monatsspalte keine Feiertagskennzahlen mehr auf', () => {
+    // Anforderung: Die Anzeige der bezahlten Feiertage (volle, halbe aus der
+    // Nachtschicht und Gesamtsumme) ist am Spaltenende entfernt. Die
+    // Berechnung bleibt im Modell erhalten (siehe calendarBuilder.test.ts).
+    const container = render(
+      <PrintCalendar
+        calendar={calendar}
+        annotations={annotations}
+        onPrint={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    expect(container.querySelectorAll('.print-month-footer').length).toBe(0);
+    expect(container.textContent).not.toContain('FT mit Schicht');
+    expect(container.textContent).not.toContain('halbe FT (Nacht)');
+    expect(container.textContent).not.toContain('bezahlt gesamt');
+  });
 });

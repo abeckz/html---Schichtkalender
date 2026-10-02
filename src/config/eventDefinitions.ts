@@ -31,18 +31,20 @@ export interface FixedEventDefinition {
  *
  * Nicht gesetzlich in Rheinland-Pfalz und damit ohne "F!"-Markierung:
  * Heilige Drei Könige (nur Baden-Württemberg, Bayern, Sachsen-Anhalt) und
- * Mariä Himmelfahrt (nur Saarland und Bayern). Beide bleiben in der
- * Schichtplanung bezahlte Werktagsfeiertage (countsAsPaidNormalShiftHoliday);
- * bezahlte Freistellung und "F!"-Markierung sind bewusst getrennte Angaben.
+ * Mariä Himmelfahrt (nur Saarland und Bayern). Beide sind deshalb auch keine
+ * bezahlten Feiertage (countsAsPaidNormalShiftHoliday: false) und werden in
+ * den Monatskennzahlen nicht als Feiertag mit Schicht gezählt. Die Anzeige
+ * der Namen bleibt erhalten, damit Termin und Schicht weiterhin gemeinsam
+ * sichtbar sind.
  * Der Reformationstag ist in Rheinland-Pfalz kein gesetzlicher Feiertag.
  * Brauchtumstage (Heiligabend, Silvester, Fastnacht ...) werden ebenfalls
  * normal (ohne "F!") angezeigt.
  */
 export const fixedEvents: readonly FixedEventDefinition[] = [
   { id: 'new-year', name: 'Neujahr', month: 1, day: 1, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },
-  { id: 'epiphany', name: 'Heilige Drei Könige', month: 1, day: 6, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: false, priority: 20 },
+  { id: 'epiphany', name: 'Heilige Drei Könige', month: 1, day: 6, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 20 },
   { id: 'labour-day', name: 'Maifeiertag', month: 5, day: 1, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },
-  { id: 'assumption', name: 'Mariä Himmelfahrt', month: 8, day: 15, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: false, priority: 20 },
+  { id: 'assumption', name: 'Mariä Himmelfahrt', month: 8, day: 15, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 20 },
   { id: 'german-unity', name: 'Tag der Deutschen Einheit', month: 10, day: 3, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },
   { id: 'reformation', name: 'Reformationstag', month: 10, day: 31, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 20 },
   { id: 'all-saints', name: 'Allerheiligen', month: 11, day: 1, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },

@@ -66,6 +66,11 @@ export const HALF_PAID_HOLIDAY = 0.5;
  * Feiertage werden nicht herausgerechnet, weil die Schicht unabhängig vom
  * Feiertag läuft und der Feiertag separat ausgewiesen wird.
  *
+ * paidWeekdayHolidayCount: Ein bezahlter Feiertag zählt nur, wenn an diesem
+ * Tag tatsächlich gearbeitet wird ("T" oder "N" der gewählten Schicht).
+ * Ein Feiertag an einem schichtfreien Tag (OFF, z. B. an einem Sonntag oder
+ * an einem freien Werktag des Zyklus) wird nicht gezählt.
+ *
  * paidNightShiftHolidayCount: Die Nachtschicht läuft von 18 bis 6 Uhr und
  * reicht damit in den Folgetag hinein. Liegt am Folgetag ein bezahlter
  * Feiertag, wird die Nachtschicht zur Hälfte auf den Feiertag angerechnet
@@ -90,9 +95,11 @@ export function calculateMonthStatistics(
     if (day.shiftState === 'DAY') dayShiftCount += 1;
     if (day.shiftState === 'NIGHT') nightShiftCount += 1;
 
-    // Voller Werktagsfeiertag: der Feiertag liegt am Werktag selbst.
+    // Voller Feiertag: der Feiertag liegt am Tag selbst und wird an diesem
+    // Tag auch gearbeitet. Ein freier Tag (OFF) begründet keinen Anspruch,
+    // unabhängig davon, ob es ein Werktag, Samstag oder Sonntag ist.
     if (
-      day.isoWeekday <= 5 &&
+      day.shiftState !== 'OFF' &&
       day.events.some((event) => event.countsAsPaidNormalShiftHoliday)
     ) {
       paidWeekdayHolidayCount += 1;

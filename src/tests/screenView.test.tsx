@@ -214,6 +214,96 @@ describe('Bildschirmdarstellung', () => {
     }
   });
 
+  it('weist in der Fußzeile ausschließlich die Schichtzahlen aus', () => {
+    // Anforderung: Die Anzeige der bezahlten Feiertage ist aus der Fußzeile
+    // entfernt. Sichtbar bleiben nur die Schichtzahlen (T und N); die
+    // Berechnung der vollen und halben Feiertage bleibt im Modell erhalten
+    // (siehe calendarBuilder.test.ts) und wird hier nicht mehr dargestellt.
+    const container = render(<App />);
+    const footers = Array.from(container.querySelectorAll('.month-footer'));
+    expect(footers.length).toBe(12);
+
+    for (const footer of footers) {
+      const text = footer.textContent ?? '';
+      expect(text).toMatch(/\d+ × T/);
+      expect(text).toMatch(/\d+ × N/);
+      expect(text).not.toContain('Feiertage mit Schicht');
+      expect(text).not.toContain('halbe Feiertage');
+      expect(text).not.toContain('bezahlt gesamt');
+      expect(text).not.toContain('Nachtschicht');
+    }
+  });
+
+  it('zeigt die bezahlten Feiertage nicht mehr in der Monatskarte an', () => {
+    // Schicht C im Dezember 2021: Der 31.12. (N) reicht in das Neujahr 2022
+    // hinein und erzeugt einen halben Feiertag. Die Berechnung bleibt
+    // bestehen, die Fußzeile nennt den Wert jedoch nicht mehr.
+    window.localStorage.setItem(
+      'schichtkalender.state',
+      JSON.stringify({
+        version: 1,
+        settings: { selectedYear: 2021, selectedShift: 'C' },
+        annotations: {},
+      }),
+    );
+
+    try {
+      const container = render(<App />);
+      const card = (name: string) =>
+        Array.from(container.querySelectorAll('.month-card')).find(
+          (candidate) => candidate.getAttribute('aria-label') === name,
+        );
+
+      const december = card('Dezember 2021');
+      expect(december).toBeDefined();
+      const footer = december!.querySelector('.month-footer')?.textContent ?? '';
+      expect(footer).not.toContain('halbe Feiertage');
+      expect(footer).not.toContain('bezahlt gesamt');
+      expect(footer).not.toContain('Feiertage mit Schicht');
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('führt einen Feiertag ohne Schicht nicht als vollen Feiertag auf', () => {
+    // Schicht C im Januar 2021: Der 06.01. (Mi) ist eine Tagschicht und
+    // damit der eine Feiertag mit Schicht. Heilige Drei Könige ist in
+    // Rheinland-Pfalz jedoch nicht bezahlt und zählt nicht mit. Geprüft
+    // wird das an der Kennzahl im Modell, da die Fußzeile die bezahlten
+    // Feiertage nicht mehr anzeigt.
+    window.localStorage.setItem(
+      'schichtkalender.state',
+      JSON.stringify({
+        version: 1,
+        settings: { selectedYear: 2021, selectedShift: 'C' },
+        annotations: {},
+      }),
+    );
+
+    try {
+      const container = render(<App />);
+      const card = (name: string) =>
+        Array.from(container.querySelectorAll('.month-card')).find(
+          (candidate) => candidate.getAttribute('aria-label') === name,
+        );
+
+      const january = card('Januar 2021');
+      expect(january).toBeDefined();
+      expect(january!.querySelector('.month-footer')?.textContent).not.toContain(
+        'Feiertage mit Schicht',
+      );
+
+      // Schicht C: Der 01.01.2021 (Fr) ist eine Nachtschicht und fällt
+      // damit selbst unter die Regel.
+      const newYearRow = Array.from(january!.querySelectorAll('.day-row')).find((row) =>
+        (row.getAttribute('aria-label') ?? '').includes('Neujahr'),
+      );
+      expect(newYearRow?.querySelector('.cell-shift')?.textContent).toBe('N');
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
   it('schaltet die Anzeige zwischen Hell und Dunkel um', () => {
     const container = render(<App />);
     const buttons = Array.from(container.querySelectorAll('.theme-button'));

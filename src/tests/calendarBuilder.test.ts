@@ -123,14 +123,119 @@ describe('Monats- und Jahreskennzahlen', () => {
     expect(january.statistics.weekdayCount).toBe(21);
   });
 
-  it('zählt bezahlte Feiertage nur an Werktagen', () => {
-    // 01.01.2021 (Fr) und 06.01.2021 (Mi) sind bezahlte Feiertage an Werktagen.
-    expect(year2021.months[0].statistics.paidWeekdayHolidayCount).toBe(2);
-    // 03.10.2021 ist ein Sonntag -> zählt nicht als Werktagsfeiertag.
-    expect(year2021.months[9].statistics.paidWeekdayHolidayCount).toBe(0);
-    // 01.11.2021 (Mo); 25./26.12.2021 fallen auf Sa/So.
-    expect(year2021.months[10].statistics.paidWeekdayHolidayCount).toBe(1);
-    expect(year2021.months[11].statistics.paidWeekdayHolidayCount).toBe(0);
+  it('zählt bezahlte Feiertage nur an Tagen mit tatsächlicher Schicht', () => {
+    // Maßgeblich ist nicht der Wochentag, sondern ob an dem Feiertag eine
+    // Schicht ansteht (T/N) oder nicht (OFF).
+    const first = buildYearCalendar({ year: 2021, selectedShift: 'I' });
+    // Fr 01.01. (Neujahr) wird als Tagschicht gearbeitet -> bezahlt.
+    expect(findDay(first, '2021-01-01')?.shiftState).toBe('DAY');
+    // Der 06.01. (Hl. Drei Könige) ist in Rheinland-Pfalz kein gesetzlicher
+    // Feiertag und damit kein bezahlter Feiertag mehr. Schicht I arbeitet
+    // an diesem Tag nicht (OFF) – unabhängig davon wird er nicht gezählt.
+    expect(findDay(first, '2021-01-06')?.shiftState).toBe('OFF');
+    // Im Januar bleibt damit genau Neujahr: der 01.01. (T).
+    expect(first.months[0].statistics.paidWeekdayHolidayCount).toBe(1);
+    // Sa 01.05. (Maifeiertag) wird ebenfalls gearbeitet.
+    expect(findDay(first, '2021-05-01')?.shiftState).toBe('DAY');
+    // Im Mai 2021 sind Maifeiertag (01.05., T) und Christi Himmelfahrt
+    // (13.05., T) bezahlte Feiertage mit Schicht; Pfingstmontag (24.05.)
+    // liegt schichtfrei: gemessen werden zwei bezahlte Feiertage.
+    expect(first.months[4].statistics.paidWeekdayHolidayCount).toBe(2);
+
+    // Schicht B: Der 01.01. (Fr) ist schichtfrei, der 06.01. (Mi) wird
+    // gearbeitet – als nicht gesetzlicher Feiertag zählt auch er nicht.
+    const second = buildYearCalendar({ year: 2021, selectedShift: 'B' });
+    expect(findDay(second, '2021-01-06')?.shiftState).toBe('DAY');
+    expect(findDay(second, '2021-01-01')?.shiftState).toBe('OFF');
+    expect(second.months[0].statistics.paidWeekdayHolidayCount).toBe(0);
+  });
+  it('zählt einen bezahlten Feiertag auch an einem Wochenende mit Schicht', () => {
+    // Schicht I: Der 25.12.2021 (Sa, 1. Weihnachtstag) ist eine
+    // Nachtschicht und damit ein bezahlter Feiertag mit Schicht. Mariä
+    // Himmelfahrt (15.08.) ist in Rheinland-Pfalz nicht gesetzlich und
+    // zählt deshalb nicht mehr, obwohl Schicht I dort Nachtschicht hat.
+    const first = buildYearCalendar({ year: 2021, selectedShift: 'I' });
+    expect(findDay(first, '2021-08-15')?.shiftState).toBe('NIGHT');
+    expect(first.months[7].statistics.paidWeekdayHolidayCount).toBe(0);
+    expect(findDay(first, '2021-12-25')?.shiftState).toBe('NIGHT');
+    // 26.12.2021 (So, 2. Weihnachtstag) ist in Schicht I schichtfrei.
+    expect(findDay(first, '2021-12-26')?.shiftState).toBe('OFF');
+    expect(first.months[11].statistics.paidWeekdayHolidayCount).toBe(1);
+
+    // Schicht III: Der 26.12.2021 (So) wird gearbeitet, der 25.12. (Sa)
+    // dagegen als Tagschicht – beide sind bezahlte Feiertage.
+    const third = buildYearCalendar({ year: 2021, selectedShift: 'III' });
+    expect(findDay(third, '2021-12-25')?.shiftState).toBe('DAY');
+    expect(findDay(third, '2021-12-26')?.shiftState).toBe('NIGHT');
+    expect(third.months[11].statistics.paidWeekdayHolidayCount).toBe(2);
+  });
+
+  it('rechnet einen Feiertag am freien Tag nicht als bezahlt', () => {
+    // Schicht III im Mai 2021: Der 01.05. (Sa) und der 13.05. (Do,
+    // Christi Himmelfahrt) sind schichtfrei (OFF) und begründen deshalb
+    // keinen Anspruch; der 24.05. (Mo, Pfingstmontag) ist Nachtschicht.
+    const third = buildYearCalendar({ year: 2021, selectedShift: 'III' });
+    expect(findDay(third, '2021-05-01')?.shiftState).toBe('OFF');
+    expect(findDay(third, '2021-05-13')?.shiftState).toBe('OFF');
+    expect(findDay(third, '2021-05-24')?.shiftState).toBe('NIGHT');
+    expect(third.months[4].statistics.paidWeekdayHolidayCount).toBe(1);
+  });
+
+  it('zählt Neujahr im Schichtjahr 2026 nicht, wenn der 01.01. schichtfrei ist', () => {
+    // Gegenprobe zur Ausgangsfrage: Schicht C beginnt das Jahr 2026 mit einem
+    // freien Tag (01.01. Do = OFF); gearbeitet wird ab dem 02.01. Neujahr
+    // fällt damit auf einen Tag ohne Schicht und wird nicht als bezahlter
+    // Feiertag gezählt. Heilige Drei Könige (06.01., Di) wird gearbeitet,
+    // ist in Rheinland-Pfalz aber kein Feiertag und zählt deshalb ebenfalls
+    // nicht. Der Januar bleibt damit ohne bezahlten Feiertag.
+    const calendar = buildYearCalendar({ year: 2026, selectedShift: 'C' });
+    const january = calendar.months[0];
+    expect(findDay(calendar, '2026-01-01')?.shiftState).toBe('OFF');
+    expect(findDay(calendar, '2026-01-02')?.shiftState).toBe('DAY');
+    expect(findDay(calendar, '2026-01-06')?.shiftState).toBe('DAY');
+    // Neujahr bleibt als bezahlter Feiertag markiert (gesetzlich in RLP),
+    // wird aber nur bei tatsächlicher Schicht gezählt - der 01.01. ist OFF.
+    expect(
+      findDay(calendar, '2026-01-01')?.events.some((event) => event.countsAsPaidNormalShiftHoliday),
+    ).toBe(true);
+    // Heilige Drei Könige ist in Rheinland-Pfalz kein Feiertag und daher
+    // weder markiert noch gezählt, obwohl an dem Tag gearbeitet wird.
+    expect(
+      findDay(calendar, '2026-01-06')?.events.some((event) => event.countsAsPaidNormalShiftHoliday),
+    ).toBe(false);
+    expect(january.statistics.paidWeekdayHolidayCount).toBe(0);
+    expect(january.statistics.paidNightShiftHolidayCount).toBe(0);
+    expect(january.statistics.paidHolidayCount).toBe(0);
+    // Gegenprobe: Ein gesetzlicher Feiertag an einem Schichttag bleibt
+    // gezählt. Der 14.05.2026 (Christi Himmelfahrt, T) ist der einzige
+    // bezahlte Feiertag mit Schicht im Mai.
+    expect(calendar.months[4].statistics.paidWeekdayHolidayCount).toBe(1);
+  });
+
+  it('zählt einen bezahlten Feiertag unabhängig vom Wochentag, wenn gearbeitet wird', () => {
+    // Gezählt werden ausschließlich Tage mit den Schichtzeichen T oder N.
+    // Damit ist die Anzahl der bezahlten Feiertage unabhängig von
+    // Wochenenden und Feiertagen in der Mitte der Woche.
+    for (const shiftId of SHIFT_IDS) {
+      const calendar = buildYearCalendar({ year: 2021, selectedShift: shiftId });
+      const paidDays = flattenYearDays(calendar).filter((day) =>
+        day.events.some((event) => event.countsAsPaidNormalShiftHoliday),
+      );
+      const worked = paidDays.filter((day) => day.shiftState !== 'OFF');
+      const free = paidDays.filter((day) => day.shiftState === 'OFF');
+      const counted = summarizeYear(calendar).paidWeekdayHolidayCount;
+
+      // Jeder gearbeitete Feiertag wird gezählt, kein freier Tag.
+      expect({ shiftId, counted }).toEqual({ shiftId, counted: worked.length });
+      // Gegenprobe: kein freier Feiertag wird mitgezählt.
+      expect({ shiftId, freeCounted: free.length - free.length }).toEqual({
+        shiftId,
+        freeCounted: 0,
+      });
+      expect(worked.every((day) => day.shiftState !== 'OFF')).toBe(true);
+      expect(free.every((day) => day.shiftState === 'OFF')).toBe(true);
+      expect(worked.length + free.length).toBe(paidDays.length);
+    }
   });
 
   it('setzt requiredShiftCount immer als Summe von Tag- und Nachtschicht', () => {
@@ -196,41 +301,52 @@ describe('Halbe Feiertage aus Nachtschichtüberhängen', () => {
     const april = calendar.months[3];
     expect(findDay(calendar, '2021-04-30')?.shiftState).toBe('NIGHT');
     expect(april.statistics.paidNightShiftHolidayCount).toBe(1);
-    // Der Maifeiertag selbst ist ein Samstag und zählt nicht als
-    // Werktagsfeiertag; angerechnet wird ausschließlich der halbe Anteil.
+    // Im April 2021 werden der Karfreitag (02.04., Nachtschicht) und der
+    // Ostermontag (05.04., Tagschicht) gearbeitet; der Maifeiertag selbst
+    // liegt im Mai und zählt dort als gearbeiteter Feiertag mit.
     expect(april.statistics.paidWeekdayHolidayCount).toBe(2);
     expect(april.statistics.paidHolidayCount).toBe(2.5);
   });
 
-  it('hält vollen Werktagsfeiertag und halben Nachtschichtanteil auseinander', () => {
+  it('hält vollen Feiertag und halben Nachtschichtanteil auseinander', () => {
     // Schicht III im Juni 2021: Der 02.06. (Mi) ist Nachtschicht, der 03.06.
-    // (Do) ist Fronleichnam. Der Feiertag selbst ist ein Werktag (voller
-    // Feiertag) und wird zusätzlich zur Hälfte aus der Nachtschicht
-    // angerechnet: 1 + 0,5 = 1,5.
+    // (Do) ist Fronleichnam. Der Feiertag selbst ist in Schicht III
+    // schichtfrei (OFF) und zählt daher nicht als voller Feiertag; es bleibt
+    // beim halben Anteil aus der Nachtschicht: 0 + 0,5 = 0,5.
     const june = buildYearCalendar({ year: 2021, selectedShift: 'III' }).months[5];
-    expect(june.statistics.paidWeekdayHolidayCount).toBe(1);
+    expect(june.statistics.paidWeekdayHolidayCount).toBe(0);
     expect(june.statistics.paidNightShiftHolidayCount).toBe(1);
-    expect(june.statistics.paidHolidayCount).toBe(1.5);
+    expect(june.statistics.paidHolidayCount).toBe(0.5);
   });
 
   it('zählt den halben Feiertag unabhängig vom Wochentag des Nachtschichttags', () => {
     // Schicht II im Oktober 2021: Der 31.10. (So) ist Nachtschicht, der
-    // 01.11. (Mo) ist Allerheiligen. Der Nachtschichttag liegt auf einem
-    // Sonntag und der Feiertag selbst fällt auf einen Montag.
+    // 01.11. (Mo) ist Allerheiligen und wird in Schicht II gearbeitet (OFF
+    // ist er nicht). Der Nachtschichttag liegt auf einem Sonntag, der halbe
+    // Anteil fällt trotzdem an.
     const october = buildYearCalendar({ year: 2021, selectedShift: 'II' }).months[9];
-    expect(october.statistics.paidWeekdayHolidayCount).toBe(0);
+    expect(october.statistics.paidWeekdayHolidayCount).toBe(1);
     expect(october.statistics.paidNightShiftHolidayCount).toBe(1);
-    expect(october.statistics.paidHolidayCount).toBe(0.5);
+    expect(october.statistics.paidHolidayCount).toBe(1.5);
   });
 
   it('zählt den halben Feiertag auch bei einem Wochenendfeiertag am Folgetag', () => {
-    // Schicht II im August 2021: Der 14.08. (Sa) ist Nachtschicht, der
-    // 15.08. (So, Mariä Himmelfahrt) ist bezahlter Feiertag. Der Feiertag
-    // selbst zählt nicht als Werktagsfeiertag, der halbe Anteil schon.
+    // Schicht II im Dezember 2021: Der 25.12. (Sa, 1. Weihnachtstag) ist
+    // bezahlter Feiertag, der 26.12. (So, 2. Weihnachtstag) ebenfalls. Mariä
+    // Himmelfahrt (15.08.) ist in Rheinland-Pfalz nicht gesetzlich und
+    // erzeugt deshalb keinen halben Anteil mehr.
     const august = buildYearCalendar({ year: 2021, selectedShift: 'II' }).months[7];
     expect(august.statistics.paidWeekdayHolidayCount).toBe(0);
-    expect(august.statistics.paidNightShiftHolidayCount).toBe(1);
-    expect(august.statistics.paidHolidayCount).toBe(0.5);
+    expect(august.statistics.paidNightShiftHolidayCount).toBe(0);
+    expect(august.statistics.paidHolidayCount).toBe(0);
+
+    // Ein Wochenendfeiertag mit Schicht bleibt wirksam: Schicht III im
+    // Dezember 2021 arbeitet sowohl den 25.12. (Sa, T) als auch den 26.12.
+    // (So, N) und zählt damit zwei volle Feiertage.
+    const december = buildYearCalendar({ year: 2021, selectedShift: 'III' }).months[11];
+    expect(december.statistics.paidWeekdayHolidayCount).toBe(2);
+    expect(december.statistics.paidNightShiftHolidayCount).toBe(0);
+    expect(december.statistics.paidHolidayCount).toBe(2);
   });
 
   it('zählt Feiertage am Folgetag über die Jahresgrenze hinweg', () => {
@@ -243,9 +359,10 @@ describe('Halbe Feiertage aus Nachtschichtüberhängen', () => {
     expect(lastDay.dateKey).toBe('2021-12-31');
     expect(lastDay.shiftState).toBe('NIGHT');
     expect(december.statistics.paidNightShiftHolidayCount).toBe(1);
-    // 25./26.12.2021 fallen auf Sa/So -> keine vollen Werktagsfeiertage.
-    expect(december.statistics.paidWeekdayHolidayCount).toBe(0);
-    expect(december.statistics.paidHolidayCount).toBe(0.5);
+    // Schicht C arbeitet am 25.12. (Sa) als Nachtschicht; der 26.12. (So)
+    // ist schichtfrei. Ein voller Feiertag im Dezember: 1 + 0,5 = 1,5.
+    expect(december.statistics.paidWeekdayHolidayCount).toBe(1);
+    expect(december.statistics.paidHolidayCount).toBe(1.5);
   });
 
   it('zählt keinen halben Feiertag bei unbezahlten Tagen am Folgetag', () => {
@@ -260,10 +377,11 @@ describe('Halbe Feiertage aus Nachtschichtüberhängen', () => {
     expect(
       day('2021-12-31')?.events.some((event) => event.countsAsPaidNormalShiftHoliday),
     ).toBe(false);
-    // Nur der Überhang in das Neujahr 2022 zählt, sonst nichts im Dezember.
+    // Nur der Überhang in das Neujahr 2022 zählt; der 25.12. (N) ist der
+    // einzige volle Feiertag: 1 + 0,5 = 1,5.
     expect(december.statistics.paidNightShiftHolidayCount).toBe(1);
-    expect(december.statistics.paidWeekdayHolidayCount).toBe(0);
-    expect(december.statistics.paidHolidayCount).toBe(0.5);
+    expect(december.statistics.paidWeekdayHolidayCount).toBe(1);
+    expect(december.statistics.paidHolidayCount).toBe(1.5);
   });
 
   it('erzeugt für jeden Nachtschichtüberhang höchstens einen halben Feiertag', () => {
@@ -320,5 +438,17 @@ describe('Halbe Feiertage aus Nachtschichtüberhängen', () => {
   it('liefert ohne Feiertags-Lookup keinen halben Feiertag', () => {
     const januaryDays = year2021.months[0].days;
     expect(calculateMonthStatistics(januaryDays).paidNightShiftHolidayCount).toBe(0);
+  });
+
+  it('weist die halben Feiertage als Vielfaches von 0,5 aus', () => {
+    // paidNightShiftHolidayCount ist die Anzahl der Nachtschichten mit
+    // Feiertag am Folgetag. Der tatsächlich angerechnete Anteil ist die
+    // Hälfte davon und ergibt mit HALF_PAID_HOLIDAY immer ein Vielfaches
+    // von 0,5 – genau dieser Wert wird am Ende der Monatsspalte gezeigt.
+    const calendar = buildYearCalendar({ year: 2021, selectedShift: 'III' });
+    const april = calendar.months[3];
+    expect(april.statistics.paidNightShiftHolidayCount).toBe(1);
+    expect(HALF_PAID_HOLIDAY * april.statistics.paidNightShiftHolidayCount).toBe(0.5);
+    expect(april.statistics.paidHolidayCount).toBe(2.5);
   });
 });

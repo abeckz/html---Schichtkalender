@@ -51,7 +51,7 @@ export interface CalendarEvent {
    *
    * Diese Kennzeichnung steuert ausschließlich die Anzeige des rosa
    * "F!"-Rechtecks in der KW-Spalte. Sie ist bewusst unabhängig von
-   * countsAsPaidNormalShiftHoliday, weil die Kennzahl die Werktagsfeiertage
+   * countsAsPaidNormalShiftHoliday, weil die Kennzahl die bezahlten Feiertage
    * nach der bestehenden Referenz zählt (dort sind auch regionale/hohe
    * Feiertage wie Mariä Himmelfahrt und Allerheiligen enthalten).
    */
@@ -102,8 +102,13 @@ export interface MonthStatistics {
   /** dayShiftCount + nightShiftCount */
   requiredShiftCount: number;
   /**
-   * Ereignisse mit countsAsPaidNormalShiftHoliday === true an Werktagen
-   * (Montag bis Freitag). Samstags- und sonntagsfeiertage zählen nicht mit.
+   * Ereignisse mit countsAsPaidNormalShiftHoliday === true, die an diesem
+   * Tag auch gearbeitet werden (die Schicht zeigt "T" oder "N").
+   *
+   * Ein bezahlter Feiertag begründet nur dann einen Anspruch, wenn an ihm
+   * tatsächlich gearbeitet wird. Freie Tage des Zyklus (OFF) zählen nicht
+   * mit, auch dann nicht, wenn sie auf einen Werktag fallen. Umgekehrt
+   * zählt ein gearbeiteter Samstag, Sonntag oder Feiertag mit.
    */
   paidWeekdayHolidayCount: number;
   /**
