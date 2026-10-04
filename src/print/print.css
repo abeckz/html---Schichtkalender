@@ -194,21 +194,39 @@
  * Tageszeile wiederholt werden und über den gesamten Monat als eine einzige
  * Linie erscheinen:
  * - ein Strich zwischen Wochentag und Tagesnummer,
+ * - ein Strich rechts neben der Tagesnummer,
  * - ein Strich links von der Schichtspalte T/N.
  * Die KW-/F!-Spalte bleibt bewusst strichfrei.
+ *
+ * Damit die Linie wirklich durchgehend wirkt (und nicht nur so hoch wie der
+ * Text), streckt sich die Zelle über die volle Zeilenhöhe (`align-self:
+ * stretch`) und zentriert ihren Inhalt selbst. Die Zeile selbst bleibt bei
+ * `align-items: center`, alle strichfreien Spalten bleiben also wie bisher.
  */
 .print-row > .print-col-wo {
-  padding-left: 0.15mm;
-  padding-right: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.15mm;
   border-right: 0.25pt solid #c8ccd1;
 }
 
 .print-row > .print-col-datum {
-  padding-left: 0.2mm;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.2mm;
+  border-right: 0.25pt solid #c8ccd1;
 }
 
 /* Ein einziger durchgehender Strich links von T/N - rechts ohne Linie. */
 .print-row > .print-col-schicht {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-left: 0.25pt solid #c8ccd1;
 }
 
@@ -246,6 +264,11 @@
  * von der logischen Zeilenzahl ab (siehe `utils/textFit.ts`): eine Zeile
  * groß, zwei Zeilen mittel, drei Zeilen klein. Termin- und Feiertagsnamen
  * (ohne Beschriftung) bleiben einzeilig in der Standardgröße.
+ *
+ * `white-space: pre-line` sorgt dafür, dass die im Eingabefeld gesetzten
+ * harten Zeilenumbrüche (`\n`) auch im Druck als Zeilenumbrüche erscheinen.
+ * Mit `normal` würden sie zu Leerzeichen zusammengezogen und die drei
+ * eingegebenen Zeilen erschienen innerhalb der Zelle nebeneinander.
  */
 .print-row > .print-col-info.label-lines-1,
 .print-row > .print-col-info.label-lines-2,
@@ -254,8 +277,9 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   line-clamp: 3;
-  white-space: normal;
+  white-space: pre-line;
   overflow: hidden;
+  overflow-wrap: anywhere;
   text-overflow: clip;
 }
 

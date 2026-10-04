@@ -407,7 +407,7 @@ body {
  */
 .day-row {
   display: grid;
-  grid-template-columns: 1.4em 1.6em minmax(0, 1fr) 3.2em 2.2em;
+  grid-template-columns: 2.4em 2.4em minmax(0, 1fr) 3.2em 2.2em;
   align-items: center;
   gap: 0;
   width: 100%;
@@ -475,21 +475,38 @@ body {
  * Tageszeile wiederholt werden und über den gesamten Monat als eine einzige
  * Linie erscheinen:
  * - ein Strich zwischen Wochentag und Tagesnummer,
+ * - ein Strich rechts neben der Tagesnummer,
  * - ein Strich links von der Schichtspalte T/N.
  * Die KW-/F!-Spalte bleibt bewusst strichfrei.
+ *
+ * Damit die Linie wirklich durchgehend wirkt (und nicht nur so hoch wie der
+ * Text), streckt sich die Zelle über die volle Zeilenhöhe (`align-self:
+ * stretch`) und zentriert ihren Inhalt selbst. Die Zeile selbst bleibt bei
+ * `align-items: center`, alle strichfreien Spalten bleiben also wie bisher.
  */
 .cell-weekday {
-  padding-right: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
   border-right: 1px solid var(--color-border);
 }
 
 .cell-day {
-  padding-left: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
   font-weight: 600;
+  border-right: 1px solid var(--color-border);
 }
 
 /* Ein einziger durchgehender Strich links von T/N - rechts ohne Linie. */
 .cell-shift {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-left: 1px solid var(--color-border);
 }
 
@@ -505,6 +522,11 @@ body {
  * Mehrzeilige Beschriftung: höchstens drei Zeilen. Die Schriftgröße hängt
  * von der logischen Zeilenzahl ab (siehe `utils/textFit.ts`): eine Zeile
  * groß, zwei Zeilen mittel, drei Zeilen klein.
+ *
+ * `white-space: pre-line` sorgt dafür, dass die im Eingabefeld gesetzten
+ * harten Zeilenumbrüche (`\n`) auch tatsächlich als Zeilenumbrüche erscheinen.
+ * Mit `normal` würden sie zu Leerzeichen zusammengezogen und die drei
+ * eingegebenen Zeilen erschienen innerhalb der Zelle nebeneinander.
  */
 .cell-information.label-lines-1,
 .cell-information.label-lines-2,
@@ -513,8 +535,9 @@ body {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   line-clamp: 3;
-  white-space: normal;
+  white-space: pre-line;
   overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .cell-information.label-lines-1 {

@@ -200,6 +200,36 @@ describe('Bildschirmdarstellung', () => {
     }
   });
 
+  it('behält die harten Zeilenumbrüche einer mehrzeiligen Beschriftung in der Tageszeile', () => {
+    // Regression: Die drei im DayEditor eingegebenen Zeilen müssen in der
+    // Bildschirmzelle als eigene Zeilen erhalten bleiben (und dürfen nicht zu
+    // Leerzeichen oder "|" zusammengezogen werden). Der Textinhalt trägt die
+    // echten Umbrüche (\n), die Anzeige erfolgt über `white-space: pre-line`.
+    const year = 2021;
+    window.localStorage.setItem(
+      'schichtkalender.state',
+      JSON.stringify({
+        version: 1,
+        settings: { selectedYear: year, selectedShift: 'C' },
+        annotations: {
+          '2021-03-15': { dateKey: '2021-03-15', label: 'Urlaub\nArzt\nSchulung', colorId: null },
+        },
+      }),
+    );
+
+    try {
+      const container = render(<App />);
+      const info = container.querySelector(
+        '.day-row .cell-information.label-lines-3',
+      );
+      expect(info).not.toBeNull();
+      expect(info?.textContent).toBe('Urlaub\nArzt\nSchulung');
+      expect(info?.textContent).not.toContain('|');
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
   it('markiert Feiertage anderer Bundesländer in Rheinland-Pfalz nicht', () => {
     const container = render(<App />);
     const rows = Array.from(container.querySelectorAll('.day-row'));

@@ -175,6 +175,28 @@ describe('PrintCalendar', () => {
     expect(neujahrRow?.querySelector('.print-col-kw .print-holiday-mark')?.textContent).toBe('F!');
   });
 
+  it('behält die harten Zeilenumbrüche einer mehrzeiligen Beschriftung', () => {
+    // Regression: Die drei im DayEditor eingegebenen Zeilen müssen in der
+    // Druckzelle als eigene Zeilen erhalten bleiben (und dürfen nicht zu
+    // Leerzeichen zusammengezogen werden). Der Textinhalt trägt die
+    // echten Umbrüche (\n), die Anzeige erfolgt über `white-space: pre-line`.
+    const container = render(
+      <PrintCalendar
+        calendar={calendar}
+        annotations={{
+          '2021-03-15': { dateKey: '2021-03-15', label: 'Urlaub\nArzt\nSchulung', colorId: null },
+        }}
+        onPrint={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    const info = container.querySelector('[data-date-key="2021-03-15"] .print-col-info');
+    expect(info?.textContent).toBe('Urlaub\nArzt\nSchulung');
+    expect(info?.textContent).not.toContain('|');
+    // Drei Zeilen -> kleinste Schriftstufe.
+    expect(info?.classList.contains('label-lines-3')).toBe(true);
+  });
+
   it('zeigt die KW ausschließlich am Montag', () => {
     const container = render(
       <PrintCalendar
