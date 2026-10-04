@@ -13,6 +13,9 @@
  * Die Vorbelegung erfolgt bereits im HTML (Inline-Skript), damit beim
  * Öffnen kein heller Blitz entsteht. Ein erzwungener Anzeigewert aus der
  * Adresse (?theme=dark|light) hat Vorrang und wird nicht gespeichert.
+ *
+ * Die Startansicht ist grundsätzlich der Dunkelmodus: ohne gespeicherte
+ * Einstellung (und ohne Adressparameter) beginnt die Anzeige dunkel.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -28,7 +31,11 @@ export const THEME_ATTRIBUTE = 'data-theme';
 /** URL-Parameter zum Erzwingen einer Anzeige (nur für Tests/Vorschau). */
 export const THEME_QUERY_PARAMETER = 'theme';
 
-export const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system';
+/**
+ * Standardeinstellung ohne gespeicherten/nutzbaren Wert: Dunkelmodus.
+ * Ohne ausdrückliche Wahl beginnt die Startansicht grundsätzlich dunkel.
+ */
+export const DEFAULT_THEME_PREFERENCE: ThemePreference = 'dark';
 
 const THEME_PREFERENCES: readonly ThemePreference[] = ['system', 'light', 'dark'];
 

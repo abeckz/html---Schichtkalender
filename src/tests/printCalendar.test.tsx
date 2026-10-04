@@ -125,8 +125,9 @@ describe('PrintCalendar', () => {
     const annotatedRow = container.querySelector('[data-date-key="2021-03-15"]');
     expect(annotatedRow).not.toBeNull();
     expect(annotatedRow?.textContent).toContain('Urlaub');
-    // jsdom normalisiert Hexwerte zu rgb(); #FFF2A8 entspricht rgb(255, 242, 168).
-    expect(annotatedRow?.getAttribute('style')).toContain('rgb(255, 242, 168)');
+    // jsdom normalisiert Hexwerte zu rgb(); #FFE000 (sattes Gelb) entspricht
+    // rgb(255, 224, 0).
+    expect(annotatedRow?.getAttribute('style')).toContain('rgb(255, 224, 0)');
 
     const neujahrRow = container.querySelector('[data-date-key="2021-01-01"]');
     // "F!" steht ausschließlich als rosa Kästchen in der KW-Spalte; die

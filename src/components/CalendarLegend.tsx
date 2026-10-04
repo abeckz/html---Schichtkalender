@@ -27,13 +27,10 @@ export function CalendarLegend({ compact = false }: CalendarLegendProps) {
         <strong>Sollschichten</strong> = Anzahl T + N
       </span>
       <span className="legend-item">
-        <strong>Feiertage mit Schicht</strong> = Feiertage, die mit T oder N zusammenfallen
-      </span>
-      <span className="legend-item">
         <span className="holiday-mark" aria-hidden="true">
           {PUBLIC_HOLIDAY_MARK}
         </span>{' '}
-        = {PUBLIC_HOLIDAY_TITLE} (rosa Kästchen in der KW-Spalte)
+        = {PUBLIC_HOLIDAY_TITLE}
       </span>
     </div>
   );

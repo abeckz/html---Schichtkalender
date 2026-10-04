@@ -304,32 +304,80 @@ describe('Bildschirmdarstellung', () => {
     }
   });
 
+  it('zeigt die obere Legende ohne die entfernten Erläuterungen', () => {
+    const container = render(<App />);
+    const legend = container.querySelector('.legend');
+    expect(legend).toBeDefined();
+    const text = legend?.textContent ?? '';
+
+    // Entfernt: die Zeile zu Feiertagen mit Schicht.
+    expect(text).not.toContain('Feiertage mit Schicht');
+    expect(text).not.toContain('Feiertage, die mit T oder N zusammenfallen');
+    // Entfernt: der Klammerzusatz zum rosa Kästchen.
+    expect(text).not.toContain('rosa Kästchen');
+    // Erhalten: die übrigen Legendenzeilen einschließlich "F!".
+    expect(text).toContain('Tagschicht');
+    expect(text).toContain('Nachtschicht');
+    expect(text).toContain('Werktage');
+    expect(text).toContain('Sollschichten');
+    expect(legend?.querySelector('.holiday-mark')?.textContent).toBe('F!');
+  });
+
   it('schaltet die Anzeige zwischen Hell und Dunkel um', () => {
     const container = render(<App />);
     const buttons = Array.from(container.querySelectorAll('.theme-button'));
     expect(buttons.length).toBe(3);
 
+    // Startansicht ist grundsätzlich der Dunkelmodus.
     const darkButton = buttons.find((button) => button.textContent?.includes('Dunkel'));
-    expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe('light');
-    click(darkButton ?? null);
     expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe('dark');
-    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
 
     const lightButton = buttons.find((button) => button.textContent?.includes('Hell'));
     click(lightButton ?? null);
     expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe('light');
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
+
+    click(darkButton ?? null);
+    expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe('dark');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+  });
+
+  it('öffnet ein mehrzeiliges Beschriftungsfeld mit adaptiver Schrift im DayEditor', () => {
+    window.localStorage.setItem(
+      'schichtkalender.state',
+      JSON.stringify({
+        version: 1,
+        settings: { selectedYear: 2021, selectedShift: 'C' },
+        annotations: {},
+      }),
+    );
+
+    try {
+      const container = render(<App />);
+      const firstRow = container.querySelector('.day-row');
+      click(firstRow);
+
+      const field = container.querySelector('.editor-textarea') as HTMLTextAreaElement | null;
+      expect(field).not.toBeNull();
+      expect(field?.tagName).toBe('TEXTAREA');
+      expect(field?.getAttribute('rows')).toBe('3');
+      // Ohne Eingabe gilt die Ein-Zeilen-Klasse mit der größten Schrift.
+      expect(field?.classList.contains('label-lines-1')).toBe(true);
+      expect(Number.parseFloat(field?.style.fontSize ?? '0')).toBeGreaterThan(0);
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
   });
 });
 
 describe('ThemeStore', () => {
-  it('fällt bei unbekannten oder fehlenden Werten auf "system" zurück', () => {
-    expect(readThemePreference(null, '')).toBe('system');
+  it('fällt bei unbekannten oder fehlenden Werten auf den Dunkelmodus zurück', () => {
+    expect(readThemePreference(null, '')).toBe('dark');
     expect(
       readThemePreference({ getItem: () => 'neon', setItem: () => undefined }, ''),
-    ).toBe('system');
+    ).toBe('dark');
     expect(readThemePreference({ getItem: () => null, setItem: () => undefined }, '')).toBe(
-      'system',
+      'dark',
     );
   });
 

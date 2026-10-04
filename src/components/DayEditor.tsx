@@ -2,7 +2,13 @@
  * DayEditor.
  *
  * Öffnet sich als Dialog bei Klick oder Touch auf einen Kalendertag und
- * erlaubt Beschriftung (maximal 50 Zeichen) und persönliche Farbe.
+ * erlaubt eine mehrzeilige Beschriftung (maximal 50 Zeichen, bis zu drei
+ * Zeilen) sowie eine persönliche Farbe.
+ *
+ * Die Schrift des Eingabefeldes passt sich der Zeilenzahl an: eine einzelne
+ * Zeile erscheint groß, drei Zeilen deutlich kleiner. Dafür wird dieselbe
+ * messfreie Logik wie in Kalender- und Druckzelle verwendet
+ * (`labelLineClass` / `fitFontSize`).
  *
  * "Zurücksetzen" entfernt ausschließlich Beschriftung und Farbe; alle
  * automatisch berechneten Daten (Events, Schicht, Datum) bleiben erhalten.
@@ -13,6 +19,7 @@ import type { AnnotationColorId, CalendarDay } from '../domain/types';
 import { ColorPicker } from './ColorPicker';
 import { MAX_LABEL_LENGTH } from '../services/storage';
 import { formatGermanDate } from '../utils/dateUtils';
+import { fitFontSize, labelLineClass } from '../utils/textFit';
 import { getShiftDefinition, shiftStateDescriptions } from '../config/shiftDefinitions';
 import type { ShiftId } from '../domain/types';
 
@@ -37,7 +44,7 @@ export function DayEditor({
 }: DayEditorProps) {
   const [label, setLabel] = useState(initialLabel);
   const [colorId, setColorId] = useState<AnnotationColorId | null>(initialColorId);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const labelId = useId();
@@ -85,6 +92,8 @@ export function DayEditor({
 
   const trimmedLabel = label.slice(0, MAX_LABEL_LENGTH);
   const hasAnnotation = trimmedLabel !== '' || colorId !== null;
+  const lineClass = labelLineClass(trimmedLabel);
+  const fontPx = fitFontSize(trimmedLabel);
 
   return (
     <div className="editor-backdrop no-print" role="presentation" onClick={onClose}>
@@ -120,14 +129,15 @@ export function DayEditor({
           <label className="field-label" htmlFor={labelId}>
             Beschriftung
           </label>
-          <input
+          <textarea
             id={labelId}
             ref={inputRef}
-            className="text-input"
-            type="text"
+            className={`text-input editor-textarea ${lineClass}`}
             value={trimmedLabel}
             maxLength={MAX_LABEL_LENGTH}
+            rows={3}
             placeholder="z. B. Urlaub, Arzt, Schulung"
+            style={{ fontSize: `${fontPx}px` }}
             onChange={(event) => setLabel(event.target.value.slice(0, MAX_LABEL_LENGTH))}
           />
           <span className="field-counter" aria-live="polite">

@@ -27,10 +27,7 @@ export function PrintHeader({ year, selectedShift }: PrintHeaderProps) {
         <span>Zahl links am Monat: Werktage Mo-Fr</span>
         <span>Zahl rechts am Monat: Sollschichten T+N</span>
         <span>Feiertage mit Schicht: nur Feiertage, die mit T/N zusammenfallen</span>
-        <span>
-          {PUBLIC_HOLIDAY_MARK} im Text und rosa Kästchen in der KW-Spalte: gesetzlicher
-          Feiertag (Rheinland-Pfalz)
-        </span>
+        <span>{PUBLIC_HOLIDAY_MARK}: gesetzlicher Feiertag (Rheinland-Pfalz)</span>
       </div>
     </header>
   );

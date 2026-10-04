@@ -27,6 +27,7 @@ import type { AnnotationColorId, CalendarDay, MonthCalendar as MonthCalendarMode
 import { getColorHex } from '../config/annotationColors';
 import { getPrintEventName } from '../config/eventDefinitions';
 import { hasPublicHoliday } from '../engines/eventEngine';
+import { labelLineClass } from '../utils/textFit';
 
 /** Feste Rasterhöhe: jeder Monatsblock besitzt genau 31 Tagespositionen. */
 export const PRINT_ROWS = 31;
@@ -114,6 +115,7 @@ export function PrintMonth({ month, annotationLabels, annotationColors }: PrintM
           const colorId = annotationColors[day.dateKey] ?? null;
           const colorHex = getColorHex(colorId);
           const information = buildPrintInformation(day, label);
+          const infoLineClass = label !== '' ? labelLineClass(label) : '';
           const classNames = ['print-row'];
           if (day.isWeekend) classNames.push('is-weekend');
           if (day.isSunday) classNames.push('is-sunday');
@@ -127,7 +129,7 @@ export function PrintMonth({ month, annotationLabels, annotationColors }: PrintM
             >
               <span className="print-col-wo">{day.weekdayShort}</span>
               <span className="print-col-datum">{String(day.day).padStart(2, '0')}</span>
-              <span className="print-col-info">{information}</span>
+              <span className={`print-col-info ${infoLineClass}`.trim()}>{information}</span>
               <span className="print-col-kw">
                 {day.isoWeekday === 1 && <span className="print-week">{day.isoWeek}</span>}
                 {hasPublicHoliday(day) && <PublicHolidayMark />}

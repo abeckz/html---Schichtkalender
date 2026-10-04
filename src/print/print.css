@@ -165,7 +165,7 @@
 
 .print-row {
   display: grid;
-  grid-template-columns: 6.5mm 8mm 1fr 8mm 5mm;
+  grid-template-columns: 6.5mm 7mm 1fr 8mm 5mm;
   align-items: center;
   min-height: 0;
   border-top: 0.25pt solid #c8ccd1;
@@ -176,17 +176,40 @@
   border-top: none;
 }
 
+/* Der Abstand zwischen Wochentag und Tagesnummer ist auf das Minimum
+   reduziert; der vertikale Strich sitzt als durchgehende Linie zwischen
+   Wochentag und Tagesnummer. */
 .print-row > span {
-  padding: 0 0.4mm;
-  border-right: 0.25pt solid #c8ccd1;
+  padding: 0 0.3mm;
   line-height: 1.05;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: clip;
 }
 
-.print-row > span:last-child {
-  border-right: none;
+/**
+ * Durchgehende senkrechte Trennstriche des Rasters.
+ *
+ * Die Striche sitzen auf den Zellen (nicht auf der Zeile), damit sie in jeder
+ * Tageszeile wiederholt werden und über den gesamten Monat als eine einzige
+ * Linie erscheinen:
+ * - ein Strich zwischen Wochentag und Tagesnummer,
+ * - ein Strich links von der Schichtspalte T/N.
+ * Die KW-/F!-Spalte bleibt bewusst strichfrei.
+ */
+.print-row > .print-col-wo {
+  padding-left: 0.15mm;
+  padding-right: 0;
+  border-right: 0.25pt solid #c8ccd1;
+}
+
+.print-row > .print-col-datum {
+  padding-left: 0.2mm;
+}
+
+/* Ein einziger durchgehender Strich links von T/N - rechts ohne Linie. */
+.print-row > .print-col-schicht {
+  border-left: 0.25pt solid #c8ccd1;
 }
 
 .print-row.is-weekend {
@@ -218,6 +241,40 @@
   font-weight: 400;
 }
 
+/**
+ * Mehrzeilige Beschriftung: höchstens drei Zeilen. Die Schriftgröße hängt
+ * von der logischen Zeilenzahl ab (siehe `utils/textFit.ts`): eine Zeile
+ * groß, zwei Zeilen mittel, drei Zeilen klein. Termin- und Feiertagsnamen
+ * (ohne Beschriftung) bleiben einzeilig in der Standardgröße.
+ */
+.print-row > .print-col-info.label-lines-1,
+.print-row > .print-col-info.label-lines-2,
+.print-row > .print-col-info.label-lines-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.print-row > .print-col-info.label-lines-1 {
+  font-size: 10pt;
+  font-weight: 600;
+  line-height: 1.05;
+}
+
+.print-row > .print-col-info.label-lines-2 {
+  font-size: 8pt;
+  line-height: 1.05;
+}
+
+.print-row > .print-col-info.label-lines-3 {
+  font-size: 6.5pt;
+  line-height: 1.02;
+}
+
 .print-col-kw {
   display: flex;
   align-items: center;
@@ -241,9 +298,9 @@
 .print-holiday-mark {
   display: inline-block;
   flex: 0 0 auto;
-  min-width: 3.2mm;
-  padding: 0 0.3mm;
-  font-size: 5.5pt;
+  min-width: 5mm;
+  padding: 0 0.5mm;
+  font-size: 8pt;
   font-weight: 700;
   line-height: 1.25;
   text-align: center;

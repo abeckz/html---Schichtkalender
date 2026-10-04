@@ -15,14 +15,12 @@
           // Anzeige, ohne die gespeicherte Einstellung zu verändern.
           var forced = /(?:^|[?&])theme=(dark|light)(?:&|$)/.exec(window.location.search);
           if (forced) stored = forced[1];
-          var wantsDark =
-            stored === 'dark' ||
-            ((stored === 'system' || !stored) &&
-              window.matchMedia &&
-              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          // Startansicht grundsätzlich dunkel: ohne ausdrückliche Wahl (und
+          // ohne Adressparameter) beginnt die Anzeige im Dunkelmodus.
+          var wantsDark = stored ? stored !== 'light' : true;
           document.documentElement.setAttribute('data-theme', wantsDark ? 'dark' : 'light');
         } catch (error) {
-          document.documentElement.setAttribute('data-theme', 'light');
+          document.documentElement.setAttribute('data-theme', 'dark');
         }
       })();
     </script>

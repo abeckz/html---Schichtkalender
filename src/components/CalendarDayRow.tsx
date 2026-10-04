@@ -23,6 +23,7 @@ import type { CalendarDay, UserDayAnnotation } from '../domain/types';
 import { getColorHex } from '../config/annotationColors';
 import { hasPublicHoliday } from '../engines/eventEngine';
 import { PUBLIC_HOLIDAY_MARK, PUBLIC_HOLIDAY_TITLE } from '../print/PrintMonth';
+import { labelLineClass } from '../utils/textFit';
 
 export interface CalendarDayRowProps {
   day: CalendarDay;
@@ -56,6 +57,11 @@ export function CalendarDayRow({ day, annotation, onOpenEditor }: CalendarDayRow
       ? annotationLabel
       : day.events.map((event) => event.name).join(' · ');
 
+  // Adaptive Schrift: kurze Beschriftungen erscheinen groß, drei Zeilen
+  // kleiner. Maßgeblich ist ausschließlich die Beschriftung des Anwenders;
+  // Termin- und Feiertagsnamen bleiben in ihrer Standardgröße.
+  const infoLineClass = annotationLabel !== '' ? labelLineClass(annotationLabel) : '';
+
   const classNames = ['day-row'];
   if (day.isWeekend) classNames.push('is-weekend');
   if (day.isSunday) classNames.push('is-sunday');
@@ -79,7 +85,7 @@ export function CalendarDayRow({ day, annotation, onOpenEditor }: CalendarDayRow
     >
       <span className="cell cell-weekday">{day.weekdayShort}</span>
       <span className="cell cell-day">{String(day.day).padStart(2, '0')}</span>
-      <span className="cell cell-information">{informationText}</span>
+      <span className={`cell cell-information ${infoLineClass}`.trim()}>{informationText}</span>
       <span className="cell cell-kw">
         {day.isoWeekday === 1 && <span className="cell-week">{day.isoWeek}</span>}
         {publicHoliday && (

@@ -5,22 +5,25 @@
  * die Palette später geändert werden kann, ohne bestehende Annotationen
  * zu zerstören.
  *
- * Die Palette ist bewusst hell, druckfreundlich und mit schwarzem
- * Kugelschreiber bzw. Bleistift beschreibbar.
+ * Die Palette ist bewusst satt und kräftig: die Farben unterscheiden sich
+ * deutlich voneinander und bleiben auch nebeneinander eindeutig erkennbar.
+ * Der Text auf einer farbigen Zeile wird zusätzlich immer in Schwarz
+ * dargestellt (siehe styles.css), damit die Beschriftung auf jeder der
+ * kräftigen Farben lesbar bleibt.
  */
 
 import type { AnnotationColor, AnnotationColorId } from '../domain/types';
 
 export const annotationColors: readonly AnnotationColor[] = [
-  { id: 'yellow', name: 'Gelb', hex: '#FFF2A8' },
-  { id: 'green', name: 'Hellgrün', hex: '#CDECCF' },
-  { id: 'blue', name: 'Hellblau', hex: '#CFE5F6' },
-  { id: 'orange', name: 'Orange', hex: '#FFD7A8' },
-  { id: 'pink', name: 'Rosa', hex: '#F6CEDD' },
-  { id: 'red', name: 'Hellrot', hex: '#F6C5C2' },
-  { id: 'purple', name: 'Lavendel', hex: '#DDD0F2' },
-  { id: 'turquoise', name: 'Türkis', hex: '#C7ECE8' },
-  { id: 'gray', name: 'Grau', hex: '#E3E5E8' },
+  { id: 'yellow', name: 'Gelb', hex: '#FFE000' },
+  { id: 'green', name: 'Grün', hex: '#2E9E3E' },
+  { id: 'blue', name: 'Blau', hex: '#1E6FE0' },
+  { id: 'orange', name: 'Orange', hex: '#FF7A00' },
+  { id: 'pink', name: 'Pink', hex: '#FF2E93' },
+  { id: 'red', name: 'Rot', hex: '#E01B1B' },
+  { id: 'purple', name: 'Violett', hex: '#8A2BE2' },
+  { id: 'turquoise', name: 'Türkis', hex: '#00C2B2' },
+  { id: 'gray', name: 'Grau', hex: '#9AA0A6' },
 ];
 
 /** Schnellzugriff colorId -> Farbe. */

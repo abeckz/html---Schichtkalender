@@ -156,6 +156,30 @@ body {
   width: 100%;
 }
 
+/**
+ * Mehrzeilige Beschriftung im DayEditor.
+ *
+ * Genau drei Zeilen Höhe; die Schriftgröße wird über die Klassen
+ * `label-lines-1/2/3` bzw. inline gesetzt (siehe `utils/textFit.ts`).
+ * Ein manuelles Größenziehen ist deaktiviert, damit das feste Raster
+ * erhalten bleibt.
+ */
+.editor-textarea {
+  display: block;
+  min-height: calc(3 * 1.35em + 12px);
+  line-height: 1.35;
+  resize: none;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.editor-textarea.label-lines-1,
+.editor-textarea.label-lines-2,
+.editor-textarea.label-lines-3 {
+  font-weight: 500;
+}
+
 .icon-button,
 .shift-button,
 .primary-button,
@@ -297,11 +321,11 @@ body {
 .holiday-mark {
   display: inline-block;
   flex: 0 0 auto;
-  min-width: 13px;
-  padding: 0 1px;
-  font-size: 9px;
+  min-width: 17px;
+  padding: 0 2px;
+  font-size: 12px;
   font-weight: 700;
-  line-height: 13px;
+  line-height: 16px;
   text-align: center;
   color: var(--color-holiday-text);
   background: var(--color-holiday-mark);
@@ -313,8 +337,20 @@ body {
 
 .year-calendar {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* Rasterabstand als Variable, damit die Spaltenbreite dazu passt. */
+  --year-calendar-gap: 14px;
+  gap: var(--year-calendar-gap);
+  /*
+   * Maximal sechs Monate pro Zeile. Auf sehr breiten Bildschirmen wird die
+   * Spaltenbreite über die sechstelbreite des Containers begrenzt, sodass
+   * ab dem siebten Monat automatisch in die zweite Zeile umgebrochen wird.
+   * Auf schmaleren Bildschirmen bleibt 280px die Untergrenze, sodass weiter
+   * automatisch umgebrochen wird (2, 3, … Monate nebeneinander).
+   */
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(280px, calc((100% - 5 * var(--year-calendar-gap)) / 6)), 1fr)
+  );
 }
 
 .month-card {
@@ -364,18 +400,24 @@ body {
  * Spaltenraster: Wochentag | Datum | Termin/Beschriftung | KW | T/N.
  * Fünf Spalten für fünf Zellen - die Information bekommt den gesamten Rest
  * der Breite und wird nicht mehr abgeschnitten.
+ *
+ * Der Abstand zwischen Wochentag und Tagesnummer ist auf das Minimum
+ * reduziert; die vertikale Abgrenzung der Zelle erfolgt über schmale
+ * senkrechte Striche statt über Pipe-Zeichen oder breite Innenabstände.
  */
 .day-row {
   display: grid;
-  grid-template-columns: 1.6em 1.9em minmax(0, 1fr) 3.2em 2.2em;
+  grid-template-columns: 1.4em 1.6em minmax(0, 1fr) 3.2em 2.2em;
   align-items: center;
-  gap: 4px;
+  gap: 0;
   width: 100%;
-  padding: 3px 8px;
+  padding: 3px 4px;
   font-size: 13px;
   text-align: left;
   background: transparent;
   border: none;
+  border-left: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-row-line);
   border-radius: 0;
   color: var(--color-text);
@@ -402,6 +444,19 @@ body {
   font-weight: 700;
 }
 
+/**
+ * Farbig hinterlegte Zeilen (persönliche Markierung) tragen immer schwarzen
+ * Text. Die satt kräftigen Palette-Farben sind hell genug für schwarze
+ * Schrift; ein ererbtes Weiß aus dem Dunkelmodus wäre auf diesen Feldern
+ * nicht lesbar. Die Regel gilt für alle Zellinhalte der Zeile.
+ */
+.day-row.has-color,
+.day-row.has-color .cell,
+.day-row.has-color .cell-week,
+.day-row.has-color .holiday-mark {
+  color: #000000;
+}
+
 .cell {
   overflow: hidden;
   white-space: nowrap;
@@ -413,12 +468,69 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/**
+ * Durchgehende senkrechte Trennstriche des Rasters.
+ *
+ * Die Striche sitzen auf den Zellen (nicht auf der Zeile), damit sie in jeder
+ * Tageszeile wiederholt werden und über den gesamten Monat als eine einzige
+ * Linie erscheinen:
+ * - ein Strich zwischen Wochentag und Tagesnummer,
+ * - ein Strich links von der Schichtspalte T/N.
+ * Die KW-/F!-Spalte bleibt bewusst strichfrei.
+ */
+.cell-weekday {
+  padding-right: 0;
+  border-right: 1px solid var(--color-border);
+}
+
 .cell-day {
+  padding-left: 0;
   font-weight: 600;
+}
+
+/* Ein einziger durchgehender Strich links von T/N - rechts ohne Linie. */
+.cell-shift {
+  border-left: 1px solid var(--color-border);
 }
 
 .cell-information {
   padding-left: 4px;
+  min-width: 0;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/**
+ * Mehrzeilige Beschriftung: höchstens drei Zeilen. Die Schriftgröße hängt
+ * von der logischen Zeilenzahl ab (siehe `utils/textFit.ts`): eine Zeile
+ * groß, zwei Zeilen mittel, drei Zeilen klein.
+ */
+.cell-information.label-lines-1,
+.cell-information.label-lines-2,
+.cell-information.label-lines-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  white-space: normal;
+  overflow: hidden;
+}
+
+.cell-information.label-lines-1 {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.cell-information.label-lines-2 {
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.cell-information.label-lines-3 {
+  font-size: 12px;
+  line-height: 1.1;
 }
 
 /** ------------------------------------------------------- Feiertagsmarkierung */
@@ -431,15 +543,6 @@ body {
 .cell-information .holiday-mark {
   margin-right: 4px;
   vertical-align: 1px;
-}
-
-/**
- * Der Informationstext eines Feiertags bleibt vollständig lesbar; die
- * "F!"-Markierung sitzt zusätzlich in der KW-Spalte.
- */
-.cell-information {
-  min-width: 0;
-  text-overflow: ellipsis;
 }
 
 .cell-kw {
@@ -577,7 +680,11 @@ body {
 
 @media (max-width: 1100px) {
   .year-calendar {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    /* Wie oben, jedoch mit etwas größerer Mindestbreite für Tablet-Breiten. */
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(max(300px, calc((100% - 5 * var(--year-calendar-gap)) / 6)), 1fr)
+    );
   }
 }
 

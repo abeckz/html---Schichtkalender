@@ -2,7 +2,7 @@
  * Prüft die Anzeige-Einstellung der Offline-Datei bei file://.
  *
  * Geprüft werden:
- *  1. Standard (kein gespeicherter Wert): folgt der Systemeinstellung.
+ *  1. Standard (kein gespeicherter Wert): beginnt grundsätzlich dunkel.
  *  2. Gespeicherter Wert "dark"/"light": wird ohne Parameter angewendet.
  *  3. Klick auf den Umschalter: Attribut und Speicherwert ändern sich.
  *
@@ -64,8 +64,8 @@ const checks = [];
 const defaultDom = dumpDom([]);
 const defaultTheme = themeOf(defaultDom);
 checks.push([
-  `Standard folgt der Systemeinstellung (${defaultTheme})`,
-  defaultTheme === 'light' || defaultTheme === 'dark',
+  `Standard beginnt dunkel (${defaultTheme})`,
+  defaultTheme === 'dark',
 ]);
 
 const defaultDarkDom = dumpDom(['--force-dark-mode']);
