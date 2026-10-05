@@ -1,7 +1,6 @@
 node_modules
 dist
 dist-ssr
-offline
 *.local
 .vite
 coverage
