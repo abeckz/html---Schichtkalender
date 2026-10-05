@@ -15,7 +15,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
 import type { AnnotationMap } from '../domain/types';
-import { buildYearCalendar } from '../engines/calendarBuilder';
+import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder';
 import { PrintCalendar } from '../print/PrintCalendar';
 import { PRINT_ROWS } from '../print/PrintMonth';
 
@@ -32,7 +32,7 @@ function render(element: React.ReactElement): HTMLElement {
 describe('PrintCalendar', () => {
   const calendar = buildYearCalendar({ year: 2021, selectedShift: 'C' });
   const annotations: AnnotationMap = {
-    '2021-03-15': { dateKey: '2021-03-15', label: 'Urlaub', colorId: 'yellow' },
+    '2021-03-15': { dateKey: '2021-03-15', label: 'Urlaub', colors: { info: 'yellow' } },
   };
 
   it('rendert genau zwei Seiten', () => {
@@ -125,9 +125,11 @@ describe('PrintCalendar', () => {
     const annotatedRow = container.querySelector('[data-date-key="2021-03-15"]');
     expect(annotatedRow).not.toBeNull();
     expect(annotatedRow?.textContent).toContain('Urlaub');
-    // jsdom normalisiert Hexwerte zu rgb(); #FFE000 (sattes Gelb) entspricht
-    // rgb(255, 224, 0).
-    expect(annotatedRow?.getAttribute('style')).toContain('rgb(255, 224, 0)');
+    // Die persönliche Farbe liegt auf der Info-Spalte (nicht auf der ganzen
+    // Zeile). jsdom normalisiert Hexwerte zu rgb(); #FFE000 (sattes Gelb)
+    // entspricht rgb(255, 224, 0).
+    const infoCell = annotatedRow?.querySelector('.print-col-info');
+    expect(infoCell?.getAttribute('style')).toContain('rgb(255, 224, 0)');
 
     const neujahrRow = container.querySelector('[data-date-key="2021-01-01"]');
     // "F!" steht ausschließlich als rosa Kästchen in der KW-Spalte; die
@@ -162,7 +164,7 @@ describe('PrintCalendar', () => {
     const container = render(
       <PrintCalendar
         calendar={calendar}
-        annotations={{ '2021-01-01': { dateKey: '2021-01-01', label: 'Frühschicht', colorId: 'yellow' } }}
+        annotations={{ '2021-01-01': { dateKey: '2021-01-01', label: 'Frühschicht', colors: { info: 'yellow' } } }}
         onPrint={() => undefined}
         onBack={() => undefined}
       />,
@@ -184,7 +186,7 @@ describe('PrintCalendar', () => {
       <PrintCalendar
         calendar={calendar}
         annotations={{
-          '2021-03-15': { dateKey: '2021-03-15', label: 'Urlaub\nArzt\nSchulung', colorId: null },
+          '2021-03-15': { dateKey: '2021-03-15', label: 'Urlaub\nArzt\nSchulung', colors: {} },
         }}
         onPrint={() => undefined}
         onBack={() => undefined}
@@ -313,6 +315,28 @@ describe('PrintCalendar', () => {
     expect(headers.length).toBe(2);
     headers.forEach((header) => {
       expect(header.textContent).toBe('BASF Schichtkalender');
+    });
+  });
+
+  it('nennt oben in der Print-Legende die Arbeitsschichten gesamt im Jahr', () => {
+    const container = render(
+      <PrintCalendar
+        calendar={calendar}
+        annotations={annotations}
+        onPrint={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    const expected = summarizeYear(calendar).requiredShiftCount;
+    const totals = container.querySelectorAll('.print-header-total');
+    // Beide Seiten tragen dieselbe erste Legendenzeile.
+    expect(totals.length).toBe(2);
+    totals.forEach((total) => {
+      expect(total.textContent).toBe(
+        `Arbeitsschichten gesamt im Jahr 2021 für Schicht C: ${expected}`,
+      );
+      // Die Zeile steht ganz oben in der Legende.
+      expect((total.parentElement as HTMLElement).firstElementChild).toBe(total);
     });
   });
 

@@ -23,7 +23,12 @@
  * Bezugsraum für die gesetzlichen Feiertage ist Rheinland-Pfalz.
  */
 
-import type { AnnotationColorId, CalendarDay, MonthCalendar as MonthCalendarModel } from '../domain/types';
+import type {
+  AnnotationColorId,
+  CalendarDay,
+  ColumnColorName,
+  MonthCalendar as MonthCalendarModel,
+} from '../domain/types';
 import { getColorHex } from '../config/annotationColors';
 import { getPrintEventName } from '../config/eventDefinitions';
 import { hasPublicHoliday } from '../engines/eventEngine';
@@ -41,7 +46,8 @@ export const PUBLIC_HOLIDAY_TITLE = 'Gesetzlicher Feiertag';
 export interface PrintMonthProps {
   month: MonthCalendarModel;
   annotationLabels: Record<string, string>;
-  annotationColors: Record<string, AnnotationColorId>;
+  /** Farben je Tag und Spalte (Spaltenname -> colorId). */
+  annotationColors: Record<string, Partial<Record<ColumnColorName, AnnotationColorId>>>;
 }
 
 interface PrintRow {
@@ -112,8 +118,12 @@ export function PrintMonth({ month, annotationLabels, annotationColors }: PrintM
 
           const { day } = row;
           const label = annotationLabels[day.dateKey] ?? '';
-          const colorId = annotationColors[day.dateKey] ?? null;
-          const colorHex = getColorHex(colorId);
+          const colors = annotationColors[day.dateKey] ?? {};
+          const weekdayHex = getColorHex(colors.weekday ?? null);
+          const datumHex = getColorHex(colors.day ?? null);
+          const infoHex = getColorHex(colors.info ?? null);
+          const schichtHex = getColorHex(colors.shift ?? null);
+          const columnStyle = (hex: string | null) => (hex ? { backgroundColor: hex } : undefined);
           const information = buildPrintInformation(day, label);
           const infoLineClass = label !== '' ? labelLineClass(label) : '';
           const classNames = ['print-row'];
@@ -121,20 +131,23 @@ export function PrintMonth({ month, annotationLabels, annotationColors }: PrintM
           if (day.isSunday) classNames.push('is-sunday');
 
           return (
-            <div
-              className={classNames.join(' ')}
-              key={day.dateKey}
-              style={colorHex ? { backgroundColor: colorHex } : undefined}
-              data-date-key={day.dateKey}
-            >
-              <span className="print-col-wo">{day.weekdayShort}</span>
-              <span className="print-col-datum">{String(day.day).padStart(2, '0')}</span>
-              <span className={`print-col-info ${infoLineClass}`.trim()}>{information}</span>
+            <div className={classNames.join(' ')} key={day.dateKey} data-date-key={day.dateKey}>
+              <span className="print-col-wo" style={columnStyle(weekdayHex)}>
+                {day.weekdayShort}
+              </span>
+              <span className="print-col-datum" style={columnStyle(datumHex)}>
+                {String(day.day).padStart(2, '0')}
+              </span>
+              <span className={`print-col-info ${infoLineClass}`.trim()} style={columnStyle(infoHex)}>
+                {information}
+              </span>
               <span className="print-col-kw">
                 {day.isoWeekday === 1 && <span className="print-week">{day.isoWeek}</span>}
                 {hasPublicHoliday(day) && <PublicHolidayMark />}
               </span>
-              <span className="print-col-schicht">{day.shiftLabel}</span>
+              <span className="print-col-schicht" style={columnStyle(schichtHex)}>
+                {day.shiftLabel}
+              </span>
             </div>
           );
         })}

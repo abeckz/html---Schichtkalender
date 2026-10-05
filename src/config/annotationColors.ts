@@ -12,7 +12,7 @@
  * kräftigen Farben lesbar bleibt.
  */
 
-import type { AnnotationColor, AnnotationColorId } from '../domain/types';
+import type { AnnotationColor, AnnotationColorId, ColumnColorName } from '../domain/types';
 
 export const annotationColors: readonly AnnotationColor[] = [
   { id: 'yellow', name: 'Gelb', hex: '#FFE000' },
@@ -60,4 +60,16 @@ export function getColorName(colorId: AnnotationColorId | null | undefined): str
 export function getColorHex(colorId: AnnotationColorId | null | undefined): string | null {
   if (!colorId) return null;
   return isAnnotationColorId(colorId) ? annotationColorMap[colorId].hex : null;
+}
+
+/**
+ * Spalten, die über einen gezogenen Streifen eingefärbt werden können.
+ * Die Informationsspalte ('info') gehört bewusst nicht dazu; sie wird über
+ * den DayEditor gepflegt.
+ */
+export const STREAK_COLUMN_NAMES: readonly ColumnColorName[] = ['weekday', 'day', 'shift'];
+
+/** Prüft, ob ein unbekannter Wert ein gültiger Spaltenname ist. */
+export function isColumnColorName(value: unknown): value is ColumnColorName {
+  return value === 'weekday' || value === 'day' || value === 'shift' || value === 'info';
 }

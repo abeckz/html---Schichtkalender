@@ -6,13 +6,14 @@
  * untereinander.
  */
 
-import type { AnnotationColorId, MonthCalendar } from '../domain/types';
+import type { AnnotationColorId, ColumnColorName, MonthCalendar } from '../domain/types';
 import { PrintMonth } from './PrintMonth';
 
 export interface PrintHalfYearProps {
   months: MonthCalendar[];
   annotationLabels: Record<string, string>;
-  annotationColors: Record<string, AnnotationColorId>;
+  /** Farben je Tag und Spalte (Spaltenname -> colorId). */
+  annotationColors: Record<string, Partial<Record<ColumnColorName, AnnotationColorId>>>;
   side: 1 | 2;
 }
 

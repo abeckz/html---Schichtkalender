@@ -11,7 +11,8 @@
  */
 
 import { useMemo } from 'react';
-import type { AnnotationMap, YearCalendar } from '../domain/types';
+import type { AnnotationColorId, AnnotationMap, ColumnColorName, YearCalendar } from '../domain/types';
+import { summarizeYear } from '../engines/calendarBuilder';
 import { PrintHeader } from './PrintHeader';
 import { PrintHalfYear } from './PrintHalfYear';
 
@@ -26,6 +27,9 @@ export function PrintCalendar({ calendar, annotations, onPrint, onBack }: PrintC
   const firstHalf = calendar.months.slice(0, 6);
   const secondHalf = calendar.months.slice(6, 12);
 
+  // Gearbeitete Schichten insgesamt (Tag- plus Nachtschichten) des Jahres.
+  const workedShiftCount = summarizeYear(calendar).requiredShiftCount;
+
   // Die Aufbereitung ist reine Darstellungslogik und verändert keine
   // Fachdaten: Beschriftungen und Farb-IDs werden aus der AnnotationMap
   // gelesen, nicht neu berechnet.
@@ -38,9 +42,12 @@ export function PrintCalendar({ calendar, annotations, onPrint, onBack }: PrintC
   }, [annotations]);
 
   const annotationColors = useMemo(() => {
-    const map: Record<string, NonNullable<AnnotationMap[string]['colorId']>> = {};
+    const map: Record<
+      string,
+      Partial<Record<ColumnColorName, NonNullable<AnnotationColorId>>>
+    > = {};
     for (const [dateKey, annotation] of Object.entries(annotations)) {
-      if (annotation.colorId) map[dateKey] = annotation.colorId;
+      if (Object.keys(annotation.colors).length > 0) map[dateKey] = annotation.colors;
     }
     return map;
   }, [annotations]);
@@ -67,7 +74,11 @@ export function PrintCalendar({ calendar, annotations, onPrint, onBack }: PrintC
 
       <div className="print-preview print-only-root">
         <article className="print-page" data-page="1">
-          <PrintHeader year={calendar.year} selectedShift={calendar.selectedShift} />
+          <PrintHeader
+            year={calendar.year}
+            selectedShift={calendar.selectedShift}
+            workedShiftCount={workedShiftCount}
+          />
           <PrintHalfYear
             months={firstHalf}
             annotationLabels={annotationLabels}
@@ -77,7 +88,11 @@ export function PrintCalendar({ calendar, annotations, onPrint, onBack }: PrintC
         </article>
 
         <article className="print-page" data-page="2">
-          <PrintHeader year={calendar.year} selectedShift={calendar.selectedShift} />
+          <PrintHeader
+            year={calendar.year}
+            selectedShift={calendar.selectedShift}
+            workedShiftCount={workedShiftCount}
+          />
           <PrintHalfYear
             months={secondHalf}
             annotationLabels={annotationLabels}

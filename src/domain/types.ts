@@ -24,6 +24,21 @@ export type AnnotationColorId =
   | 'turquoise'
   | 'gray';
 
+/**
+ * Färbbare Spalte einer Tageszeile.
+ *
+ * Über einen gezogenen Streifen lassen sich ausschließlich die drei linken
+ * Spalten einfärben:
+ * - 'weekday': Wochentag
+ * - 'day': Tagesnummer
+ * - 'shift': Schichtrhythmus T/N
+ *
+ * 'info' ist die Informationsspalte; sie wird weiterhin über den DayEditor
+ * eingefärbt (persönliche Tagesfarbe). Damit sind in einer Zeile bis zu vier
+ * verschiedene Farben möglich.
+ */
+export type ColumnColorName = 'weekday' | 'day' | 'shift' | 'info';
+
 /** Definition eines Schichtsystems (datengetrieben, zyklisch). */
 export interface ShiftDefinition {
   readonly id: ShiftId;
@@ -90,7 +105,14 @@ export interface UserDayAnnotation {
   dateKey: string;
   /** Freitext, maximal 50 Zeichen. */
   label: string;
-  colorId: AnnotationColorId | null;
+  /**
+   * Persönliche Farben je Spalte (Spaltenname -> colorId).
+   *
+   * Der gezogene Streifen setzt die drei linken Spalten ('weekday', 'day',
+   * 'shift'); der DayEditor setzt die Informationsspalte ('info'). Fehlende
+   * Einträge bedeuten "keine Farbe" für diese Spalte.
+   */
+  colors: Partial<Record<ColumnColorName, AnnotationColorId>>;
 }
 
 /** Monatskennzahlen. */

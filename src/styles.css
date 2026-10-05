@@ -308,6 +308,16 @@ body {
   gap: 5px;
 }
 
+/**
+ * Erste Legendenzeile: Gesamtzahl der gearbeiteten Schichten des Jahres.
+ * flex-basis 100 % erzwingt eine eigene Zeile ganz oben in der Legende.
+ */
+.legend-total {
+  flex-basis: 100%;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
 .legend-item strong {
   color: var(--color-text);
 }
@@ -510,7 +520,19 @@ body {
   border-left: 1px solid var(--color-border);
 }
 
+/**
+ * Infozelle.
+ *
+ * `align-self: stretch` streckt die Zelle über die volle Zeilenhöhe. Nur so
+ * deckt ein gesetzter Hintergrund (persönliche Farbe) den kompletten
+ * Zellenbereich ab - bis zu den durchgehenden senkrechten Trennstrichen, die
+ * von den Spalten Wochentag/Datum/T-N gebildet werden. `display: flex` mit
+ * `align-items: center` zentriert den einzeiligen Text vertikal in der Zelle.
+ */
 .cell-information {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
   padding-left: 4px;
   min-width: 0;
   white-space: normal;
@@ -527,14 +549,25 @@ body {
  * harten Zeilenumbrüche (`\n`) auch tatsächlich als Zeilenumbrüche erscheinen.
  * Mit `normal` würden sie zu Leerzeichen zusammengezogen und die drei
  * eingegebenen Zeilen erschienen innerhalb der Zelle nebeneinander.
+ *
+ * Die Zelle ist ein senkrechter Flex-Container mit `justify-content: center`.
+ * Nur so steht ein- und zweizeiliger Text **vertikal mittig** in der Zelle; die
+ * frühere Variante mit `display: -webkit-box` und `-webkit-box-pack: center`
+ * ließ den Text trotz `align-self: stretch` oben kleben. `align-items:
+ * flex-start` hält den Text dabei **linksbündig** (nicht horizontal
+ * zentriert), `text-align: left` sichert das auch für die geclippte
+ * Textbox. Dreizeiliger Text füllt die Zelle ohnehin fast vollständig aus.
  */
 .cell-information.label-lines-1,
 .cell-information.label-lines-2,
 .cell-information.label-lines-3 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  /* Volle Zellenhöhe für den Hintergrund (siehe .cell-information). */
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* vertikal zentriert */
+  align-items: flex-start; /* linksbündig */
+  text-align: left;
   white-space: pre-line;
   overflow: hidden;
   overflow-wrap: anywhere;
@@ -698,6 +731,33 @@ body {
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
 }
+
+/* ------------------------------------------------- Streak-Auswahl */
+
+/**
+ * Während eines Ziehens über eine der Zieh-Spalten (Wochentag, Tagesnummer,
+ * T/N) wird ausschließlich die gestartete Spalte hervorgehoben. Die
+ * Hervorhebung liegt auf der Zelle, damit nur diese Spalte sichtbar wird.
+ */
+.cell.is-column-selected {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+  background: var(--color-accent-soft);
+}
+
+/* Die Zieh-Spalten zeigen den Greif-Cursor: hier beginnt der Streifen. */
+.cell-weekday,
+.cell-day,
+.cell-shift {
+  cursor: crosshair;
+}
+
+.streak-summary {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
 
 /* ------------------------------------------------- Responsive Raster */
 

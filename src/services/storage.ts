@@ -10,12 +10,13 @@ import type {
   AnnotationColorId,
   AnnotationMap,
   AppSettings,
+  ColumnColorName,
   PersistedState,
   ShiftId,
   UserDayAnnotation,
 } from '../domain/types';
 import { SHIFT_IDS } from '../config/shiftDefinitions';
-import { isAnnotationColorId } from '../config/annotationColors';
+import { isAnnotationColorId, isColumnColorName } from '../config/annotationColors';
 import { DEFAULT_SETTINGS } from '../config/appDefaults';
 import { isValidDateKey } from '../utils/dateUtils';
 
@@ -58,13 +59,28 @@ function isPlausibleYear(value: unknown): value is number {
 /** Bereinigt ein einzelnes Annotationsobjekt oder liefert null. */
 export function normalizeAnnotation(value: unknown): UserDayAnnotation | null {
   if (!value || typeof value !== 'object') return null;
-  const candidate = value as Partial<UserDayAnnotation>;
+  const candidate = value as Partial<UserDayAnnotation> & { colorId?: unknown };
   if (typeof candidate.dateKey !== 'string' || !isValidDateKey(candidate.dateKey)) return null;
   const label = normalizeLabel(candidate.label ?? '');
-  const colorId = isAnnotationColorId(candidate.colorId) ? candidate.colorId : null;
+
+  const colors: Partial<Record<ColumnColorName, AnnotationColorId>> = {};
+  const rawColors = candidate.colors;
+  if (rawColors && typeof rawColors === 'object') {
+    for (const [column, colorId] of Object.entries(rawColors as Record<string, unknown>)) {
+      if (isColumnColorName(column) && isAnnotationColorId(colorId)) {
+        colors[column] = colorId;
+      }
+    }
+  }
+  // Rückwärtskompatibilität: die frühere Tagesfarbe (`colorId`) entsprach der
+  // Farbe der Informationsspalte und wird dorthin übernommen.
+  if (candidate.colorId !== undefined && colors.info === undefined && isAnnotationColorId(candidate.colorId)) {
+    colors.info = candidate.colorId;
+  }
+
   // Vollständig leere Annotationen werden nicht gespeichert.
-  if (label === '' && colorId === null) return null;
-  return { dateKey: candidate.dateKey, label, colorId };
+  if (label === '' && Object.keys(colors).length === 0) return null;
+  return { dateKey: candidate.dateKey, label, colors };
 }
 
 /** Bereinigt Einstellungen. */
@@ -163,10 +179,19 @@ export function saveSettings(
   return writeState({ version: STORAGE_VERSION, settings, annotations }, storage);
 }
 
-/** Farbe einer Annotation (null, wenn keine gesetzt ist). */
+/** Farbe der Informationsspalte einer Annotation (null, wenn keine gesetzt ist). */
 export function getAnnotationColorId(
   annotations: AnnotationMap,
   dateKey: string,
 ): AnnotationColorId | null {
-  return annotations[dateKey]?.colorId ?? null;
+  return annotations[dateKey]?.colors.info ?? null;
+}
+
+/** Farbe einer beliebigen Spalte einer Annotation (null, wenn keine gesetzt ist). */
+export function getColumnColorId(
+  annotations: AnnotationMap,
+  dateKey: string,
+  column: ColumnColorName,
+): AnnotationColorId | null {
+  return annotations[dateKey]?.colors[column] ?? null;
 }

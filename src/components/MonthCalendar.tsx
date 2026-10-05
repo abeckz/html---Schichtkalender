@@ -11,16 +11,32 @@
  * angezeigt.
  */
 
-import type { AnnotationMap, CalendarDay, MonthCalendar as MonthCalendarModel } from '../domain/types';
+import type { AnnotationMap, CalendarDay, ColumnColorName, MonthCalendar as MonthCalendarModel } from '../domain/types';
 import { CalendarDayRow } from './CalendarDayRow';
 
 export interface MonthCalendarProps {
   month: MonthCalendarModel;
   annotations: AnnotationMap;
   onOpenEditor: (day: CalendarDay) => void;
+  /** dateKeys der aktuell markierten Streifen-Auswahl. */
+  selectedKeys?: ReadonlySet<string>;
+  /** Spalte, die während der aktuellen Streifen-Auswahl hervorgehoben wird. */
+  selectedColumn?: ColumnColorName | null;
+  onStreakStart?: (day: CalendarDay, column: ColumnColorName) => void;
+  onStreakEnter?: (day: CalendarDay) => void;
+  onStreakEnd?: () => void;
 }
 
-export function MonthCalendar({ month, annotations, onOpenEditor }: MonthCalendarProps) {
+export function MonthCalendar({
+  month,
+  annotations,
+  onOpenEditor,
+  selectedKeys,
+  selectedColumn,
+  onStreakStart,
+  onStreakEnter,
+  onStreakEnd,
+}: MonthCalendarProps) {
   const { statistics } = month;
   return (
     <section className="month-card" aria-label={`${month.name} ${month.year}`}>
@@ -43,6 +59,11 @@ export function MonthCalendar({ month, annotations, onOpenEditor }: MonthCalenda
             day={day}
             annotation={annotations[day.dateKey]}
             onOpenEditor={onOpenEditor}
+            isSelected={selectedKeys?.has(day.dateKey) ?? false}
+            selectedColumn={selectedColumn}
+            onStreakStart={onStreakStart}
+            onStreakEnter={onStreakEnter}
+            onStreakEnd={onStreakEnd}
           />
         ))}
       </div>

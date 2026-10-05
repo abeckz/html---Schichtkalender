@@ -17,6 +17,8 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
 import { App } from '../components/App';
+import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder';
+import { DEFAULT_SHIFT } from '../config/appDefaults';
 import {
   THEME_ATTRIBUTE,
   THEME_STORAGE_KEY,
@@ -172,7 +174,7 @@ describe('Bildschirmdarstellung', () => {
     // blieben gespeicherte Kommentare beim Start unsichtbar.
     const year = 2021;
     const storedAnnotations = {
-      '2021-05-01': { dateKey: '2021-05-01', label: 'Bereitschaft', colorId: 'yellow' },
+      '2021-05-01': { dateKey: '2021-05-01', label: 'Bereitschaft', colors: { info: 'yellow' } },
     };
     window.localStorage.setItem(
       'schichtkalender.state',
@@ -353,6 +355,26 @@ describe('Bildschirmdarstellung', () => {
     expect(legend?.querySelector('.holiday-mark')?.textContent).toBe('F!');
   });
 
+  it('zeigt oben in der Legende die Arbeitsschichten gesamt im Jahr', () => {
+    const container = render(<App />);
+    const legend = container.querySelector('.legend');
+    expect(legend).toBeDefined();
+
+    // Die Anwendung startet beim aktuellen Jahr und der Standardschicht.
+    // Die Gesamtzahl entspricht Tag- plus Nachtschichten des Jahres.
+    const expected = summarizeYear(
+      buildYearCalendar({ year: startYear, selectedShift: DEFAULT_SHIFT }),
+    ).requiredShiftCount;
+
+    const total = legend?.querySelector('.legend-total');
+    expect(total).toBeDefined();
+    // Die Zeile steht ganz oben in der Legende.
+    expect(legend?.firstElementChild).toBe(total);
+    expect(total?.textContent).toBe(
+      `Arbeitsschichten gesamt im Jahr ${startYear} für Schicht ${DEFAULT_SHIFT}: ${expected}`,
+    );
+  });
+
   it('schaltet die Anzeige zwischen Hell und Dunkel um', () => {
     const container = render(<App />);
     const buttons = Array.from(container.querySelectorAll('.theme-button'));
@@ -394,6 +416,103 @@ describe('Bildschirmdarstellung', () => {
       // Ohne Eingabe gilt die Ein-Zeilen-Klasse mit der größten Schrift.
       expect(field?.classList.contains('label-lines-1')).toBe(true);
       expect(Number.parseFloat(field?.style.fontSize ?? '0')).toBeGreaterThan(0);
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('markiert per vertikalem Ziehen einen Streifen und färbt ihn spaltenweise ein', () => {
+    // Regression-Anforderung: Mit gedrückter und gezogener Maustaste lässt
+    // sich vertikal über eine einzelne Zieh-Spalte (hier: die T/N-Zelle) ein
+    // Streifen markieren. Beim Loslassen öffnet sich ein Fenster, in dem
+    // ausschließlich diese Spalte eingefärbt wird. Bestehende Beschriftungen
+    // und andere Spaltenfarben bleiben erhalten.
+    const year = 2021;
+    window.localStorage.setItem(
+      'schichtkalender.state',
+      JSON.stringify({
+        version: 1,
+        settings: { selectedYear: year, selectedShift: 'C' },
+        annotations: {
+          '2021-03-15': { dateKey: '2021-03-15', label: 'Urlaub', colors: {} },
+        },
+      }),
+    );
+
+    function mouse(element: Element | null, type: string, target?: Element) {
+      if (!element) throw new Error('Element nicht gefunden.');
+      const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 });
+      act(() => {
+        (target ?? element).dispatchEvent(event);
+      });
+    }
+
+    try {
+      const container = render(<App />);
+      const march = Array.from(container.querySelectorAll('.month-card')).find(
+        (card) => card.getAttribute('aria-label') === `März ${year}`,
+      );
+      expect(march).toBeDefined();
+
+      const marchRows = Array.from(march!.querySelectorAll('.day-row'));
+
+      // Die ersten drei zusammenhängenden Tage des Monats markieren.
+      const rows = marchRows.slice(0, 3);
+      expect(rows.length).toBe(3);
+
+      // Ziehen beginnt in der T/N-Zelle (Zieh-Spalte) der ersten Zeile.
+      mouse(rows[0], 'mousedown', rows[0].querySelector('.cell-shift') ?? rows[0]);
+      for (const row of rows.slice(1)) {
+        // React leitet onMouseEnter aus mouseover ab; im Test wird daher
+        // mouseover (mit relatedTarget außerhalb) ausgelöst.
+        act(() => {
+          row.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        });
+      }
+      // Loslassen beendet die Auswahl und öffnet das Streifen-Fenster.
+      mouse(rows[2], 'mouseup', rows[2].querySelector('.cell-shift') ?? rows[2]);
+      act(() => {
+        window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      });
+
+      const dialog = container.querySelector('.day-editor');
+      expect(dialog).not.toBeNull();
+      expect(dialog?.textContent).toContain('Streifen einfärben');
+      expect(dialog?.textContent).toContain('3 Tage markiert');
+      // Die Zusammenfassung nennt die gestartete Spalte.
+      expect(dialog?.textContent).toContain('T/N');
+
+      // Einfärben: eine Farbe wählen und anwenden.
+      const yellow = Array.from(dialog!.querySelectorAll('.color-option')).find((option) =>
+        option.textContent?.includes('Gelb'),
+      );
+      click(yellow ?? null);
+      const apply = Array.from(dialog!.querySelectorAll('button')).find(
+        (button) => button.textContent === 'Einfärben',
+      );
+      click(apply ?? null);
+
+      // Die drei Tage tragen nun die Farbe ausschließlich in der gestarteten
+      // Spalte (shift); die übrigen Spalten bleiben ungefärbt. Der Dialog ist
+      // geschlossen.
+      expect(container.querySelector('.day-editor')).toBeNull();
+      const persisted = JSON.parse(window.localStorage.getItem('schichtkalender.state') ?? '{}');
+      // Die drei gefärbten Tage plus die unveränderte Altmarkierung am 15.03.
+      expect(persisted.annotations['2021-03-01']).toEqual({
+        dateKey: '2021-03-01',
+        label: '',
+        colors: { shift: 'yellow' },
+      });
+      expect(persisted.annotations['2021-03-02'].colors.shift).toBe('yellow');
+      expect(persisted.annotations['2021-03-03'].colors.shift).toBe('yellow');
+      expect(persisted.annotations['2021-03-02'].colors.weekday).toBeUndefined();
+      // Bestehende Beschriftung außerhalb der Auswahl bleibt vollständig
+      // unverändert (Farbe und Beschriftung).
+      expect(persisted.annotations['2021-03-15']).toEqual({
+        dateKey: '2021-03-15',
+        label: 'Urlaub',
+        colors: {},
+      });
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }

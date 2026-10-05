@@ -3,6 +3,9 @@
  *
  * Sehr kompakt: Titel, Jahr, Schicht sowie die einmalige Erklärung der
  * Kennzahlen links und rechts am Monatsnamen.
+ *
+ * Die erste Legendenzeile nennt die Gesamtzahl der im Jahr für die gewählte
+ * Schicht gearbeiteten Schichten (Tag- plus Nachtschichten).
  */
 
 import type { ShiftId } from '../domain/types';
@@ -11,9 +14,11 @@ import { PUBLIC_HOLIDAY_MARK } from './PrintMonth';
 export interface PrintHeaderProps {
   year: number;
   selectedShift: ShiftId;
+  /** Gearbeitete Schichten insgesamt (Tag- plus Nachtschichten) des Jahres. */
+  workedShiftCount: number;
 }
 
-export function PrintHeader({ year, selectedShift }: PrintHeaderProps) {
+export function PrintHeader({ year, selectedShift, workedShiftCount }: PrintHeaderProps) {
   return (
     <header className="print-page-header">
       <div className="print-header-row">
@@ -22,6 +27,10 @@ export function PrintHeader({ year, selectedShift }: PrintHeaderProps) {
         <span className="print-header-shift">Schicht {selectedShift}</span>
       </div>
       <div className="print-header-legend">
+        <span className="print-header-total">
+          Arbeitsschichten gesamt im Jahr {year} für Schicht {selectedShift}:{' '}
+          {workedShiftCount}
+        </span>
         <span>T = Tagschicht 6-18 Uhr</span>
         <span>N = Nachtschicht 18-6 Uhr</span>
         <span>Zahl links am Monat: Werktage Mo-Fr</span>

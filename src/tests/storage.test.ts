@@ -51,41 +51,52 @@ describe('Normalisierung einzelner Annotationen', () => {
     const annotation: UserDayAnnotation = {
       dateKey: '2021-01-01',
       label: 'Arzt',
-      colorId: 'green',
+      colors: { info: 'green' },
     };
     expect(normalizeAnnotation(annotation)).toEqual(annotation);
   });
 
   it('lehnt ungültige dateKeys ab', () => {
-    expect(normalizeAnnotation({ dateKey: '2021-02-30', label: 'x', colorId: null })).toBeNull();
-    expect(normalizeAnnotation({ dateKey: '01.01.2021', label: 'x', colorId: null })).toBeNull();
+    expect(normalizeAnnotation({ dateKey: '2021-02-30', label: 'x' })).toBeNull();
+    expect(normalizeAnnotation({ dateKey: '01.01.2021', label: 'x' })).toBeNull();
     expect(normalizeAnnotation({ label: 'x' })).toBeNull();
     expect(normalizeAnnotation(null)).toBeNull();
     expect(normalizeAnnotation('text')).toBeNull();
   });
 
-  it('setzt unbekannte Farben auf null und kürzt Labels', () => {
+  it('behält gültige Spaltenfarben und verwirft unbekannte', () => {
     const result = normalizeAnnotation({
       dateKey: '2021-05-05',
       label: 'y'.repeat(80),
-      colorId: 'neonpink',
+      colors: { weekday: 'red', day: 'neonpink', unbekannt: 'blue', shift: 42 },
     });
     expect(result).toEqual({
       dateKey: '2021-05-05',
       label: 'y'.repeat(MAX_LABEL_LENGTH),
-      colorId: null,
+      colors: { weekday: 'red' },
     });
   });
 
   it('verwirft vollständig leere Annotationen', () => {
-    expect(normalizeAnnotation({ dateKey: '2021-05-05', label: '', colorId: null })).toBeNull();
+    expect(normalizeAnnotation({ dateKey: '2021-05-05', label: '', colors: {} })).toBeNull();
+    expect(normalizeAnnotation({ dateKey: '2021-05-05', label: '' })).toBeNull();
+  });
+
+  it('übernimmt das frühere colorId als Farbe der Informationsspalte', () => {
+    // Abwärtskompatibilität: ältere Speicherstände nutzten ein einzelnes
+    // `colorId`; es entsprach der persönlichen Tagesfarbe (Info-Spalte).
+    expect(normalizeAnnotation({ dateKey: '2021-05-05', label: 'Alt', colorId: 'red' })).toEqual({
+      dateKey: '2021-05-05',
+      label: 'Alt',
+      colors: { info: 'red' },
+    });
   });
 
   it('bereinigt eine Sammlung und indexiert nach dateKey', () => {
     const map = normalizeAnnotations({
-      a: { dateKey: '2021-01-01', label: 'A', colorId: 'red' },
-      b: { dateKey: '2021-01-01', label: 'B', colorId: 'blue' },
-      c: { dateKey: 'ungültig', label: 'C', colorId: 'blue' },
+      a: { dateKey: '2021-01-01', label: 'A', colors: { info: 'red' } },
+      b: { dateKey: '2021-01-01', label: 'B', colors: { info: 'blue' } },
+      c: { dateKey: 'ungültig', label: 'C', colors: { info: 'blue' } },
     });
     expect(Object.keys(map)).toEqual(['2021-01-01']);
     expect(map['2021-01-01'].label).toBe('B');
@@ -112,7 +123,7 @@ describe('Lesen und Schreiben', () => {
     version: 1,
     settings: { selectedYear: 2023, selectedShift: 'B' },
     annotations: {
-      '2023-04-04': { dateKey: '2023-04-04', label: 'Urlaub', colorId: 'orange' },
+      '2023-04-04': { dateKey: '2023-04-04', label: 'Urlaub', colors: { info: 'orange' } },
     },
   };
 
@@ -155,7 +166,7 @@ describe('Lesen und Schreiben', () => {
     expect(loaded.annotations['2024-06-01']).toEqual({
       dateKey: '2024-06-01',
       label: 'Test',
-      colorId: null,
+      colors: {},
     });
   });
 
@@ -174,7 +185,7 @@ describe('Lesen und Schreiben', () => {
   it('speichert Einstellungen mit Annotationen über saveSettings', () => {
     const storage = createMemoryStorage();
     const annotations: AnnotationMap = {
-      '2021-12-24': { dateKey: '2021-12-24', label: 'frei', colorId: 'pink' },
+      '2021-12-24': { dateKey: '2021-12-24', label: 'frei', colors: { info: 'pink' } },
     };
     expect(saveSettings({ selectedYear: 2021, selectedShift: 'C' }, annotations, storage)).toBe(
       true,

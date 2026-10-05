@@ -105,6 +105,15 @@
   line-height: 1.2;
 }
 
+/**
+ * Erste Legendenzeile: Gesamtzahl der gearbeiteten Schichten des Jahres.
+ * flex-basis 100 % erzwingt eine eigene Zeile ganz oben in der Legende.
+ */
+.print-header-total {
+  flex-basis: 100%;
+  font-weight: 700;
+}
+
 /* --------------------------------------------- Halbjahr: 1 x 6 Monate */
 
 .print-half-year {
@@ -254,7 +263,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/**
+ * Infozelle.
+ *
+ * `align-self: stretch` streckt die Zelle über die volle Zeilenhöhe. Nur so
+ * deckt ein gesetzter Hintergrund (persönliche Farbe) den kompletten
+ * Zellenbereich ab - bis zu den durchgehenden senkrechten Trennstrichen, die
+ * von den Spalten wo/datum/schicht gebildet werden. `display: flex` mit
+ * `align-items: center` zentriert den einzeiligen Text vertikal in der Zelle.
+ */
 .print-col-info {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
   font-size: 7pt;
   font-weight: 400;
 }
@@ -269,14 +290,25 @@
  * harten Zeilenumbrüche (`\n`) auch im Druck als Zeilenumbrüche erscheinen.
  * Mit `normal` würden sie zu Leerzeichen zusammengezogen und die drei
  * eingegebenen Zeilen erschienen innerhalb der Zelle nebeneinander.
+ *
+ * Die Zelle ist ein senkrechter Flex-Container mit `justify-content: center`.
+ * Nur so steht ein- und zweizeiliger Text **vertikal mittig** in der Zelle; die
+ * frühere Variante mit `display: -webkit-box` und `-webkit-box-pack: center`
+ * ließ den Text trotz `align-self: stretch` oben kleben. `align-items:
+ * flex-start` hält den Text dabei **linksbündig** (nicht horizontal
+ * zentriert), `text-align: left` sichert das auch für die geclippte
+ * Textbox. Dreizeiliger Text füllt die Zelle ohnehin fast vollständig aus.
  */
 .print-row > .print-col-info.label-lines-1,
 .print-row > .print-col-info.label-lines-2,
 .print-row > .print-col-info.label-lines-3 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  /* Volle Zellenhöhe für den Hintergrund (siehe .print-col-info). */
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* vertikal zentriert */
+  align-items: flex-start; /* linksbündig */
+  text-align: left;
   white-space: pre-line;
   overflow: hidden;
   overflow-wrap: anywhere;

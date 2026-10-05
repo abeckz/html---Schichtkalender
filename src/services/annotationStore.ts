@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { AnnotationColorId, AnnotationMap, AppSettings } from '../domain/types';
+import type { AnnotationColorId, AnnotationMap, AppSettings, ColumnColorName } from '../domain/types';
 import {
   getDefaultStorage,
   normalizeAnnotation,
@@ -25,6 +25,18 @@ export interface AnnotationStore {
   setAnnotation: (dateKey: string, label: string, colorId: AnnotationColorId | null) => void;
   /** Entfernt nur Beschriftung und Farbe eines Tages. */
   resetAnnotation: (dateKey: string) => void;
+  /**
+   * Setzt die Farbe einer Spalte für mehrere Tage auf einmal
+   * (Streifen-Markierung).
+   *
+   * Bestehende Beschriftungen und übrige Spaltenfarben bleiben unverändert
+   * erhalten. Eine Farbe von null entfernt nur die Farbe dieser Spalte.
+   */
+  setColumnColorForDateKeys: (
+    dateKeys: readonly string[],
+    column: ColumnColorName,
+    colorId: AnnotationColorId | null,
+  ) => void;
   /** Ersetzt die gesamte Map (Reset/Import). */
   replaceAnnotations: (next: AnnotationMap) => void;
 }
@@ -58,7 +70,14 @@ export function useAnnotationStore(
   const setAnnotation = useCallback(
     (dateKey: string, label: string, colorId: AnnotationColorId | null) => {
       setAnnotations((current) => {
-        const normalized = normalizeAnnotation({ dateKey, label, colorId });
+        const existing = current[dateKey];
+        const colors = { ...(existing?.colors ?? {}) };
+        if (colorId) {
+          colors.info = colorId;
+        } else {
+          delete colors.info;
+        }
+        const normalized = normalizeAnnotation({ dateKey, label, colors });
         const next = { ...current };
         if (normalized) {
           next[dateKey] = normalized;
@@ -80,9 +99,45 @@ export function useAnnotationStore(
     });
   }, []);
 
+  const setColumnColorForDateKeys = useCallback(
+    (
+      dateKeys: readonly string[],
+      column: ColumnColorName,
+      colorId: AnnotationColorId | null,
+    ) => {
+      setAnnotations((current) => {
+        const next = { ...current };
+        for (const dateKey of dateKeys) {
+          const existing = current[dateKey];
+          const label = existing?.label ?? '';
+          const colors = { ...(existing?.colors ?? {}) };
+          if (colorId) {
+            colors[column] = colorId;
+          } else {
+            delete colors[column];
+          }
+          const normalized = normalizeAnnotation({ dateKey, label, colors });
+          if (normalized) {
+            next[dateKey] = normalized;
+          } else {
+            delete next[dateKey];
+          }
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
   const replaceAnnotations = useCallback((next: AnnotationMap) => {
     setAnnotations(next);
   }, []);
 
-  return { annotations, setAnnotation, resetAnnotation, replaceAnnotations };
+  return {
+    annotations,
+    setAnnotation,
+    resetAnnotation,
+    setColumnColorForDateKeys,
+    replaceAnnotations,
+  };
 }
