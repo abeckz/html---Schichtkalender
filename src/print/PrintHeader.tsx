@@ -35,7 +35,6 @@ export function PrintHeader({ year, selectedShift, workedShiftCount }: PrintHead
         <span>N = Nachtschicht 18-6 Uhr</span>
         <span>Zahl links am Monat: Werktage Mo-Fr</span>
         <span>Zahl rechts am Monat: Sollschichten T+N</span>
-        <span>Feiertage mit Schicht: nur Feiertage, die mit T/N zusammenfallen</span>
         <span>{PUBLIC_HOLIDAY_MARK}: gesetzlicher Feiertag (Rheinland-Pfalz)</span>
       </div>
     </header>
