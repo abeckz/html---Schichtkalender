@@ -18,6 +18,8 @@ export interface SettingsStore {
   settings: AppSettings;
   setYear: (year: number) => void;
   setShift: (shiftId: ShiftId) => void;
+  /** Übernimmt Jahr und Schicht gemeinsam (z. B. beim Laden einer Datei). */
+  setSettings: (next: Partial<AppSettings>) => void;
   goToPreviousYear: () => void;
   goToNextYear: () => void;
   canGoToPreviousYear: boolean;
@@ -63,6 +65,14 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
     setSettings((current) => ({ ...current, selectedShift: shiftId }));
   }, []);
 
+  const replaceSettings = useCallback((next: Partial<AppSettings>) => {
+    setSettings((current) => ({
+      selectedYear:
+        next.selectedYear !== undefined ? clampYear(next.selectedYear) : current.selectedYear,
+      selectedShift: next.selectedShift ?? current.selectedShift,
+    }));
+  }, []);
+
   const goToPreviousYear = useCallback(() => {
     setSettings((current) => ({
       ...current,
@@ -81,6 +91,7 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
     settings,
     setYear,
     setShift,
+    setSettings: replaceSettings,
     goToPreviousYear,
     goToNextYear,
     canGoToPreviousYear: settings.selectedYear > MIN_YEAR,

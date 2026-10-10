@@ -26,6 +26,7 @@ import {
   readThemePreference,
   resolveTheme,
 } from '../services/themeStore';
+import { parseState, serializeState } from '../services/persistence';
 
 /**
  * Startjahr der Anwendung: das aktuelle Jahr. Die Feiertagspr�fungen pr�fen
@@ -34,10 +35,29 @@ import {
  */
 const startYear = new Date().getFullYear();
 
+/**
+ * Gemountete Wurzeln aller Renderaufrufe. Die Tests brauchen dies, um vor
+ * einem neuen Render die vorherigen Anwendungen sauber zu entfernen; sonst
+ * würden mehrere App-Instanzen parallel am selben `window` lauschen (z. B. am
+ * `beforeunload`-Ereignis).
+ */
+const mountedRoots: { root: ReturnType<typeof createRoot>; container: HTMLElement }[] = [];
+
+/** Entfernt alle zuvor gerenderten Anwendungen (inkl. ihrer Listener). */
+function unmountAll(): void {
+  for (const entry of mountedRoots.splice(0)) {
+    act(() => {
+      entry.root.unmount();
+    });
+    entry.container.remove();
+  }
+}
+
 function render(element: React.ReactElement): HTMLElement {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
+  mountedRoots.push({ root, container });
   act(() => {
     root.render(<StrictMode>{element}</StrictMode>);
   });
@@ -513,6 +533,110 @@ describe('Bildschirmdarstellung', () => {
         label: 'Urlaub',
         colors: {},
       });
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('übernimmt eine geladene Sicherungsdatei in Einstellungen und Kalender', async () => {
+    // Dateibasierte Persistenz: Eine zuvor erzeugte Sicherung (serializeState)
+    // wird über den Lade-Baustein wieder eingelesen und muss Jahr und Schicht
+    // sichtbar übernehmen.
+    const container = render(<App />);
+    const fileButton = Array.from(container.querySelectorAll('.data-controls button')).find(
+      (button) => button.textContent?.includes('Laden'),
+    );
+    expect(fileButton).toBeDefined();
+
+    const state = {
+      version: 1,
+      settings: { selectedYear: 2022, selectedShift: 'B' as const },
+      annotations: {
+        '2022-05-05': { dateKey: '2022-05-05', label: 'Schulung', colors: { info: 'green' as const } },
+      },
+    };
+    const parsed = parseState(serializeState(state));
+    expect(parsed?.settings.selectedYear).toBe(2022);
+
+    // Den Datei-Dialog umgehen: das Lesen läuft über den FileReader und ist
+    // asynchron. Daher wird der Change-Event samt nachgelagerter Zustands-
+    // aktualisierung mit einer asynchronen act-Hülle umschlossen.
+    const input = container.querySelector(
+      '.data-controls input[type="file"]',
+    ) as HTMLInputElement;
+    expect(input).not.toBeNull();
+    const file = new File([serializeState(state)], 'schichtkalender-2022.json', {
+      type: 'application/json',
+    });
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+
+    await act(async () => {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      // Dem FileReader Zeit geben, das Promise aufzulösen.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const select = container.querySelector('.year-select') as HTMLSelectElement | null;
+    expect(select?.value).toBe('2022');
+    const activeShift = container.querySelector('.shift-button.is-active');
+    expect(activeShift?.textContent).toBe('B');
+  });
+});
+
+describe('Warnung bei ungespeicherten Daten', () => {
+  it('blockiert das Schließen und zeigt den Hinweis, sobald Änderungen vorliegen', () => {
+    // Frühere Renderaufrufe entfernen, damit nur diese App am window lauscht.
+    unmountAll();
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      // Ohne Änderungen (leerer Zustand): kein Blockieren.
+      const clean = new Event('beforeunload', { cancelable: true });
+      act(() => {
+        window.dispatchEvent(clean);
+      });
+      expect(clean.defaultPrevented).toBe(false);
+      expect(container.querySelector('.unsaved-dialog')).toBeNull();
+
+      // Eine persönliche Markierung setzen (Tag öffnen, speichern).
+      const row = container.querySelector('.day-row');
+      expect(row).not.toBeNull();
+      click(row);
+
+      const editor = container.querySelector('.day-editor');
+      expect(editor).not.toBeNull();
+      const textarea = editor!.querySelector('textarea') as HTMLTextAreaElement;
+      act(() => {
+        // Der Change-Handler liest event.target.value.
+        const setter = Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          'value',
+        )?.set;
+        setter?.call(textarea, 'Notiz');
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      const saveButton = Array.from(editor!.querySelectorAll('button')).find(
+        (button) => button.textContent === 'Speichern',
+      );
+      click(saveButton ?? null);
+
+      // Nun gibt es ungespeicherte Änderungen: das Schließen wird blockiert.
+      const blocked = new Event('beforeunload', { cancelable: true });
+      act(() => {
+        window.dispatchEvent(blocked);
+      });
+      expect(blocked.defaultPrevented).toBe(true);
+      expect(container.querySelector('.unsaved-dialog')).not.toBeNull();
+      expect(container.querySelector('.unsaved-dialog')?.textContent).toContain(
+        'Ungespeicherte Daten',
+      );
+
+      // Abbrechen schließt nur das Hinweisfenster und kehrt zur App zurück.
+      const cancel = Array.from(
+        container.querySelectorAll('.unsaved-dialog button'),
+      ).find((button) => button.textContent === 'Abbrechen');
+      click(cancel ?? null);
+      expect(container.querySelector('.unsaved-dialog')).toBeNull();
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }

@@ -26,6 +26,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // Zentrale Testfreigabe (u. a. IS_REACT_ACT_ENVIRONMENT für Reacts act).
+    setupFiles: ['src/tests/setupTests.ts'],
     globals: false,
   },
 });

@@ -7,30 +7,52 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AnnotationColorId, CalendarDay, ColumnColorName } from '../domain/types';
+import type {
+  AnnotationColorId,
+  CalendarDay,
+  ColumnColorName,
+  PersistedState,
+} from '../domain/types';
 import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder';
 import { useSettingsStore } from '../services/settingsStore';
 import { useAnnotationStore } from '../services/annotationStore';
 import { useThemeStore } from '../services/themeStore';
+import { STORAGE_VERSION } from '../services/storage';
+import { saveState } from '../services/persistence';
+import { useUnsavedChangesGuard } from '../services/unsavedChanges';
 import { Toolbar } from './Toolbar';
 import { YearCalendar } from './YearCalendar';
 import { CalendarLegend } from './CalendarLegend';
 import { DayEditor } from './DayEditor';
 import { StreakEditor } from './StreakEditor';
+import { UnsavedChangesDialog } from './UnsavedChangesDialog';
 import { PrintCalendar } from '../print/PrintCalendar';
 
 export type AppView = 'screen' | 'print';
 
 export function App() {
-  const { settings, setYear, setShift, goToPreviousYear, goToNextYear, canGoToPreviousYear, canGoToNextYear } =
+  const { settings, setYear, setShift, setSettings, goToPreviousYear, goToNextYear, canGoToPreviousYear, canGoToNextYear } =
     useSettingsStore();
-  const { annotations, setAnnotation, resetAnnotation, setColumnColorForDateKeys } =
+  const { annotations, setAnnotation, resetAnnotation, setColumnColorForDateKeys, replaceAnnotations } =
     useAnnotationStore(settings);
   // Anzeige-Einstellung (Hell/Dunkel): reine Darstellung, keine Fachdaten.
   const theme = useThemeStore();
 
   const [view, setView] = useState<AppView>('screen');
   const [editingDay, setEditingDay] = useState<CalendarDay | null>(null);
+
+  // Hinweis-Fenster bei ungespeicherten Daten (Schließen-Versuch).
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+
+  // Aktueller Zustand als ein Objekt; Grundlage für Signatur und Speicherung.
+  const currentState: PersistedState = useMemo(
+    () => ({ version: STORAGE_VERSION, settings, annotations }),
+    [settings, annotations],
+  );
+
+  // Überwachung ungespeicherter Änderungen: blockiert das Schließen des
+  // Fensters (beforeunload) und öffnet zusätzlich den eigenen Hinweis.
+  const unsaved = useUnsavedChangesGuard(currentState, () => setShowUnsavedDialog(true));
 
   // Streifen-Auswahl (vertikales Ziehen mit gedrückter Maustaste). Die
   // markierten Tage werden beim Loslassen in einem eigenen Fenster eingefärbt.
@@ -125,6 +147,59 @@ export function App() {
     window.print();
   }, []);
 
+  // Datei-Sicherung: der aktuelle Zustand (Einstellungen + Annotationen)
+  // wird als JSON-Datei gesichert. Bevorzugt über den Systemdialog
+  // (Chrome/Edge), sonst als Download. Nach Erfolg gilt der Zustand als
+  // gesichert (keine Warnung mehr beim Schließen).
+  const handleSaveFile = useCallback(async (): Promise<boolean> => {
+    const state: PersistedState = { version: STORAGE_VERSION, settings, annotations };
+    const outcome = await saveState(state);
+    if (outcome === 'saved') {
+      unsaved.markSaved(state);
+      setShowUnsavedDialog(false);
+      return true;
+    }
+    return false;
+  }, [settings, annotations, unsaved]);
+
+  // Datei laden: übernimmt Einstellungen und Annotationen gemeinsam. Die
+  // Werte sind bereits durch parseState bereinigt; der Handler bleibt daher
+  // schlank und verändert keine Fachdaten. Der geladene Zustand stammt aus
+  // einer Datei und gilt daher sofort als gesichert.
+  const handleLoadFile = useCallback(
+    (state: PersistedState) => {
+      setSettings(state.settings);
+      replaceAnnotations(state.annotations);
+      unsaved.markLoaded(state);
+      // Nach dem Laden keine offene Tages-/Streifen-Auswahl stehen lassen.
+      setEditingDay(null);
+      setStreakKeys([]);
+      setStreakColumn(null);
+      setStreakDays([]);
+    },
+    [setSettings, replaceAnnotations, unsaved],
+  );
+
+  // Im Hinweis-Fenster: jetzt sichern (bei Erfolg schließt das Fenster).
+  const handleDialogSave = useCallback(() => {
+    void handleSaveFile();
+  }, [handleSaveFile]);
+
+  // Im Hinweis-Fenster: Schließen ohne Speichern bestätigen. Danach wird die
+  // Warnung zurückgesetzt und das Fenster erneut geschlossen.
+  const handleDialogDiscard = useCallback(() => {
+    unsaved.clear();
+    setShowUnsavedDialog(false);
+    // Erneuter Schließversuch; da nun keine Änderungen mehr gemeldet werden,
+    // blockiert der Browser nicht mehr.
+    if (typeof window !== 'undefined') window.close();
+  }, [unsaved]);
+
+  // Im Hinweis-Fenster: Schließen abbrechen (zur Anwendung zurückkehren).
+  const handleDialogCancel = useCallback(() => {
+    setShowUnsavedDialog(false);
+  }, []);
+
   return (
     <div className="app">
       <Toolbar
@@ -138,6 +213,8 @@ export function App() {
         onSelectShift={setShift}
         onOpenPrint={() => setView('print')}
         theme={theme}
+        onSaveFile={handleSaveFile}
+        onLoadFile={handleLoadFile}
       />
 
       {view === 'screen' ? (
@@ -187,6 +264,14 @@ export function App() {
           column={streakColumn}
           onApply={handleStreakApply}
           onClose={handleStreakClose}
+        />
+      )}
+
+      {showUnsavedDialog && (
+        <UnsavedChangesDialog
+          onSave={handleDialogSave}
+          onDiscard={handleDialogDiscard}
+          onCancel={handleDialogCancel}
         />
       )}
     </div>

@@ -10,7 +10,9 @@ import type { ShiftId } from '../domain/types';
 import { YearSelector } from './YearSelector';
 import { ShiftSelector } from './ShiftSelector';
 import { ThemeToggle } from './ThemeToggle';
+import { DataControls } from './DataControls';
 import type { ThemeStore } from '../services/themeStore';
+import type { PersistedState } from '../domain/types';
 
 export interface ToolbarProps {
   year: number;
@@ -23,6 +25,10 @@ export interface ToolbarProps {
   onSelectShift: (shiftId: ShiftId) => void;
   onOpenPrint: () => void;
   theme: ThemeStore;
+  /** Sichert den Zustand als Datei; Rückgabe: Erfolg. */
+  onSaveFile: () => Promise<boolean>;
+  /** Lädt einen zuvor gesicherten Zustand aus einer Datei. */
+  onLoadFile: (state: PersistedState) => void;
 }
 
 export function Toolbar({
@@ -36,6 +42,8 @@ export function Toolbar({
   onSelectShift,
   onOpenPrint,
   theme,
+  onSaveFile,
+  onLoadFile,
 }: ToolbarProps) {
   return (
     <header className="toolbar no-print">
@@ -50,6 +58,7 @@ export function Toolbar({
           canGoNext={canGoNext}
         />
         <ShiftSelector selectedShift={selectedShift} onSelectShift={onSelectShift} />
+        <DataControls onSave={onSaveFile} onLoad={onLoadFile} />
         <ThemeToggle theme={theme} />
         <button type="button" className="primary-button" onClick={onOpenPrint}>
           Druckansicht
