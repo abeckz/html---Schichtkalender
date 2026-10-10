@@ -99,7 +99,7 @@
 .print-header-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 4mm;
+  gap: 0 9mm;
   font-size: 6.5pt;
   color: #000000;
   line-height: 1.2;
@@ -112,6 +112,34 @@
 .print-header-total {
   flex-basis: 100%;
   font-weight: 700;
+}
+
+/**
+ * Farblegende im Seitenkopf. Eigene Zeile (flex-basis 100 %), damit die
+ * Farbblöcke in einer eigenen Zeile direkt unter der Gesamtzeile stehen.
+ * Die Erklärung steht immer als Text neben dem Farbblock.
+ */
+.print-header-colors {
+  flex-basis: 100%;
+  gap: 0 9mm;
+}
+
+.print-header-colors .color-legend-item {
+  padding: 0;
+  font-size: inherit;
+  color: #000000;
+  background: transparent;
+  border: 0;
+  cursor: default;
+}
+
+.print-header-colors .color-legend-swatch {
+  width: 2.6mm;
+  height: 2.6mm;
+  border: 0.4pt solid #000000;
+  border-radius: 0.5mm;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 /* --------------------------------------------- Halbjahr: 1 x 6 Monate */
@@ -205,7 +233,7 @@
  * - ein Strich zwischen Wochentag und Tagesnummer,
  * - ein Strich rechts neben der Tagesnummer,
  * - ein Strich links von der Schichtspalte T/N.
- * Die KW-/F!-Spalte bleibt bewusst strichfrei.
+ * Die KW-/F-Spalte bleibt bewusst strichfrei.
  *
  * Damit die Linie wirklich durchgehend wirkt (und nicht nur so hoch wie der
  * Text), streckt sich die Zelle über die volle Zeilenhöhe (`align-self:
@@ -345,7 +373,7 @@
 }
 
 /**
- * Rosa Kästchen "F!" für gesetzliche Feiertage in der KW-Spalte.
+ * Rosa Kästchen "F" für gesetzliche Feiertage in der KW-Spalte.
  *
  * Immer massiv gedruckt (kein Rahmen, keine Transparenz), damit die
  * Markierung auch ohne Geräteunterstützung für Hintergrundfarben
@@ -368,6 +396,55 @@
   font-size: 9pt;
   font-weight: 700;
   text-align: center;
+}
+
+/**
+ * Finale Zeile je Monat, unterhalb des 31-Zeilen-Rasters.
+ *
+ * Sie liegt innerhalb von `.print-month` (flex column). Da `.print-month-body`
+ * `flex: 1 1 auto` besitzt, teilen sich das Tagesraster und diese Zeile die
+ * feste Monatshöhe; das Layout der Monate bleibt ansonsten unverändert.
+ *
+ * Links stehen die Schichtzahlen (T und N), rechts - unter der T/N-Spalte -
+ * die farblich markierten Schichten als Kästchen mit Anzahl.
+ */
+.print-month-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.8mm;
+  padding: 0.4mm 0.8mm;
+  border-top: 0.75pt solid #000000;
+  background: #eef1f4;
+}
+
+.print-footer-shift {
+  font-size: 8pt;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.print-footer-marked {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6mm;
+  margin-left: auto;
+}
+
+.print-month-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4mm;
+  padding: 0 0.4mm;
+  font-size: 8pt;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  color: #000000;
 }
 
 /* ------------------------------------------------------------- Druck */

@@ -53,10 +53,10 @@ describe('PRINT_ROWS', () => {
 describe('buildPrintInformation', () => {
   it('schreibt den Feiertagsnamen an einem reinen gesetzlichen Feiertag aus', () => {
     const day = monthOf(2021, 1).days[0]; // 01.01.2021 = Neujahr
-    // "F!" gehört ausschließlich in die KW-Spalte; die Textspalte nennt den
+    // "F" gehört ausschließlich in die KW-Spalte; die Textspalte nennt den
     // Feiertag ausgeschrieben.
     expect(buildPrintInformation(day, '')).toBe('Neujahr');
-    expect(buildPrintInformation(day, '')).not.toContain('F!');
+    expect(buildPrintInformation(day, '')).not.toContain('F');
   });
 
   it('verbindet mehrere Ereignisse mit "·"', () => {
@@ -70,7 +70,7 @@ describe('buildPrintInformation', () => {
   });
 
   it('blendet Termin- und Feiertagsnamen aus, sobald ein Kommentar vorliegt', () => {
-    // 03.10.2021: gesetzlicher Feiertag (F!) und Erntedank. Sobald ein
+    // 03.10.2021: gesetzlicher Feiertag (F) und Erntedank. Sobald ein
     // Kommentar eingetragen ist, steht in der Zeile ausschließlich der
     // Kommentar; der Feiertag bleibt über das rosa Kästchen erkennbar.
     const holiday = monthOf(2021, 10).days.find((entry) => entry.day === 3);
@@ -97,14 +97,14 @@ describe('buildPrintInformation', () => {
 
   it('verwendet immer den vollständigen Namen für gesetzliche Feiertage', () => {
     // Der Feiertagsname steht ausgeschrieben in der Textspalte; die
-    // Markierung "F!" gehört ausschließlich in die KW-Spalte.
+    // Markierung "F" gehört ausschließlich in die KW-Spalte.
     expect(getPrintEventName('Neujahr')).toBe('Neujahr');
     expect(getPrintEventName('1. Weihnachtstag')).toBe('1. Weihnachtstag');
     expect(getPrintEventName('Tag der Deutschen Einheit')).toBe('Tag der Deutschen Einheit');
     expect(getPrintEventName('Christi Himmelfahrt')).toBe('Christi Himmelfahrt');
   });
 
-  it('kürzt weiterhin die nicht mit "F!" markierten Aktionstage', () => {
+  it('kürzt weiterhin die nicht mit "F" markierten Aktionstage', () => {
     expect(getPrintEventName('Beginn Sommerzeit')).toBe('Sommerzeit');
     expect(getPrintEventName('Ende Sommerzeit')).toBe('Sommerzeit');
     expect(getPrintEventName('Buß- und Bettag')).toBe('Buß-/Bettag');
@@ -120,7 +120,7 @@ describe('Kennzeichnung gesetzlicher Feiertage (Rheinland-Pfalz)', () => {
 
   it('markiert reine Brauchtumstage nicht', () => {
     // Reformationstag, Heiligabend und Silvester sind keine gesetzlichen
-    // Feiertage im Bezugsraum und dürfen kein "F!" erhalten.
+    // Feiertage im Bezugsraum und dürfen kein "F" erhalten.
     expect(hasPublicHoliday(dayOf(2021, '2021-10-31'))).toBe(false);
     expect(hasPublicHoliday(dayOf(2021, '2021-12-24'))).toBe(false);
     expect(hasPublicHoliday(dayOf(2021, '2021-12-31'))).toBe(false);
@@ -144,8 +144,8 @@ describe('Kennzeichnung gesetzlicher Feiertage (Rheinland-Pfalz)', () => {
     expect(hasPublicHoliday(dayOf(2021, '2021-02-02'))).toBe(false);
   });
 
-  it('verwendet "F!" als Markierungszeichen', () => {
-    expect(PUBLIC_HOLIDAY_MARK).toBe('F!');
+  it('verwendet "F" als Markierungszeichen', () => {
+    expect(PUBLIC_HOLIDAY_MARK).toBe('F');
   });
 });
 

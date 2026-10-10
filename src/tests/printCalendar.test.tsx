@@ -17,7 +17,7 @@ import { StrictMode } from 'react';
 import type { AnnotationMap } from '../domain/types';
 import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder';
 import { PrintCalendar } from '../print/PrintCalendar';
-import { PRINT_ROWS } from '../print/PrintMonth';
+import { PrintMonth, PRINT_ROWS } from '../print/PrintMonth';
 
 function render(element: React.ReactElement): HTMLElement {
   const container = document.createElement('div');
@@ -132,13 +132,13 @@ describe('PrintCalendar', () => {
     expect(infoCell?.getAttribute('style')).toContain('rgb(255, 224, 0)');
 
     const neujahrRow = container.querySelector('[data-date-key="2021-01-01"]');
-    // "F!" steht ausschließlich als rosa Kästchen in der KW-Spalte; die
+    // "F" steht ausschließlich als rosa Kästchen in der KW-Spalte; die
     // Textspalte nennt den Feiertag ausgeschrieben.
     expect(
       neujahrRow?.querySelector('.print-col-info .print-holiday-mark'),
     ).toBeNull();
     expect(neujahrRow?.querySelector('.print-col-info')?.textContent).toBe('Neujahr');
-    expect(neujahrRow?.querySelector('.print-col-kw .print-holiday-mark')?.textContent).toBe('F!');
+    expect(neujahrRow?.querySelector('.print-col-kw .print-holiday-mark')?.textContent).toBe('F');
     expect(
       neujahrRow?.querySelector('.print-col-kw .print-holiday-mark')?.getAttribute('title'),
     ).toBe('Gesetzlicher Feiertag');
@@ -160,7 +160,7 @@ describe('PrintCalendar', () => {
     expect(dayRow?.textContent).not.toContain('N');
   });
 
-  it('zeigt bei einem Kommentar nur den Kommentar und behält das "F!"-Kästchen', () => {
+  it('zeigt bei einem Kommentar nur den Kommentar und behält das "F"-Kästchen', () => {
     const container = render(
       <PrintCalendar
         calendar={calendar}
@@ -174,7 +174,7 @@ describe('PrintCalendar', () => {
     expect(neujahrRow?.querySelector('.print-col-info')?.textContent).toBe('Frühschicht');
     expect(neujahrRow?.querySelector('.print-col-info .print-holiday-mark')).toBeNull();
     // Der Feiertag bleibt über das rosa Kästchen in der KW-Spalte sichtbar.
-    expect(neujahrRow?.querySelector('.print-col-kw .print-holiday-mark')?.textContent).toBe('F!');
+    expect(neujahrRow?.querySelector('.print-col-kw .print-holiday-mark')?.textContent).toBe('F');
   });
 
   it('behält die harten Zeilenumbrüche einer mehrzeiligen Beschriftung', () => {
@@ -217,7 +217,7 @@ describe('PrintCalendar', () => {
     expect(tuesday?.querySelector('.print-week')).toBeNull();
   });
 
-  it('setzt das rosa "F!"-Kästchen bei gesetzlichen Feiertagen in die KW-Spalte', () => {
+  it('setzt das rosa "F"-Kästchen bei gesetzlichen Feiertagen in die KW-Spalte', () => {
     const container = render(
       <PrintCalendar
         calendar={calendar}
@@ -228,15 +228,15 @@ describe('PrintCalendar', () => {
     );
     // Neujahr 2021 (Freitag).
     const newYear = container.querySelector('[data-date-key="2021-01-01"] .print-col-kw');
-    expect(newYear?.querySelector('.print-holiday-mark')?.textContent).toBe('F!');
+    expect(newYear?.querySelector('.print-holiday-mark')?.textContent).toBe('F');
 
     // Ostermontag 2021 (Montag): KW-Wert und Feiertagsmarkierung zugleich.
     const easterMonday = container.querySelector('[data-date-key="2021-04-05"] .print-col-kw');
     expect(easterMonday?.querySelector('.print-week')?.textContent).toBe('14');
-    expect(easterMonday?.querySelector('.print-holiday-mark')?.textContent).toBe('F!');
+    expect(easterMonday?.querySelector('.print-holiday-mark')?.textContent).toBe('F');
   });
 
-  it('markiert Brauchtumstage nicht mit "F!"', () => {
+  it('markiert Brauchtumstage nicht mit "F"', () => {
     const container = render(
       <PrintCalendar
         calendar={calendar}
@@ -254,13 +254,13 @@ describe('PrintCalendar', () => {
       container.querySelector('[data-date-key="2021-12-24"] .print-holiday-mark'),
     ).toBeNull();
     // An einem reinen Feiertag steht in der Textspalte der ausgeschriebene
-    // Name; "F!" erscheint ausschließlich in der KW-Spalte.
+    // Name; "F" erscheint ausschließlich in der KW-Spalte.
     expect(
       container.querySelector('[data-date-key="2021-01-01"] .print-col-info')?.textContent,
     ).toBe('Neujahr');
     expect(
       container.querySelector('[data-date-key="2021-01-01"] .print-col-info')?.textContent,
-    ).not.toContain('F!');
+    ).not.toContain('F');
   });
 
   it('markiert Feiertage anderer Bundesländer in Rheinland-Pfalz nicht', () => {
@@ -292,14 +292,14 @@ describe('PrintCalendar', () => {
       />,
     );
     // 03.10.2021: Die Textspalte nennt Feiertag und Erntedank; die KW-Spalte
-    // enthält nur das rosa "F!"-Kästchen.
+    // enthält nur das rosa "F"-Kästchen.
     const unity = container.querySelector('[data-date-key="2021-10-03"]');
     expect(unity?.querySelector('.print-col-info .print-holiday-mark')).toBeNull();
     expect(unity?.querySelector('.print-col-info')?.textContent).toBe(
       'Tag der Deutschen Einheit · Erntedank',
     );
-    expect(unity?.querySelector('.print-col-kw .print-holiday-mark')?.textContent).toBe('F!');
-    expect(unity?.querySelector('.print-col-info')?.textContent).not.toContain('F!');
+    expect(unity?.querySelector('.print-col-kw .print-holiday-mark')?.textContent).toBe('F');
+    expect(unity?.querySelector('.print-col-info')?.textContent).not.toContain('F');
   });
 
   it('nennt den Kalender im Seitenheader "BASF Schichtkalender"', () => {
@@ -340,10 +340,71 @@ describe('PrintCalendar', () => {
     });
   });
 
+  it('zeigt die benutzte Farblegende read-only im Seitenkopf', () => {
+    const container = render(
+      <PrintCalendar
+        calendar={calendar}
+        annotations={annotations}
+        colorLegend={{ yellow: 'Urlaub' }}
+        onPrint={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    const boxes = container.querySelectorAll('.print-header-colors');
+    // Beide Seiten tragen die Farblegende des Jahres.
+    expect(boxes.length).toBe(2);
+    boxes.forEach((box) => {
+      expect(box.textContent).toContain('Urlaub');
+      // In der Druckansicht gibt es keine Schaltflächen.
+      expect(box.querySelectorAll('button').length).toBe(0);
+    });
+  });
+
+  it('lässt die Farblegende im Kopf weg, wenn keine Farbe benutzt wird', () => {
+    const container = render(
+      <PrintCalendar
+        calendar={calendar}
+        annotations={{}}
+        onPrint={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    expect(container.querySelectorAll('.print-header-colors').length).toBe(0);
+  });
+
+  it('stellt im Seitenkopf die Farblegende vor die Erklärungen der Buchstaben und Kennzahlen', () => {
+    // Anforderung: Im Kopf der Druckansicht steht die Farblegende direkt unter
+    // der Gesamtzeile; darunter erst die Erläuterungen zu T, N, Werktage,
+    // Sollschichten und F.
+    const container = render(
+      <PrintCalendar
+        calendar={calendar}
+        annotations={annotations}
+        colorLegend={{ yellow: 'Urlaub' }}
+        onPrint={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    const legend = container.querySelector('.print-header-legend') as HTMLElement;
+    const children = Array.from(legend.children);
+
+    expect(children[0].classList.contains('print-header-total')).toBe(true);
+    expect(children[1].classList.contains('print-header-colors')).toBe(true);
+    const afterLegend = children.slice(2).map((child) => child.textContent ?? '');
+    expect(afterLegend).toEqual([
+      'T = Tagschicht von 6 bis 18 Uhr',
+      'N = Nachtschicht von 18 bis 6 Uhr',
+      'Werktage = Anzahl Montag bis Freitag',
+      'Sollschichten = Anzahl T + N',
+      'F = Gesetzlicher Feiertag',
+    ]);
+  });
+
   it('führt am Ende der Monatsspalte keine Feiertagskennzahlen mehr auf', () => {
     // Anforderung: Die Anzeige der bezahlten Feiertage (volle, halbe aus der
     // Nachtschicht und Gesamtsumme) ist am Spaltenende entfernt. Die
     // Berechnung bleibt im Modell erhalten (siehe calendarBuilder.test.ts).
+    // Stattdessen trägt die finale Zeile je Monat die Schichtzahlen (T/N).
     const container = render(
       <PrintCalendar
         calendar={calendar}
@@ -352,9 +413,83 @@ describe('PrintCalendar', () => {
         onBack={() => undefined}
       />,
     );
-    expect(container.querySelectorAll('.print-month-footer').length).toBe(0);
+    expect(container.querySelectorAll('.print-month-footer').length).toBe(12);
     expect(container.textContent).not.toContain('FT mit Schicht');
     expect(container.textContent).not.toContain('halbe FT (Nacht)');
     expect(container.textContent).not.toContain('bezahlt gesamt');
+  });
+
+  it('zählt in der Druck-Monatsspalte die markierten T/N-Schichten je Farbe', () => {
+    // Anforderung: Auch im Druck erscheint ganz unten im Monat - unter dem
+    // 31-Zeilen-Raster - eine finale Zeile mit den Schichtzahlen (T/N) und
+    // rechts die farblich markierten Schichten als Kästchen. Gezählt werden
+    // nur tatsächlich erfasste T/N; freie Tage bleiben außen vor.
+    const march = calendar.months[2]; // März 2021, Schicht C
+    const workedDays = march.days.filter((day) => day.shiftLabel !== '');
+    const offDays = march.days.filter((day) => day.shiftLabel === '');
+    expect(workedDays.length).toBeGreaterThan(1);
+    expect(offDays.length).toBeGreaterThan(0);
+
+    const annotationColors: Record<string, { shift?: 'yellow' | 'green' }> = {};
+    workedDays.forEach((day, index) => {
+      annotationColors[day.dateKey] = { shift: index === 0 ? 'green' : 'yellow' };
+    });
+    // Ein freier Tag zusätzlich markiert: darf die Summe nicht erhöhen.
+    annotationColors[offDays[0].dateKey] = { shift: 'yellow' };
+
+    const container = render(
+      <PrintMonth month={march} annotationLabels={{}} annotationColors={annotationColors} />,
+    );
+
+    // Die finale Zeile sitzt außerhalb des 31-Zeilen-Rasters.
+    const footer = container.querySelector('.print-month-footer');
+    expect(footer).not.toBeNull();
+    expect(container.querySelector('.print-month-body .print-month-footer')).toBeNull();
+
+    // Dort stehen die Tag- und Nachtschichtzahlen der Monatsstatistik.
+    const shiftTexts = Array.from(container.querySelectorAll('.print-footer-shift')).map(
+      (node) => node.textContent,
+    );
+    expect(shiftTexts).toEqual([`${march.statistics.dayShiftCount} × T`, `${march.statistics.nightShiftCount} × N`]);
+
+    const chips = Array.from(container.querySelectorAll('.print-month-chip'));
+    // Gelb (Palette zuerst) mit allen bis auf einen Schichttag; Grün mit einem.
+    expect(chips.length).toBe(2);
+    expect(chips[0].textContent).toBe(String(workedDays.length - 1));
+    expect(chips[0].getAttribute('style')).toContain('rgb(255, 224, 0)');
+    expect(chips[1].textContent).toBe('1');
+    expect(chips[1].getAttribute('style')).toContain('rgb(46, 158, 62)');
+  });
+
+  it('behält in der Druckansicht das 31-Zeilen-Raster trotz finaler Zeile bei', () => {
+    // Anforderung: Die finale Zeile darf das Layout der Monate nicht verändern.
+    // Das Tagesraster muss weiterhin genau PRINT_ROWS Zeilen enthalten.
+    const march = calendar.months[2];
+    const annotationColors: Record<string, { shift?: 'yellow' }> = {};
+    const workedDays = march.days.filter((day) => day.shiftLabel !== '');
+    workedDays.forEach((day) => {
+      annotationColors[day.dateKey] = { shift: 'yellow' };
+    });
+
+    const container = render(
+      <PrintMonth month={march} annotationLabels={{}} annotationColors={annotationColors} />,
+    );
+    expect(container.querySelectorAll('.print-month-body > .print-row').length).toBe(PRINT_ROWS);
+  });
+
+  it('zeigt in der Druck-Monatsspalte ohne T/N-Markierung nur die T/N-Zahlen', () => {
+    const march = calendar.months[2];
+    const container = render(
+      <PrintMonth month={march} annotationLabels={{}} annotationColors={{}} />,
+    );
+    // Die finale Zeile ist immer vorhanden (wie in der App), aber ohne
+    // Markierungen fehlen die farbigen Kästchen.
+    const footer = container.querySelector('.print-month-footer');
+    expect(footer).not.toBeNull();
+    expect(footer?.querySelectorAll('.print-month-chip').length).toBe(0);
+    const shiftTexts = Array.from(container.querySelectorAll('.print-footer-shift')).map(
+      (node) => node.textContent,
+    );
+    expect(shiftTexts).toEqual([`${march.statistics.dayShiftCount} × T`, `${march.statistics.nightShiftCount} × N`]);
   });
 });

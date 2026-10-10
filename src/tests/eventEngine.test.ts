@@ -197,7 +197,7 @@ describe('Ereignisse über mehrere Jahre', () => {
   });
 });
 
-describe('Gesetzliche Feiertage in Rheinland-Pfalz (Markierung "F!")', () => {
+describe('Gesetzliche Feiertage in Rheinland-Pfalz (Markierung "F")', () => {
   const events = generateCalendarEvents(2021);
 
   /** Namen aller gesetzlich markierten Ereignisse eines Jahres. */

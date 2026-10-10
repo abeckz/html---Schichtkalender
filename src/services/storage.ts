@@ -10,6 +10,7 @@ import type {
   AnnotationColorId,
   AnnotationMap,
   AppSettings,
+  ColorLegendMap,
   ColumnColorName,
   PersistedState,
   ShiftId,
@@ -110,6 +111,37 @@ export function normalizeAnnotations(value: unknown): AnnotationMap {
   return result;
 }
 
+/** Maximale Länge eines Erklärtextes der Farblegende. */
+export const MAX_LEGEND_TEXT_LENGTH = 50;
+
+/** Freitext eines Legendeneintrags auf die Maximallänge begrenzen. */
+export function normalizeLegendText(text: unknown): string {
+  return typeof text === 'string' ? text.slice(0, MAX_LEGEND_TEXT_LENGTH) : '';
+}
+
+/**
+ * Bereinigt die Erklärtexte der Farblegende.
+ *
+ * Erwartet die Struktur Jahr -> colorId -> Text. Ungültige Jahre, unbekannte
+ * Farben und leere Texte werden verworfen; es wird nie geworfen.
+ */
+export function normalizeColorLegend(value: unknown): ColorLegendMap {
+  const result: ColorLegendMap = {};
+  if (!value || typeof value !== 'object') return result;
+  for (const [yearKey, colors] of Object.entries(value as Record<string, unknown>)) {
+    const year = Number(yearKey);
+    if (!isPlausibleYear(year) || !colors || typeof colors !== 'object') continue;
+    const entry: Partial<Record<AnnotationColorId, string>> = {};
+    for (const [colorKey, text] of Object.entries(colors as Record<string, unknown>)) {
+      if (!isAnnotationColorId(colorKey)) continue;
+      const normalized = normalizeLegendText(text);
+      if (normalized !== '') entry[colorKey] = normalized;
+    }
+    if (Object.keys(entry).length > 0) result[year] = entry;
+  }
+  return result;
+}
+
 /** Liest und validiert den persistierten Zustand. */
 export function readState(
   storage: StorageLike | null = getDefaultStorage(),
@@ -118,6 +150,7 @@ export function readState(
     version: STORAGE_VERSION,
     settings: { ...DEFAULT_SETTINGS },
     annotations: {},
+    colorLegend: {},
   };
   if (!storage) return fallback;
 
@@ -135,6 +168,7 @@ export function readState(
       version: STORAGE_VERSION,
       settings: normalizeSettings(parsed.settings),
       annotations: normalizeAnnotations(parsed.annotations),
+      colorLegend: normalizeColorLegend(parsed.colorLegend),
     };
   } catch {
     return fallback;
@@ -152,6 +186,7 @@ export function writeState(
       version: STORAGE_VERSION,
       settings: normalizeSettings(state.settings),
       annotations: normalizeAnnotations(state.annotations),
+      colorLegend: normalizeColorLegend(state.colorLegend),
     };
     storage.setItem(STORAGE_KEY, JSON.stringify(payload));
     return true;
@@ -175,8 +210,9 @@ export function saveSettings(
   settings: AppSettings,
   annotations: AnnotationMap,
   storage: StorageLike | null = getDefaultStorage(),
+  colorLegend: ColorLegendMap = {},
 ): boolean {
-  return writeState({ version: STORAGE_VERSION, settings, annotations }, storage);
+  return writeState({ version: STORAGE_VERSION, settings, annotations, colorLegend }, storage);
 }
 
 /** Farbe der Informationsspalte einer Annotation (null, wenn keine gesetzt ist). */

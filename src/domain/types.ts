@@ -65,7 +65,7 @@ export interface CalendarEvent {
    * true für gesetzliche Feiertage.
    *
    * Diese Kennzeichnung steuert ausschließlich die Anzeige des rosa
-   * "F!"-Rechtecks in der KW-Spalte. Sie ist bewusst unabhängig von
+   * "F"-Rechtecks in der KW-Spalte. Sie ist bewusst unabhängig von
    * countsAsPaidNormalShiftHoliday, weil die Kennzahl die bezahlten Feiertage
    * nach der bestehenden Referenz zählt (dort sind auch regionale/hohe
    * Feiertage wie Mariä Himmelfahrt und Allerheiligen enthalten).
@@ -199,9 +199,23 @@ export interface AppSettings {
 /** Persistierte Annotationen, global nach dateKey. */
 export type AnnotationMap = Record<string, UserDayAnnotation>;
 
+/**
+ * Erklärtexte der Farblegende, geschlüsselt nach Jahr und Farbe.
+ *
+ * Pro Jahr kann jeder Farbe der persönlichen Palette ein Freitext zugeordnet
+ * werden (z. B. "Gelb = Urlaub"). Die Zuordnung ist bewusst jahresbezogen:
+ * derselbe Farbton kann in unterschiedlichen Jahren eine andere Bedeutung
+ * haben. Fehlt ein Eintrag, zeigt die Legende nur den Farbnamen.
+ *
+ * Struktur: Jahr (als Zahl) -> colorId -> Text.
+ */
+export type ColorLegendMap = Record<number, Partial<Record<AnnotationColorId, string>>>;
+
 /** Versionierter LocalStorage-Zustand. */
 export interface PersistedState {
   version: number;
   settings: AppSettings;
   annotations: AnnotationMap;
+  /** Erklärtexte der Farblegende je Jahr und Farbe. */
+  colorLegend: ColorLegendMap;
 }

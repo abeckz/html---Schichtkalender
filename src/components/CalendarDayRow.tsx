@@ -7,8 +7,8 @@
  * den Text.
  *
  * Gesetzliche Feiertage werden in der KW-Spalte (rechts) als rosa Kästchen
- * mit "F!" markiert. In der Textspalte steht der ausgeschriebene
- * Feiertagsname; die Markierung "F!" erscheint ausschließlich in der
+ * mit "F" markiert. In der Textspalte steht der ausgeschriebene
+ * Feiertagsname; die Markierung "F" erscheint ausschließlich in der
  * KW-Spalte. Trägt der Tag einen Kommentar bzw. eine Info, verdrängt dieser
  * Text die Termin- und Feiertagsangaben vollständig.
  *
@@ -95,7 +95,7 @@ export function CalendarDayRow({
 
   // Der Informationstext zeigt die Termine und den Kommentar/die Info des
   // Anwenders. Gesetzliche Feiertage stehen dort ausgeschrieben; die
-  // Markierung "F!" gehört ausschließlich in die KW-Spalte.
+  // Markierung "F" gehört ausschließlich in die KW-Spalte.
   //
   // Sobald ein Kommentar vorliegt, steht ausschließlich dieser Text in der
   // Zeile: der Termin- bzw. Feiertagsname verschwindet dann vollständig.

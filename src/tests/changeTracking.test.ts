@@ -8,6 +8,7 @@ const emptyState: PersistedState = {
   version: STORAGE_VERSION,
   settings: { ...DEFAULT_SETTINGS },
   annotations: {},
+  colorLegend: {},
 };
 
 const sampleState: PersistedState = {
@@ -16,6 +17,7 @@ const sampleState: PersistedState = {
   annotations: {
     '2026-03-15': { dateKey: '2026-03-15', label: 'Urlaub', colors: { info: 'yellow' } },
   },
+  colorLegend: {},
 };
 
 describe('Signatur des Zustands', () => {
@@ -26,6 +28,7 @@ describe('Signatur des Zustands', () => {
       annotations: {
         '2026-05-01': { dateKey: '2026-05-01', label: 'x', colors: { day: 'red', info: 'blue' } },
       },
+      colorLegend: {},
     };
     // Andere Version, andere Schlüsselreihenfolge – gleicher Inhalt.
     const b: PersistedState = {
@@ -38,6 +41,7 @@ describe('Signatur des Zustands', () => {
           colors: { info: 'blue', day: 'red' } as never,
         },
       },
+      colorLegend: {},
     };
     expect(stateSignature(a)).toBe(stateSignature(b));
   });
@@ -79,6 +83,7 @@ describe('Erkennung ungespeicherter Änderungen', () => {
         version: STORAGE_VERSION,
         settings: { selectedYear: 2026, selectedShift: 'C' },
         annotations: {},
+        colorLegend: {},
       }),
     ).toBe(true);
   });

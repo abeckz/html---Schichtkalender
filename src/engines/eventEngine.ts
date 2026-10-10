@@ -208,7 +208,7 @@ export function getEventsForDate(
 /**
  * Prüft, ob an einem Tag mindestens ein gesetzlicher Feiertag liegt.
  *
- * Grundlage für die "F!"-Markierung in der KW-Spalte. Mehrfachbelegungen
+ * Grundlage für die "F"-Markierung in der KW-Spalte. Mehrfachbelegungen
  * (z. B. Ostersonntag und Sommerzeitbeginn) werden korrekt behandelt.
  */
 export function hasPublicHoliday(day: CalendarDay): boolean {

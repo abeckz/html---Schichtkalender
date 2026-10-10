@@ -14,8 +14,10 @@ import type {
   PersistedState,
 } from '../domain/types';
 import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder';
+import { usedAnnotationColors } from '../config/annotationColors';
 import { useSettingsStore } from '../services/settingsStore';
 import { useAnnotationStore } from '../services/annotationStore';
+import { useColorLegendStore } from '../services/colorLegendStore';
 import { useThemeStore } from '../services/themeStore';
 import { STORAGE_VERSION } from '../services/storage';
 import { saveState } from '../services/persistence';
@@ -23,6 +25,7 @@ import { useUnsavedChangesGuard } from '../services/unsavedChanges';
 import { Toolbar } from './Toolbar';
 import { YearCalendar } from './YearCalendar';
 import { CalendarLegend } from './CalendarLegend';
+import { ColorLegendEditor } from './ColorLegendEditor';
 import { DayEditor } from './DayEditor';
 import { StreakEditor } from './StreakEditor';
 import { UnsavedChangesDialog } from './UnsavedChangesDialog';
@@ -35,19 +38,26 @@ export function App() {
     useSettingsStore();
   const { annotations, setAnnotation, resetAnnotation, setColumnColorForDateKeys, replaceAnnotations } =
     useAnnotationStore(settings);
+  // Erklärtexte der Farblegende (jahresbezogen); rein darstellungsbezogen.
+  const { colorLegend, setColorLegendText, replaceColorLegend } = useColorLegendStore(
+    settings,
+    annotations,
+  );
   // Anzeige-Einstellung (Hell/Dunkel): reine Darstellung, keine Fachdaten.
   const theme = useThemeStore();
 
   const [view, setView] = useState<AppView>('screen');
   const [editingDay, setEditingDay] = useState<CalendarDay | null>(null);
+  // Farbe, deren Erklärung gerade bearbeitet wird (öffnet den Eingabedialog).
+  const [editingLegendColor, setEditingLegendColor] = useState<AnnotationColorId | null>(null);
 
   // Hinweis-Fenster bei ungespeicherten Daten (Schließen-Versuch).
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
 
   // Aktueller Zustand als ein Objekt; Grundlage für Signatur und Speicherung.
   const currentState: PersistedState = useMemo(
-    () => ({ version: STORAGE_VERSION, settings, annotations }),
-    [settings, annotations],
+    () => ({ version: STORAGE_VERSION, settings, annotations, colorLegend }),
+    [settings, annotations, colorLegend],
   );
 
   // Überwachung ungespeicherter Änderungen: blockiert das Schließen des
@@ -72,6 +82,17 @@ export function App() {
 
   // Gearbeitete Schichten insgesamt (Tag- plus Nachtschichten) des Jahres.
   const workedShiftCount = useMemo(() => summarizeYear(calendar).requiredShiftCount, [calendar]);
+
+  // Für die Farblegende: die im Jahr tatsächlich benutzten Farben sowie die
+  // jahresbezogenen Erklärungstexte. Beides ist reine Darstellungsableitung.
+  const usedColors = useMemo(
+    () => usedAnnotationColors(annotations, settings.selectedYear),
+    [annotations, settings.selectedYear],
+  );
+  const colorTexts = useMemo(
+    () => colorLegend[settings.selectedYear] ?? {},
+    [colorLegend, settings.selectedYear],
+  );
 
   // Schnellzugriff dateKey -> Tag, damit die Auswahl chronologisch sortiert
   // und das Streifen-Fenster mit vollständigen Tagesdaten gefüllt werden kann.
@@ -152,7 +173,7 @@ export function App() {
   // (Chrome/Edge), sonst als Download. Nach Erfolg gilt der Zustand als
   // gesichert (keine Warnung mehr beim Schließen).
   const handleSaveFile = useCallback(async (): Promise<boolean> => {
-    const state: PersistedState = { version: STORAGE_VERSION, settings, annotations };
+    const state: PersistedState = { version: STORAGE_VERSION, settings, annotations, colorLegend };
     const outcome = await saveState(state);
     if (outcome === 'saved') {
       unsaved.markSaved(state);
@@ -160,7 +181,7 @@ export function App() {
       return true;
     }
     return false;
-  }, [settings, annotations, unsaved]);
+  }, [settings, annotations, colorLegend, unsaved]);
 
   // Datei laden: übernimmt Einstellungen und Annotationen gemeinsam. Die
   // Werte sind bereits durch parseState bereinigt; der Handler bleibt daher
@@ -170,14 +191,16 @@ export function App() {
     (state: PersistedState) => {
       setSettings(state.settings);
       replaceAnnotations(state.annotations);
+      replaceColorLegend(state.colorLegend);
       unsaved.markLoaded(state);
-      // Nach dem Laden keine offene Tages-/Streifen-Auswahl stehen lassen.
+      // Nach dem Laden keine offene Tages-/Streifen-/Legenden-Auswahl stehen lassen.
       setEditingDay(null);
+      setEditingLegendColor(null);
       setStreakKeys([]);
       setStreakColumn(null);
       setStreakDays([]);
     },
-    [setSettings, replaceAnnotations, unsaved],
+    [setSettings, replaceAnnotations, replaceColorLegend, unsaved],
   );
 
   // Im Hinweis-Fenster: jetzt sichern (bei Erfolg schließt das Fenster).
@@ -223,6 +246,9 @@ export function App() {
             year={settings.selectedYear}
             selectedShift={settings.selectedShift}
             workedShiftCount={workedShiftCount}
+            usedColors={usedColors}
+            colorTexts={colorTexts}
+            onEditColor={setEditingLegendColor}
           />
           <YearCalendar
             calendar={calendar}
@@ -240,6 +266,7 @@ export function App() {
           <PrintCalendar
             calendar={calendar}
             annotations={annotations}
+            colorLegend={colorTexts}
             onPrint={handlePrint}
             onBack={() => setView('screen')}
           />
@@ -255,6 +282,16 @@ export function App() {
           onSave={setAnnotation}
           onReset={resetAnnotation}
           onClose={() => setEditingDay(null)}
+        />
+      )}
+
+      {editingLegendColor && (
+        <ColorLegendEditor
+          colorId={editingLegendColor}
+          year={settings.selectedYear}
+          initialText={colorTexts[editingLegendColor] ?? ''}
+          onSave={setColorLegendText}
+          onClose={() => setEditingLegendColor(null)}
         />
       )}
 

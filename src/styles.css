@@ -22,7 +22,7 @@
   --color-weekend: #f5f6f8;
   --color-sunday: #eef0f3;
   --color-row-line: #eceff2;
-  /* Feiertagsmarkierung (rosa Kästchen "F!" in der KW-Spalte). */
+  /* Feiertagsmarkierung (rosa Kästchen "F" in der KW-Spalte). */
   --color-holiday-mark: #f6cedd;
   --color-holiday-border: #d17d9c;
   --color-holiday-text: #8a1f4a;
@@ -319,7 +319,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 18px;
+  gap: 6px 34px;
   padding: 8px 12px;
   margin-bottom: 14px;
   font-size: 13px;
@@ -349,7 +349,76 @@ body {
   color: var(--color-text);
 }
 
-/* ------------------------------------- Feiertagsmarkierung ("F!") */
+/**
+ * Farblegende innerhalb der Legendenzeile. Eigene Zeile (flex-basis 100 %),
+ * damit die Farbblöcke in einer eigenen Zeile direkt unter der Gesamtzeile
+ * stehen. Die größeren Abstände halten die Blöcke gut lesbar.
+ */
+.legend-colors {
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+}
+
+.color-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 22px;
+}
+
+/**
+ * Ein Eintrag der Farblegende: Farbblock plus Erklärung. Als Schaltfläche
+ * (Bildschirmansicht) bzw. als reiner Text (Druckansicht).
+ */
+.color-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.color-legend-item:hover {
+  border-color: var(--color-accent);
+}
+
+.color-legend-item-static {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+}
+
+.color-legend-swatch {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 3px;
+}
+
+.color-legend-text {
+  white-space: nowrap;
+}
+
+/* Vorschau im Eingabedialog der Farblegende. */
+.color-legend-editor-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------- Feiertagsmarkierung ("F") */
 
 /**
  * Rosa Kästchen in der KW-Spalte. Farbe und Text stehen immer zusammen,
@@ -520,7 +589,7 @@ body {
  * - ein Strich zwischen Wochentag und Tagesnummer,
  * - ein Strich rechts neben der Tagesnummer,
  * - ein Strich links von der Schichtspalte T/N.
- * Die KW-/F!-Spalte bleibt bewusst strichfrei.
+ * Die KW-/F-Spalte bleibt bewusst strichfrei.
  *
  * Damit die Linie wirklich durchgehend wirkt (und nicht nur so hoch wie der
  * Text), streckt sich die Zelle über die volle Zeilenhöhe (`align-self:
@@ -626,7 +695,7 @@ body {
 
 /**
  * Informationstext eines Feiertags. Die Kopie des rosa Kästchenstils macht
- * die Feiertagsmarkierung auch im Fließtext sofort erkennbar: "F!" steht
+ * die Feiertagsmarkierung auch im Fließtext sofort erkennbar: "F" steht
  * einmal im Text und einmal als Kästchen in der KW-Spalte.
  */
 .cell-information .holiday-mark {
@@ -649,15 +718,55 @@ body {
   text-align: center;
 }
 
+/**
+ * Fußzeile des Monats.
+ *
+ * Links stehen die Schichtzahlen (T und N). Die farblich markierten
+ * Schichtsummen sitzen - wie in der Druckansicht - rechtsbündig am
+ * Fußzeilenende, also unter der rechten T/N-Spalte. `.month-footer-marked`
+ * schiebt sich mit `margin-left: auto` an den rechten Rand.
+ */
 .month-footer {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px 12px;
   padding: 6px 10px;
   font-size: 11px;
   color: var(--color-text-muted);
   border-top: 1px solid var(--color-border);
   background: var(--color-surface-sunken);
+}
+
+/**
+ * Summe der in der Schichtspalte (T/N) markierten Schichten. Die Kästchen
+ * tragen die Markierungsfarbe und die Anzahl der erfassten Schichttage als
+ * Text. Der Text steht auf allen satt kräftigen Palettenfarben in Schwarz.
+ *
+ * `margin-left: auto` rückt die Kästchen an den rechten Rand der Fußzeile,
+ * sodass sie unter der rechten T/N-Spalte liegen (wie in der Druckansicht).
+ */
+.month-footer-marked {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.month-footer-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  color: #000000;
+  font-weight: 700;
+  line-height: 1;
 }
 
 

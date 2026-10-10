@@ -3,8 +3,8 @@
  *
  * Abgesichert werden die Anforderungen, die nur die Oberfläche betreffen:
  * - keine Spaltenkopfzeile ueber den Tageszeilen,
- * - rosa "F!"-Kästchen bei gesetzlichen Feiertagen in der KW-Spalte,
- * - "F!" als einzige Nennung des Feiertags; ein Kommentar in der Zeile
+ * - rosa "F"-Kästchen bei gesetzlichen Feiertagen in der KW-Spalte,
+ * - "F" als einzige Nennung des Feiertags; ein Kommentar in der Zeile
  *   verdrängt Termin- und Feiertagsnamen vollständig,
  * - Titel "BASF Schichtkalender" und funktionierender Hell/Dunkel-Umschalter,
  * - Unabhängigkeit der Anzeige-Einstellung von den Fachdaten.
@@ -17,7 +17,13 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
 import { App } from '../components/App';
+import { countMarkedShiftsByColor, MonthCalendar } from '../components/MonthCalendar';
 import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder';
+
+/** Baut einen realen Monat für die Markierungs-Tests (März 2021, Schicht C). */
+function buildMarch2021(): import('../domain/types').MonthCalendar {
+  return buildYearCalendar({ year: 2021, selectedShift: 'C' }).months[2];
+}
 import { DEFAULT_SHIFT } from '../config/appDefaults';
 import {
   THEME_ATTRIBUTE,
@@ -93,7 +99,7 @@ describe('Bildschirmdarstellung', () => {
     expect(selectedOption?.textContent).toBe(String(startYear));
   });
 
-  it('markiert gesetzliche Feiertage mit "F!" und Brauchtumstage nicht', () => {
+  it('markiert gesetzliche Feiertage mit "F" und Brauchtumstage nicht', () => {
     const container = render(<App />);
     // Der Maifeiertag (01.05.) ist immer ein gesetzlicher Feiertag, und der
     // 01.01. ist immer Neujahr; beide werden gezielt gepr�ft.
@@ -103,16 +109,16 @@ describe('Bildschirmdarstellung', () => {
     const label = (row: Element) => row.getAttribute('aria-label') ?? '';
     const maiRow = rows.find((row) => label(row).includes('Maifeiertag'));
     expect(maiRow).toBeDefined();
-    expect(maiRow?.querySelector('.cell-kw .holiday-mark')?.textContent).toBe('F!');
+    expect(maiRow?.querySelector('.cell-kw .holiday-mark')?.textContent).toBe('F');
     expect(label(maiRow!)).toContain('Gesetzlicher Feiertag');
-    // Der Feiertagsname steht ausgeschrieben im Informationstext; "F!" gibt es
+    // Der Feiertagsname steht ausgeschrieben im Informationstext; "F" gibt es
     // ausschließlich in der KW-Spalte.
     expect(label(maiRow!)).toContain('Maifeiertag');
     expect(maiRow?.querySelector('.cell-information')?.textContent).toBe('Maifeiertag');
     expect(maiRow?.querySelector('.cell-information .holiday-mark')).toBeNull();
 
     const newYearRow = rows.find((row) => label(row).includes('Neujahr'));
-    expect(newYearRow?.querySelector('.cell-kw .holiday-mark')?.textContent).toBe('F!');
+    expect(newYearRow?.querySelector('.cell-kw .holiday-mark')?.textContent).toBe('F');
     expect(label(newYearRow!)).toContain('Gesetzlicher Feiertag');
     expect(newYearRow?.querySelector('.cell-information')?.textContent).toBe('Neujahr');
 
@@ -127,7 +133,7 @@ describe('Bildschirmdarstellung', () => {
     expect(label(eveRow!)).toContain('Heiligabend');
   });
 
-  it('nennt einen gesetzlichen Feiertag ausgeschrieben und markiert ihn mit "F!"', () => {
+  it('nennt einen gesetzlichen Feiertag ausgeschrieben und markiert ihn mit "F"', () => {
     const container = render(<App />);
     const rows = Array.from(container.querySelectorAll('.day-row'));
     const maiRow = rows.find((row) =>
@@ -136,11 +142,11 @@ describe('Bildschirmdarstellung', () => {
     expect(maiRow).toBeDefined();
 
     // Der Feiertag steht ausgeschrieben im Informationstext; das rosa
-    // "F!"-Kästchen sitzt ausschließlich in der KW-Spalte.
+    // "F"-Kästchen sitzt ausschließlich in der KW-Spalte.
     expect(maiRow!.querySelector('.cell-information')?.textContent).toBe('Maifeiertag');
     expect(maiRow!.querySelector('.cell-information .holiday-mark')).toBeNull();
-    expect(maiRow!.querySelector('.cell-information')?.textContent).not.toContain('F!');
-    expect(maiRow!.querySelector('.cell-kw .holiday-mark')?.textContent).toBe('F!');
+    expect(maiRow!.querySelector('.cell-information')?.textContent).not.toContain('F');
+    expect(maiRow!.querySelector('.cell-kw .holiday-mark')?.textContent).toBe('F');
     expect(maiRow!.querySelector('.cell-badge')).toBeNull();
     expect(maiRow!.querySelector('.cell-kw')?.textContent).not.toContain('Maifeiertag');
     expect(maiRow!.querySelector('.cell-kw')?.textContent).not.toContain('Dt. Einheit');
@@ -174,15 +180,15 @@ describe('Bildschirmdarstellung', () => {
       expect(row).toBeDefined();
 
       // Nur der Kommentar steht in der Zeile: Termin- und Feiertagsname sind
-      // ausgeblendet. Auch der Informationstext enthält kein "F!" - der
+      // ausgeblendet. Auch der Informationstext enthält kein "F" - der
       // Feiertag bleibt ausschließlich über das rosa Kästchen in der
       // KW-Spalte erkennbar.
       expect(row!.querySelector('.cell-information')?.textContent).toBe('Bereitschaft');
       expect(row!.querySelector('.cell-information .holiday-mark')).toBeNull();
-      expect(row!.querySelector('.cell-information')?.textContent).not.toContain('F!');
+      expect(row!.querySelector('.cell-information')?.textContent).not.toContain('F');
       expect(row!.querySelector('.cell-information')?.textContent).not.toContain('Maifeiertag');
       // Der Feiertag bleibt über das rosa Kästchen in der KW-Spalte sichtbar.
-      expect(row!.querySelector('.cell-kw .holiday-mark')?.textContent).toBe('F!');
+      expect(row!.querySelector('.cell-kw .holiday-mark')?.textContent).toBe('F');
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }
@@ -286,6 +292,65 @@ describe('Bildschirmdarstellung', () => {
     }
   });
 
+  it('zählt die in der T/N-Spalte markierten Schichten je Farbe ohne freie Tage', () => {
+    // Anforderung: Werden Zellen der rechten T/N-Spalte eingefärbt, soll ganz
+    // unten im Monat die Summe der markierten Schichten erscheinen. Gezählt
+    // werden ausschließlich tatsächlich erfasste T/N; freie Tage (OFF) zählen
+    // nicht mit, selbst wenn die Spalte dort eingefärbt wurde.
+    const month = buildMarch2021();
+    const workedDays = month.days.filter((day) => day.shiftLabel !== '');
+    const offDays = month.days.filter((day) => day.shiftLabel === '');
+    expect(workedDays.length).toBeGreaterThan(2);
+    expect(offDays.length).toBeGreaterThan(0);
+
+    // Die shift-Spalte an allen T/N-Tagen gelb und zusätzlich an einem freien
+    // Tag markieren. Der freie Tag darf die Summe nicht erhöhen.
+    const annotations: Record<string, { dateKey: string; label: string; colors: { shift: 'yellow' } }> = {};
+    for (const day of workedDays) {
+      annotations[day.dateKey] = { dateKey: day.dateKey, label: '', colors: { shift: 'yellow' } };
+    }
+    annotations[offDays[0].dateKey] = {
+      dateKey: offDays[0].dateKey,
+      label: '',
+      colors: { shift: 'yellow' },
+    };
+
+    const counts = countMarkedShiftsByColor(month.days, annotations);
+    expect(counts).toEqual([{ colorId: 'yellow', count: workedDays.length }]);
+  });
+
+  it('trennt die markierten Schichten in der Fußzeile nach Farben', () => {
+    const month = buildMarch2021();
+    const workedDays = month.days.filter((day) => day.shiftLabel !== '');
+    // Mindestens zwei Schichttage mit unterschiedlichen Farben markieren.
+    const first = workedDays[0];
+    const second = workedDays[1];
+    const annotations = {
+      [first.dateKey]: { dateKey: first.dateKey, label: '', colors: { shift: 'yellow' as const } },
+      [second.dateKey]: { dateKey: second.dateKey, label: '', colors: { shift: 'green' as const } },
+    };
+
+    const container = render(
+      <MonthCalendar month={month} annotations={annotations} onOpenEditor={() => undefined} />,
+    );
+
+    const chips = Array.from(container.querySelectorAll('.month-footer-chip'));
+    expect(chips.length).toBe(2);
+    // Reihenfolge folgt der Farbpalette: Gelb vor Grün.
+    expect(chips[0].textContent).toBe('1');
+    expect(chips[0].getAttribute('style')).toContain('rgb(255, 224, 0)');
+    expect(chips[1].textContent).toBe('1');
+    expect(chips[1].getAttribute('style')).toContain('rgb(46, 158, 62)');
+  });
+
+  it('zeigt keine Markierungs-Summe, wenn die T/N-Spalte nicht markiert ist', () => {
+    const month = buildMarch2021();
+    const container = render(
+      <MonthCalendar month={month} annotations={{}} onOpenEditor={() => undefined} />,
+    );
+    expect(container.querySelector('.month-footer-chip')).toBeNull();
+  });
+
   it('zeigt die bezahlten Feiertage nicht mehr in der Monatskarte an', () => {
     // Schicht C im Dezember 2021: Der 31.12. (N) reicht in das Neujahr 2022
     // hinein und erzeugt einen halben Feiertag. Die Berechnung bleibt
@@ -367,12 +432,12 @@ describe('Bildschirmdarstellung', () => {
     expect(text).not.toContain('Feiertage, die mit T oder N zusammenfallen');
     // Entfernt: der Klammerzusatz zum rosa Kästchen.
     expect(text).not.toContain('rosa Kästchen');
-    // Erhalten: die übrigen Legendenzeilen einschließlich "F!".
+    // Erhalten: die übrigen Legendenzeilen einschließlich "F".
     expect(text).toContain('Tagschicht');
     expect(text).toContain('Nachtschicht');
     expect(text).toContain('Werktage');
     expect(text).toContain('Sollschichten');
-    expect(legend?.querySelector('.holiday-mark')?.textContent).toBe('F!');
+    expect(legend?.querySelector('.holiday-mark')?.textContent).toBe('F');
   });
 
   it('zeigt oben in der Legende die Arbeitsschichten gesamt im Jahr', () => {
@@ -554,6 +619,7 @@ describe('Bildschirmdarstellung', () => {
       annotations: {
         '2022-05-05': { dateKey: '2022-05-05', label: 'Schulung', colors: { info: 'green' as const } },
       },
+      colorLegend: {},
     };
     const parsed = parseState(serializeState(state));
     expect(parsed?.settings.selectedYear).toBe(2022);
@@ -734,3 +800,4 @@ describe('ThemeStore', () => {
     expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe('light');
   });
 });
+

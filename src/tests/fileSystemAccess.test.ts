@@ -17,6 +17,7 @@ const sampleState: PersistedState = {
   annotations: {
     '2026-03-15': { dateKey: '2026-03-15', label: 'Urlaub', colors: { info: 'yellow' } },
   },
+  colorLegend: {},
 };
 
 /** Baut eine minimale window-Attrappe mit optionaler File System Access API. */

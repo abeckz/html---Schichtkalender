@@ -12,7 +12,7 @@
  * kräftigen Farben lesbar bleibt.
  */
 
-import type { AnnotationColor, AnnotationColorId, ColumnColorName } from '../domain/types';
+import type { AnnotationColor, AnnotationColorId, AnnotationMap, ColumnColorName } from '../domain/types';
 
 export const annotationColors: readonly AnnotationColor[] = [
   { id: 'yellow', name: 'Gelb', hex: '#FFE000' },
@@ -72,4 +72,29 @@ export const STREAK_COLUMN_NAMES: readonly ColumnColorName[] = ['weekday', 'day'
 /** Prüft, ob ein unbekannter Wert ein gültiger Spaltenname ist. */
 export function isColumnColorName(value: unknown): value is ColumnColorName {
   return value === 'weekday' || value === 'day' || value === 'shift' || value === 'info';
+}
+
+/**
+ * Ermittelt die im angegebenen Jahr tatsächlich benutzten Markierungsfarben.
+ *
+ * Eine Farbe gilt als benutzt, sobald sie in mindestens einer Annotation des
+ * Jahres in einer der Spalten (weekday, day, shift, info) gesetzt ist. Der
+ * Jahresbezug ergibt sich aus dem dateKey (YYYY-MM-DD).
+ *
+ * Das Ergebnis folgt der Reihenfolge der Farbpalette, damit die Anzeige
+ * unabhängig von der Reihenfolge der Annotationen stabil bleibt.
+ */
+export function usedAnnotationColors(
+  annotations: AnnotationMap,
+  year: number,
+): AnnotationColorId[] {
+  const prefix = `${year}-`;
+  const used = new Set<AnnotationColorId>();
+  for (const [dateKey, annotation] of Object.entries(annotations)) {
+    if (!dateKey.startsWith(prefix)) continue;
+    for (const colorId of Object.values(annotation.colors)) {
+      if (isAnnotationColorId(colorId)) used.add(colorId);
+    }
+  }
+  return annotationColors.filter((color) => used.has(color.id)).map((color) => color.id);
 }

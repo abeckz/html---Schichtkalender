@@ -64,7 +64,7 @@ export function useAnnotationStore(
 
   // Jede Änderung sofort persistieren.
   useEffect(() => {
-    writeState({ version: 1, settings, annotations }, storage);
+    writeState({ version: 1, settings, annotations, colorLegend: {} }, storage);
   }, [settings, annotations, storage]);
 
   const setAnnotation = useCallback(

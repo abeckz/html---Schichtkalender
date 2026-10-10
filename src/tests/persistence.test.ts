@@ -19,6 +19,7 @@ const sampleState: PersistedState = {
     '2026-03-15': { dateKey: '2026-03-15', label: 'Urlaub', colors: { info: 'yellow' } },
     '2026-04-01': { dateKey: '2026-04-01', label: '', colors: { weekday: 'red' } },
   },
+  colorLegend: {},
 };
 
 describe('Dateiname', () => {
@@ -47,7 +48,7 @@ describe('Serialisierung', () => {
     const text = serializeState(sampleState);
     expect(text).toContain('\n');
     const parsed = JSON.parse(text);
-    expect(Object.keys(parsed).sort()).toEqual(['annotations', 'settings', 'version']);
+    expect(Object.keys(parsed).sort()).toEqual(['annotations', 'colorLegend', 'settings', 'version']);
   });
 
   it('bereinigt ungültige Werte bereits beim Serialisieren', () => {
@@ -57,6 +58,7 @@ describe('Serialisierung', () => {
       annotations: {
         bad: { dateKey: 'kein-datum', label: 'x' } as never,
       },
+      colorLegend: {},
     });
     const loaded = parseState(text);
     expect(loaded?.version).toBe(STORAGE_VERSION);

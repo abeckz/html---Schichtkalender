@@ -8,14 +8,14 @@
  *
  * In der KW-Spalte steht ausschließlich die ISO-Kalenderwoche (jeweils am
  * Montag). Gesetzliche Feiertage werden dort zusätzlich als rosa Kästchen
- * mit "F!" markiert. In der Spalte "Information" steht der Termin- bzw.
- * Feiertagsname ausgeschrieben; die Markierung "F!" erscheint ausschließlich
+ * mit "F" markiert. In der Spalte "Information" steht der Termin- bzw.
+ * Feiertagsname ausgeschrieben; die Markierung "F" erscheint ausschließlich
  * in der KW-Spalte und trägt den vollständigen Namen als title.
  *
  * Sobald der Tag einen Kommentar bzw. eine Info trägt, steht in der
  * Textspalte ausschließlich dieser Kommentar: Termin- und Feiertagsnamen
  * verschwinden dann vollständig. Der Feiertag bleibt über das rosa
- * "F!"-Kästchen in der KW-Spalte erkennbar.
+ * "F"-Kästchen in der KW-Spalte erkennbar.
  *
  * Beispiel: "Neujahr" in der Spalte Information, daneben die KW und das
  * rosa Kästchen.
@@ -33,12 +33,13 @@ import { getColorHex } from '../config/annotationColors';
 import { getPrintEventName } from '../config/eventDefinitions';
 import { hasPublicHoliday } from '../engines/eventEngine';
 import { labelLineClass } from '../utils/textFit';
+import { countMarkedShiftsByColorTable } from '../components/MonthCalendar';
 
 /** Feste Rasterhöhe: jeder Monatsblock besitzt genau 31 Tagespositionen. */
 export const PRINT_ROWS = 31;
 
 /** Zeichen der Feiertagsmarkierung in der KW-Spalte. */
-export const PUBLIC_HOLIDAY_MARK = 'F!';
+export const PUBLIC_HOLIDAY_MARK = 'F';
 
 /** Barrierefreie Beschreibung der Feiertagsmarkierung. */
 export const PUBLIC_HOLIDAY_TITLE = 'Gesetzlicher Feiertag';
@@ -67,11 +68,11 @@ function buildRows(month: MonthCalendarModel): PrintRow[] {
  * Informationstext einer Zeile.
  *
  * - Ohne Kommentar: alle Termine des Tages inklusive des ausgeschriebenen
- *   Feiertagsnamens (getrennt mit "·"). Die Markierung "F!" erscheint
+ *   Feiertagsnamens (getrennt mit "·"). Die Markierung "F" erscheint
  *   ausschließlich in der KW-Spalte, niemals hier.
  * - Mit Kommentar: ausschließlich der Kommentar. Termin- und Feiertagsnamen
  *   verschwinden dann vollständig; der Feiertag bleibt über das rosa
- *   "F!"-Kästchen in der KW-Spalte erkennbar.
+ *   "F"-Kästchen in der KW-Spalte erkennbar.
  */
 export function buildPrintInformation(
   day: CalendarDay,
@@ -95,6 +96,7 @@ export function PublicHolidayMark() {
 
 export function PrintMonth({ month, annotationLabels, annotationColors }: PrintMonthProps) {
   const rows = buildRows(month);
+  const markedShiftCounts = countMarkedShiftsByColorTable(month.days, annotationColors);
   return (
     <div className="print-month" data-month={month.month}>
       <div className="print-month-header">
@@ -151,6 +153,28 @@ export function PrintMonth({ month, annotationLabels, annotationColors }: PrintM
             </div>
           );
         })}
+      </div>
+      <div className="print-month-footer">
+        <span className="print-footer-shift">
+          {month.statistics.dayShiftCount} × T
+        </span>
+        <span className="print-footer-shift">
+          {month.statistics.nightShiftCount} × N
+        </span>
+        {markedShiftCounts.length > 0 && (
+          <span className="print-footer-marked" title="Markierte Schichten (T/N) je Farbe">
+            {markedShiftCounts.map(({ colorId, count }) => (
+              <span
+                key={colorId}
+                className="print-month-chip"
+                style={{ backgroundColor: getColorHex(colorId) ?? undefined }}
+                title={`${count} markierte ${count === 1 ? 'Schicht' : 'Schichten'}`}
+              >
+                {count}
+              </span>
+            ))}
+          </span>
+        )}
       </div>
     </div>
   );

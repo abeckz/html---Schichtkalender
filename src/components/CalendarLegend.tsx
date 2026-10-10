@@ -6,10 +6,15 @@
  *
  * In der ersten Zeile steht die Gesamtzahl der im gewählten Jahr für die
  * gewählte Schicht gearbeiteten Schichten (Tag- plus Nachtschichten).
+ *
+ * Darunter folgt zuerst die Farblegende (sofern Markierungsfarben benutzt
+ * werden) und danach die Erklärung der Buchstaben und Kennzahlen. Ein Klick
+ * auf einen Farbblock öffnet den Eingabedialog der Farblegende.
  */
 
-import type { ShiftId } from '../domain/types';
+import type { AnnotationColorId, ShiftId } from '../domain/types';
 import { PUBLIC_HOLIDAY_MARK, PUBLIC_HOLIDAY_TITLE } from '../print/PrintMonth';
+import { ColorLegendBox } from './ColorLegendBox';
 
 export interface CalendarLegendProps {
   compact?: boolean;
@@ -19,6 +24,12 @@ export interface CalendarLegendProps {
   selectedShift: ShiftId;
   /** Gearbeitete Schichten insgesamt (Tag- plus Nachtschichten) des Jahres. */
   workedShiftCount: number;
+  /** Benutzte Markierungsfarben des Jahres (in Palettenreihenfolge). */
+  usedColors?: readonly AnnotationColorId[];
+  /** Erklärungstexte je Farbe des Jahres. */
+  colorTexts?: Partial<Record<AnnotationColorId, string>>;
+  /** Klick auf eine Farbbox (öffnet den Eingabedialog). */
+  onEditColor?: (colorId: AnnotationColorId) => void;
 }
 
 export function CalendarLegend({
@@ -26,6 +37,9 @@ export function CalendarLegend({
   year,
   selectedShift,
   workedShiftCount,
+  usedColors = [],
+  colorTexts = {},
+  onEditColor,
 }: CalendarLegendProps) {
   return (
     <div className={compact ? 'legend legend-compact' : 'legend'}>
@@ -33,6 +47,17 @@ export function CalendarLegend({
         <strong>Arbeitsschichten gesamt</strong> im Jahr {year} für Schicht{' '}
         {selectedShift}: {workedShiftCount}
       </span>
+      {usedColors.length > 0 && (
+        <span className="legend-item legend-colors">
+          <strong>Farben</strong>
+          <ColorLegendBox
+            colors={usedColors}
+            texts={colorTexts}
+            onEditColor={onEditColor}
+            className="legend-color-box"
+          />
+        </span>
+      )}
       <span className="legend-item">
         <strong>T</strong> = Tagschicht von 6 bis 18 Uhr
       </span>

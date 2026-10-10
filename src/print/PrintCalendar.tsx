@@ -12,6 +12,7 @@
 
 import { useMemo } from 'react';
 import type { AnnotationColorId, AnnotationMap, ColumnColorName, YearCalendar } from '../domain/types';
+import { usedAnnotationColors } from '../config/annotationColors';
 import { summarizeYear } from '../engines/calendarBuilder';
 import { PrintHeader } from './PrintHeader';
 import { PrintHalfYear } from './PrintHalfYear';
@@ -19,16 +20,27 @@ import { PrintHalfYear } from './PrintHalfYear';
 export interface PrintCalendarProps {
   calendar: YearCalendar;
   annotations: AnnotationMap;
+  /** Erklärungstexte der Farblegende des gedruckten Jahres. */
+  colorLegend?: Partial<Record<AnnotationColorId, string>>;
   onPrint: () => void;
   onBack: () => void;
 }
 
-export function PrintCalendar({ calendar, annotations, onPrint, onBack }: PrintCalendarProps) {
+export function PrintCalendar({
+  calendar,
+  annotations,
+  colorLegend = {},
+  onPrint,
+  onBack,
+}: PrintCalendarProps) {
   const firstHalf = calendar.months.slice(0, 6);
   const secondHalf = calendar.months.slice(6, 12);
 
   // Gearbeitete Schichten insgesamt (Tag- plus Nachtschichten) des Jahres.
   const workedShiftCount = summarizeYear(calendar).requiredShiftCount;
+
+  // Benutzte Markierungsfarben des Jahres für die Farblegende im Seitenkopf.
+  const usedColors = usedAnnotationColors(annotations, calendar.year);
 
   // Die Aufbereitung ist reine Darstellungslogik und verändert keine
   // Fachdaten: Beschriftungen und Farb-IDs werden aus der AnnotationMap
@@ -68,7 +80,7 @@ export function PrintCalendar({ calendar, annotations, onPrint, onBack }: PrintC
           <br />
           Beide Seiten füllen das Blatt vollständig aus – Skalierung auf 100 % bzw. „An Seite anpassen“ deaktiviert lassen.
           <br />
-          Hintergrundfarben aktivieren, damit Farbmarkierungen und das rosa Feiertagsfeld (F!) farbig gedruckt werden.
+          Hintergrundfarben aktivieren, damit Farbmarkierungen und das rosa Feiertagsfeld (F) farbig gedruckt werden.
         </p>
       </div>
 
@@ -78,6 +90,8 @@ export function PrintCalendar({ calendar, annotations, onPrint, onBack }: PrintC
             year={calendar.year}
             selectedShift={calendar.selectedShift}
             workedShiftCount={workedShiftCount}
+            usedColors={usedColors}
+            colorLegend={colorLegend}
           />
           <PrintHalfYear
             months={firstHalf}
@@ -92,6 +106,8 @@ export function PrintCalendar({ calendar, annotations, onPrint, onBack }: PrintC
             year={calendar.year}
             selectedShift={calendar.selectedShift}
             workedShiftCount={workedShiftCount}
+            usedColors={usedColors}
+            colorLegend={colorLegend}
           />
           <PrintHalfYear
             months={secondHalf}

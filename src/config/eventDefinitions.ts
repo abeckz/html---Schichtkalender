@@ -13,7 +13,7 @@ export interface FixedEventDefinition {
   month: number;
   day: number;
   countsAsPaidNormalShiftHoliday: boolean;
-  /** Gesetzlicher Feiertag: wird in der KW-Spalte als rosa "F!" angezeigt. */
+  /** Gesetzlicher Feiertag: wird in der KW-Spalte als rosa "F" angezeigt. */
   isPublicHoliday: boolean;
   priority: number;
 }
@@ -29,7 +29,7 @@ export interface FixedEventDefinition {
  * Einheit, Allerheiligen sowie 1. und 2. Weihnachtstag.
  * Fronleichnam ist in Rheinland-Pfalz ganzflächig gesetzlicher Feiertag.
  *
- * Nicht gesetzlich in Rheinland-Pfalz und damit ohne "F!"-Markierung:
+ * Nicht gesetzlich in Rheinland-Pfalz und damit ohne "F"-Markierung:
  * Heilige Drei Könige (nur Baden-Württemberg, Bayern, Sachsen-Anhalt) und
  * Mariä Himmelfahrt (nur Saarland und Bayern). Beide sind deshalb auch keine
  * bezahlten Feiertage (countsAsPaidNormalShiftHoliday: false) und werden in
@@ -38,7 +38,7 @@ export interface FixedEventDefinition {
  * sichtbar sind.
  * Der Reformationstag ist in Rheinland-Pfalz kein gesetzlicher Feiertag.
  * Brauchtumstage (Heiligabend, Silvester, Fastnacht ...) werden ebenfalls
- * normal (ohne "F!") angezeigt.
+ * normal (ohne "F") angezeigt.
  */
 export const fixedEvents: readonly FixedEventDefinition[] = [
   { id: 'new-year', name: 'Neujahr', month: 1, day: 1, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },
@@ -77,10 +77,10 @@ export const easterRelativeEvents: readonly {
 
 /**
  * Kurzbezeichnungen für die Printansicht: ausschließlich Brauchtums- und
- * Aktionstage, die nicht als gesetzlicher Feiertag mit "F!" markiert sind.
+ * Aktionstage, die nicht als gesetzlicher Feiertag mit "F" markiert sind.
  *
  * Gesetzliche Feiertage stehen hier bewusst nicht: Sie werden in der
- * KW-Spalte durch das "F!"-Kästchen gekennzeichnet, während ihr
+ * KW-Spalte durch das "F"-Kästchen gekennzeichnet, während ihr
  * ausgeschriebener Name im Informationstext erhalten bleibt. Ein Kurztext
  * würde den Feiertag ein zweites Mal nennen - genau das soll vermieden
  * werden.

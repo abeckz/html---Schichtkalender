@@ -125,6 +125,7 @@ describe('Lesen und Schreiben', () => {
     annotations: {
       '2023-04-04': { dateKey: '2023-04-04', label: 'Urlaub', colors: { info: 'orange' } },
     },
+    colorLegend: {},
   };
 
   it('rundreist verlustfrei', () => {
@@ -137,11 +138,17 @@ describe('Lesen und Schreiben', () => {
   });
 
   it('liefert ohne Storage oder ohne Daten die Standardwerte', () => {
-    expect(readState(null)).toEqual({ version: 1, settings: DEFAULT_SETTINGS, annotations: {} });
+    expect(readState(null)).toEqual({
+      version: 1,
+      settings: DEFAULT_SETTINGS,
+      annotations: {},
+      colorLegend: {},
+    });
     expect(readState(createMemoryStorage())).toEqual({
       version: 1,
       settings: DEFAULT_SETTINGS,
       annotations: {},
+      colorLegend: {},
     });
   });
 
