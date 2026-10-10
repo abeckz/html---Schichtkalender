@@ -581,6 +581,57 @@ describe('Bildschirmdarstellung', () => {
     const activeShift = container.querySelector('.shift-button.is-active');
     expect(activeShift?.textContent).toBe('B');
   });
+
+  it('färbt nur die betroffene Zelle ein und lässt die übrigen Spalten unmarkiert', () => {
+    // Regression: Eine einzelne eingefärbte Spalte darf nicht die
+    // Textfarbe der gesamten Zeile umstellen. Die Kontrastfarbe hängt an
+    // der Spaltenklasse `has-color-<spalte>` und betrifft damit
+    // ausschließlich die tatsächlich hinterlegte Zelle.
+    unmountAll();
+    window.localStorage.setItem(
+      'schichtkalender.state',
+      JSON.stringify({
+        version: 1,
+        settings: { selectedYear: 2022, selectedShift: 'B' },
+        annotations: {
+          // Nur die Info-Spalte trägt eine Farbe.
+          '2022-05-05': { dateKey: '2022-05-05', label: 'Schulung', colors: { info: 'green' } },
+          // Nur die T/N-Spalte (Streifen) trägt eine Farbe.
+          '2022-05-06': { dateKey: '2022-05-06', label: '', colors: { shift: 'yellow' } },
+        },
+      }),
+    );
+    try {
+      const container = render(<App />);
+
+      // Die Bildschirmzeilen tragen kein data-date-key (das gibt es nur in der
+      // Druckansicht). Die Zeile wird daher über die gesetzte Farbspalte
+      // gefunden.
+      const infoRow = container.querySelector('.day-row[data-color-info="green"]');
+      expect(infoRow).not.toBeNull();
+      // Die Zeile ist als eingefärbt markiert ...
+      expect(infoRow?.className).toContain('has-color');
+      // ... aber nur die Info-Spalte trägt die Kontrast-Spaltenklasse.
+      expect(infoRow?.className).toContain('has-color-info');
+      expect(infoRow?.className).not.toContain('has-color-weekday');
+      expect(infoRow?.className).not.toContain('has-color-day');
+      expect(infoRow?.className).not.toContain('has-color-shift');
+      // Nur die Info-Zelle hat einen Hintergrund gesetzt.
+      const infoCell = infoRow?.querySelector('.cell-information') as HTMLElement | null;
+      expect(infoCell?.style.backgroundColor).not.toBe('');
+      const weekdayCell = infoRow?.querySelector('.cell-weekday') as HTMLElement | null;
+      expect(weekdayCell?.style.backgroundColor).toBe('');
+
+      const shiftRow = container.querySelector('.day-row[data-color-shift="yellow"]');
+      expect(shiftRow).not.toBeNull();
+      expect(shiftRow?.className).toContain('has-color-shift');
+      expect(shiftRow?.className).not.toContain('has-color-info');
+      expect(shiftRow?.className).not.toContain('has-color-weekday');
+      expect(shiftRow?.className).not.toContain('has-color-day');
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
 });
 
 describe('Warnung bei ungespeicherten Daten', () => {

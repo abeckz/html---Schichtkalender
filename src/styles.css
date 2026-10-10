@@ -482,15 +482,21 @@ body {
 }
 
 /**
- * Farbig hinterlegte Zeilen (persönliche Markierung) tragen immer schwarzen
- * Text. Die satt kräftigen Palette-Farben sind hell genug für schwarze
- * Schrift; ein ererbtes Weiß aus dem Dunkelmodus wäre auf diesen Feldern
- * nicht lesbar. Die Regel gilt für alle Zellinhalte der Zeile.
+ * Farbig hinterlegte Zellen (persönliche Markierung) tragen schwarzen Text.
+ * Die satt kräftigen Palette-Farben sind hell genug für schwarze Schrift;
+ * ein ererbtes Weiß aus dem Dunkelmodus wäre auf diesen Feldern nicht
+ * lesbar.
+ *
+ * Die Regel gilt ausschließlich für die Spalte, die tatsächlich einen
+ * Hintergrund gesetzt hat. Nicht eingefärbte Zellen derselben Zeile behalten
+ * damit ihre normale Textfarbe (hell im Dunkelmodus) - sonst würde eine
+ * einzelne farbige Zelle die gesamte Zeile unlesbar machen.
  */
-.day-row.has-color,
-.day-row.has-color .cell,
-.day-row.has-color .cell-week,
-.day-row.has-color .holiday-mark {
+.day-row.has-color-weekday .cell-weekday,
+.day-row.has-color-day .cell-day,
+.day-row.has-color-info .cell-information,
+.day-row.has-color-info .cell-information .holiday-mark,
+.day-row.has-color-shift .cell-shift {
   color: #000000;
 }
 
