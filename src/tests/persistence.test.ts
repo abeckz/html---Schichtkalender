@@ -6,15 +6,15 @@ import {
   parseState,
   serializeState,
   triggerDownload,
-} from '../services/persistence';
-import { readFileAsText } from '../services/fileReader';
-import { STORAGE_VERSION } from '../services/storage';
-import { DEFAULT_SETTINGS } from '../config/appDefaults';
-import type { PersistedState } from '../domain/types';
+} from '../services/persistence.ts';
+import { readFileAsText } from '../services/fileReader.ts';
+import { STORAGE_VERSION, normalizeSettings } from '../services/storage.ts';
+import { DEFAULT_SETTINGS } from '../config/appDefaults.ts';
+import type { PersistedState } from '../domain/types.ts';
 
 const sampleState: PersistedState = {
   version: STORAGE_VERSION,
-  settings: { selectedYear: 2026, selectedShift: 'C' },
+  settings: { selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
   annotations: {
     '2026-03-15': { dateKey: '2026-03-15', label: 'Urlaub', colors: { info: 'yellow' } },
     '2026-04-01': { dateKey: '2026-04-01', label: '', colors: { weekday: 'red' } },
@@ -39,7 +39,7 @@ describe('Serialisierung', () => {
     const text = serializeState(sampleState);
     const loaded = parseState(text);
     expect(loaded).not.toBeNull();
-    expect(loaded?.settings).toEqual(sampleState.settings);
+    expect(loaded?.settings).toEqual(normalizeSettings(sampleState.settings));
     expect(loaded?.annotations).toEqual(sampleState.annotations);
     expect(loaded?.version).toBe(STORAGE_VERSION);
   });
@@ -54,7 +54,7 @@ describe('Serialisierung', () => {
   it('bereinigt ungültige Werte bereits beim Serialisieren', () => {
     const text = serializeState({
       version: 999,
-      settings: { selectedYear: 1200, selectedShift: 'Z' as never },
+      settings: { selectedYear: 1200, selectedShift: 'Z' as never, weekdayOverDate: false },
       annotations: {
         bad: { dateKey: 'kein-datum', label: 'x' } as never,
       },
@@ -62,7 +62,7 @@ describe('Serialisierung', () => {
     });
     const loaded = parseState(text);
     expect(loaded?.version).toBe(STORAGE_VERSION);
-    expect(loaded?.settings).toEqual(DEFAULT_SETTINGS);
+    expect(loaded?.settings).toEqual(normalizeSettings({ ...DEFAULT_SETTINGS }));
     expect(loaded?.annotations).toEqual({});
   });
 });

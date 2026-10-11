@@ -6,12 +6,17 @@
  * Druckdarstellung ist davon vollständig unabhängig.
  */
 
-import type { AnnotationMap, CalendarDay, ColumnColorName, YearCalendar as YearCalendarModel } from '../domain/types';
-import { MonthCalendar } from './MonthCalendar';
+import type { AnnotationMap, CalendarDay, ColumnColorName, YearCalendar as YearCalendarModel } from '../domain/types.ts';
+import { MonthCalendar } from './MonthCalendar.tsx';
 
 export interface YearCalendarProps {
   calendar: YearCalendarModel;
   annotations: AnnotationMap;
+  /**
+   * Anzeige-Option "Wochentag über Datum" (Standard: aus). Ist sie gesetzt,
+   * steht das Datum unter dem Wochentag und die Tagesnummer-Spalte entfällt.
+   */
+  weekdayOverDate?: boolean;
   onOpenEditor: (day: CalendarDay) => void;
   selectedKeys?: ReadonlySet<string>;
   /** Spalte, die während der aktuellen Streifen-Auswahl hervorgehoben wird. */
@@ -24,6 +29,7 @@ export interface YearCalendarProps {
 export function YearCalendar({
   calendar,
   annotations,
+  weekdayOverDate = false,
   onOpenEditor,
   selectedKeys,
   selectedColumn,
@@ -38,6 +44,7 @@ export function YearCalendar({
           key={month.month}
           month={month}
           annotations={annotations}
+          weekdayOverDate={weekdayOverDate}
           onOpenEditor={onOpenEditor}
           selectedKeys={selectedKeys}
           selectedColumn={selectedColumn}

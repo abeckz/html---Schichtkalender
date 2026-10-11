@@ -291,6 +291,45 @@ body {
   gap: 4px;
 }
 
+/**
+ * Umschalter "Wochentag über Datum" der Menübox.
+ *
+ * Beschriftung links, Schalter rechts; der Schalter trägt einen sichtbaren
+ * Zustandstext ("Ein"/"Aus"), damit der Zustand nicht ausschließlich über
+ * Farbe transportiert wird. Standard ist "Aus".
+ */
+.weekday-over-date-toggle {
+  gap: 8px;
+}
+
+.switch-button {
+  min-width: 54px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+}
+
+.switch-button:hover {
+  border-color: var(--color-accent);
+}
+
+.switch-button.is-active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.switch-state {
+  display: inline-block;
+  line-height: 1;
+}
+
 .theme-button {
   display: flex;
   align-items: center;
@@ -597,6 +636,15 @@ body {
   border-bottom: none;
 }
 
+/**
+ * Anzeige-Option "Wochentag über Datum": Wochentag und Datum teilen sich eine
+ * Spalte, die Tagesnummer-Spalte entfällt. Der frei werdende Platz kommt der
+ * großen Spalte mit den Bemerkungen zugute (zweite Spalte = 1fr).
+ */
+.day-row.is-weekday-over-date {
+  grid-template-columns: 3.6em minmax(0, 1fr) 3.2em 2.2em;
+}
+
 .day-row:hover {
   background: var(--color-accent-soft);
 }
@@ -627,6 +675,7 @@ body {
  */
 .day-row.has-color-weekday .cell-weekday,
 .day-row.has-color-day .cell-day,
+.day-row.is-weekday-over-date.has-color-day .cell-weekday,
 .day-row.has-color-info .cell-information,
 .day-row.has-color-info .cell-information .holiday-mark,
 .day-row.has-color-shift .cell-shift {
@@ -642,6 +691,24 @@ body {
 .cell-weekday,
 .cell-day {
   font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Gemeinsame Zelle für Wochentag und Datum (Anzeige-Option "Wochentag über
+ * Datum"): Datum unter dem Wochentag. Beide Werte stehen als Block
+ * untereinander; die Zelle zentriert sie vertikal und linksbündig.
+ */
+.cell-date-stack {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  line-height: 1.05;
+}
+
+.cell-weekday-date {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
 }
 
 /**

@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PersistedState } from '../domain/types';
-import { hasUnsavedChanges, stateSignature } from './changeTracking';
+import { hasUnsavedChanges, stateSignature } from './changeTracking.ts';
 
 export interface UnsavedChangesGuard {
   /** true, wenn seit der letzten Sicherung Änderungen vorliegen. */

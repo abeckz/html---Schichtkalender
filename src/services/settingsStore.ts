@@ -9,15 +9,17 @@
  */
 
 import { useCallback, useState } from 'react';
-import type { AppSettings, ShiftId } from '../domain/types';
-import { readState } from '../services/storage';
-import { MAX_YEAR, MIN_YEAR, isValidYear } from '../utils/dateUtils';
-import { SELECTABLE_YEARS } from '../config/appDefaults';
+import type { AppSettings, ShiftId } from '../domain/types.ts';
+import { readState } from '../services/storage.ts';
+import { MAX_YEAR, MIN_YEAR, isValidYear } from '../utils/dateUtils.ts';
+import { SELECTABLE_YEARS } from '../config/appDefaults.ts';
 
 export interface SettingsStore {
   settings: AppSettings;
   setYear: (year: number) => void;
   setShift: (shiftId: ShiftId) => void;
+  /** Schaltet die Anzeige-Option "Wochentag über Datum" um. */
+  setWeekdayOverDate: (enabled: boolean) => void;
   /** Übernimmt Jahr und Schicht gemeinsam (z. B. beim Laden einer Datei). */
   setSettings: (next: Partial<AppSettings>) => void;
   goToPreviousYear: () => void;
@@ -54,6 +56,7 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
         ? (initial?.selectedYear ?? persisted.selectedYear)
         : persisted.selectedYear,
       selectedShift: initial?.selectedShift ?? persisted.selectedShift,
+      weekdayOverDate: initial?.weekdayOverDate ?? persisted.weekdayOverDate,
     };
   });
 
@@ -65,11 +68,16 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
     setSettings((current) => ({ ...current, selectedShift: shiftId }));
   }, []);
 
+  const setWeekdayOverDate = useCallback((enabled: boolean) => {
+    setSettings((current) => ({ ...current, weekdayOverDate: enabled }));
+  }, []);
+
   const replaceSettings = useCallback((next: Partial<AppSettings>) => {
     setSettings((current) => ({
       selectedYear:
         next.selectedYear !== undefined ? clampYear(next.selectedYear) : current.selectedYear,
       selectedShift: next.selectedShift ?? current.selectedShift,
+      weekdayOverDate: next.weekdayOverDate ?? current.weekdayOverDate,
     }));
   }, []);
 
@@ -91,6 +99,7 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
     settings,
     setYear,
     setShift,
+    setWeekdayOverDate,
     setSettings: replaceSettings,
     goToPreviousYear,
     goToNextYear,

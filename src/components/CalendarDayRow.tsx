@@ -20,15 +20,23 @@
  */
 
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import type { CalendarDay, ColumnColorName, UserDayAnnotation } from '../domain/types';
-import { getColorHex } from '../config/annotationColors';
-import { hasPublicHoliday } from '../engines/eventEngine';
-import { PUBLIC_HOLIDAY_MARK, PUBLIC_HOLIDAY_TITLE } from '../print/PrintMonth';
-import { labelLineClass } from '../utils/textFit';
+import type { CalendarDay, ColumnColorName, UserDayAnnotation } from '../domain/types.ts';
+import { getColorHex } from '../config/annotationColors.ts';
+import { hasPublicHoliday } from '../engines/eventEngine.ts';
+import { PUBLIC_HOLIDAY_MARK, PUBLIC_HOLIDAY_TITLE } from '../print/PrintMonth.tsx';
+import { labelLineClass } from '../utils/textFit.ts';
 
 export interface CalendarDayRowProps {
   day: CalendarDay;
   annotation: UserDayAnnotation | undefined;
+  /**
+   * Anzeige-Option "Wochentag über Datum" (Standard: aus).
+   *
+   * false: Wochentag und Tagesnummer stehen in getrennten Zellen.
+   * true:  Das Datum steht unter dem Wochentag in einer Zelle, die Zelle der
+   *        Tagesnummer entfällt.
+   */
+  weekdayOverDate?: boolean;
   onOpenEditor: (day: CalendarDay) => void;
   /** true, wenn der Tag Teil der aktuellen Streifen-Auswahl ist. */
   isSelected?: boolean;
@@ -69,6 +77,7 @@ function describeDay(day: CalendarDay, annotation: UserDayAnnotation | undefined
 export function CalendarDayRow({
   day,
   annotation,
+  weekdayOverDate = false,
   onOpenEditor,
   isSelected = false,
   selectedColumn = null,
@@ -85,6 +94,12 @@ export function CalendarDayRow({
   const dayHex = getColorHex(annotation?.colors.day ?? null);
   const infoHex = getColorHex(annotation?.colors.info ?? null);
   const shiftHex = getColorHex(annotation?.colors.shift ?? null);
+
+  // Anzeige-Option "Wochentag über Datum": Datum unter den Wochentag, ohne
+  // eigene Tagesnummer-Zelle. Die persönliche Farbe der Tagesnummer wird
+  // dabei auf die gemeinsame Zelle übertragen, damit die Markierung sichtbar
+  // bleibt; die Farbe des Wochentags hat Vorrang, wenn beide gesetzt sind.
+  const combinedWeekdayHex = weekdayOverDate ? (weekdayHex ?? dayHex) : weekdayHex;
 
   const columnStyle = (hex: string | null) =>
     hex ? { backgroundColor: hex } : undefined;
@@ -110,6 +125,7 @@ export function CalendarDayRow({
   const infoLineClass = annotationLabel !== '' ? labelLineClass(annotationLabel) : '';
 
   const classNames = ['day-row'];
+  if (weekdayOverDate) classNames.push('is-weekday-over-date');
   if (day.isWeekend) classNames.push('is-weekend');
   if (day.isSunday) classNames.push('is-sunday');
   if (annotation) classNames.push('has-annotation');
@@ -171,12 +187,27 @@ export function CalendarDayRow({
       data-color-shift={annotation?.colors.shift ?? undefined}
       data-public-holiday={publicHoliday ? 'true' : undefined}
     >
-      <span className={`cell cell-weekday${selectedClass('weekday')}`} style={columnStyle(weekdayHex)}>
-        {day.weekdayShort}
-      </span>
-      <span className={`cell cell-day${selectedClass('day')}`} style={columnStyle(dayHex)}>
-        {String(day.day).padStart(2, '0')}
-      </span>
+      {weekdayOverDate ? (
+        // Datum unter dem Wochentag: eine gemeinsame Zelle, keine eigene
+        // Tagesnummer-Zelle. Der Zugriff auf die Farbe der Tagesnummer bleibt
+        // über `data-color-day` erhalten.
+        <span
+          className={`cell cell-weekday cell-date-stack${selectedClass('weekday')}`}
+          style={columnStyle(combinedWeekdayHex)}
+        >
+          <span className="cell-weekday-name">{day.weekdayShort}</span>
+          <span className="cell-weekday-date">{String(day.day).padStart(2, '0')}</span>
+        </span>
+      ) : (
+        <>
+          <span className={`cell cell-weekday${selectedClass('weekday')}`} style={columnStyle(weekdayHex)}>
+            {day.weekdayShort}
+          </span>
+          <span className={`cell cell-day${selectedClass('day')}`} style={columnStyle(dayHex)}>
+            {String(day.day).padStart(2, '0')}
+          </span>
+        </>
+      )}
       <span
         className={`cell cell-information${selectedClass('info')} ${infoLineClass}`.trim()}
         style={columnStyle(infoHex)}

@@ -28,12 +28,12 @@ import type {
   CalendarDay,
   ColumnColorName,
   MonthCalendar as MonthCalendarModel,
-} from '../domain/types';
-import { getColorHex } from '../config/annotationColors';
-import { getPrintEventName } from '../config/eventDefinitions';
-import { hasPublicHoliday } from '../engines/eventEngine';
-import { labelLineClass } from '../utils/textFit';
-import { countMarkedShiftsByColorTable } from '../components/MonthCalendar';
+} from '../domain/types.ts';
+import { getColorHex } from '../config/annotationColors.ts';
+import { getPrintEventName } from '../config/eventDefinitions.ts';
+import { hasPublicHoliday } from '../engines/eventEngine.ts';
+import { labelLineClass } from '../utils/textFit.ts';
+import { countMarkedShiftsByColorTable } from '../components/MonthCalendar.tsx';
 
 /** Feste Rasterhöhe: jeder Monatsblock besitzt genau 31 Tagespositionen. */
 export const PRINT_ROWS = 31;
@@ -49,6 +49,15 @@ export interface PrintMonthProps {
   annotationLabels: Record<string, string>;
   /** Farben je Tag und Spalte (Spaltenname -> colorId). */
   annotationColors: Record<string, Partial<Record<ColumnColorName, AnnotationColorId>>>;
+  /**
+   * Anzeige-Option "Wochentag über Datum" (Standard: aus).
+   *
+   * false: eigene Spalten für Wochentag und Tagesnummer.
+   * true:  Das Datum steht unter dem Wochentag in einer gemeinsamen Spalte;
+   *        die Tagesnummer-Spalte entfällt und die Bemerkungsspalte gewinnt
+   *        die Breite hinzu.
+   */
+  weekdayOverDate?: boolean;
 }
 
 interface PrintRow {
@@ -94,9 +103,20 @@ export function PublicHolidayMark() {
   );
 }
 
-export function PrintMonth({ month, annotationLabels, annotationColors }: PrintMonthProps) {
+export function PrintMonth({
+  month,
+  annotationLabels,
+  annotationColors,
+  weekdayOverDate = false,
+}: PrintMonthProps) {
   const rows = buildRows(month);
   const markedShiftCounts = countMarkedShiftsByColorTable(month.days, annotationColors);
+  // Die Anzeige-Option steuert ausschließlich das Spaltenraster der Tabelle:
+  // mit gesetztem Schalter steht das Datum unter dem Wochentag und es gibt
+  // keine eigene Tagesnummer-Spalte mehr.
+  const emptyRowClassName = weekdayOverDate
+    ? 'print-row print-row-empty print-row-weekday-over-date'
+    : 'print-row print-row-empty';
   return (
     <div className="print-month" data-month={month.month}>
       <div className="print-month-header">
@@ -112,9 +132,10 @@ export function PrintMonth({ month, annotationLabels, annotationColors }: PrintM
         {rows.map((row) => {
           if (!row.day) {
             return (
-              <div className="print-row print-row-empty" key={`empty-${row.position}`}>
+              <div className={emptyRowClassName} key={`empty-${row.position}`}>
                 <span className="print-col-wo" />
-                <span className="print-col-datum" />
+                {/* Ohne eigene Datumsspalte trägt die Wochentagsspalte beide Angaben. */}
+                {!weekdayOverDate && <span className="print-col-datum" />}
                 <span className="print-col-info" />
                 <span className="print-col-kw" />
                 <span className="print-col-schicht" />
@@ -133,17 +154,35 @@ export function PrintMonth({ month, annotationLabels, annotationColors }: PrintM
           const information = buildPrintInformation(day, label);
           const infoLineClass = label !== '' ? labelLineClass(label) : '';
           const classNames = ['print-row'];
+          if (weekdayOverDate) classNames.push('print-row-weekday-over-date');
           if (day.isWeekend) classNames.push('is-weekend');
           if (day.isSunday) classNames.push('is-sunday');
 
+          // Ohne eigene Datumsspalte übernimmt die Wochentagsspalte beide
+          // Angaben; die Farbe der Tagesnummer wird dorthin übertragen, damit
+          // die Markierung erhalten bleibt (Wochentagsfarbe hat Vorrang).
+          const combinedWeekdayHex = weekdayOverDate ? weekdayHex ?? datumHex : weekdayHex;
+
           return (
             <div className={classNames.join(' ')} key={day.dateKey} data-date-key={day.dateKey}>
-              <span className="print-col-wo" style={columnStyle(weekdayHex)}>
-                {day.weekdayShort}
+              <span
+                className={
+                  weekdayOverDate
+                    ? 'print-col-wo print-col-date-stack'
+                    : 'print-col-wo'
+                }
+                style={columnStyle(combinedWeekdayHex)}
+              >
+                <span className="print-col-weekday-name">{day.weekdayShort}</span>
+                {weekdayOverDate && (
+                  <span className="print-col-weekday-date">{String(day.day).padStart(2, '0')}</span>
+                )}
               </span>
-              <span className="print-col-datum" style={columnStyle(datumHex)}>
-                {String(day.day).padStart(2, '0')}
-              </span>
+              {!weekdayOverDate && (
+                <span className="print-col-datum" style={columnStyle(datumHex)}>
+                  {String(day.day).padStart(2, '0')}
+                </span>
+              )}
               <span className={`print-col-info ${infoLineClass}`.trim()} style={columnStyle(infoHex)}>
                 {information}
               </span>

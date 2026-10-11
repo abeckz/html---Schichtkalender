@@ -14,10 +14,10 @@ import { describe, expect, it } from 'vitest';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
-import type { AnnotationMap } from '../domain/types';
-import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder';
-import { PrintCalendar } from '../print/PrintCalendar';
-import { PrintMonth, PRINT_ROWS } from '../print/PrintMonth';
+import type { AnnotationMap } from '../domain/types.ts';
+import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder.ts';
+import { PrintCalendar } from '../print/PrintCalendar.tsx';
+import { PrintMonth, PRINT_ROWS } from '../print/PrintMonth.tsx';
 
 function render(element: React.ReactElement): HTMLElement {
   const container = document.createElement('div');
@@ -514,5 +514,62 @@ describe('PrintCalendar', () => {
       (node) => node.textContent,
     );
     expect(shiftTexts).toEqual([`${march.statistics.dayShiftCount} × T`, `${march.statistics.nightShiftCount} × N`]);
+  });
+});
+
+describe('Anzeige-Option "Wochentag über Datum" (Druck)', () => {
+  const calendar = buildYearCalendar({ year: 2021, selectedShift: 'C' });
+
+  it('lässt im Standard Wochentag und Datum in getrennten Spalten', () => {
+    const container = render(
+      <PrintCalendar
+        calendar={calendar}
+        annotations={{}}
+        onPrint={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    expect(container.querySelector('.print-row-weekday-over-date')).toBeNull();
+    const row = container.querySelector('[data-date-key="2021-01-04"]');
+    // Eigene Datumsspalte mit zweistelliger Tagesnummer.
+    expect(row?.querySelector('.print-col-datum')?.textContent).toBe('04');
+    expect(row?.querySelector('.print-col-wo')?.textContent).toBe('Mo');
+  });
+
+  it('schreibt im Druck das Datum unter den Wochentag und entfernt die Datumsspalte', () => {
+    const container = render(
+      <PrintCalendar
+        calendar={calendar}
+        annotations={{}}
+        weekdayOverDate
+        onPrint={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    // Jede Tageszeile trägt die Rasterklasse der Option ...
+    expect(container.querySelectorAll('.print-row-weekday-over-date').length).toBeGreaterThan(0);
+    // ... und alle Rasterzeilen enthalten kein eigenes Datumsfeld mehr.
+    expect(container.querySelectorAll('.print-month-body .print-col-datum').length).toBe(0);
+
+    const row = container.querySelector('[data-date-key="2021-01-04"]');
+    const weekdayCell = row?.querySelector('.print-col-wo');
+    // Wochentag oben, Datum darunter - in derselben Zelle.
+    expect(weekdayCell?.querySelector('.print-col-weekday-name')?.textContent).toBe('Mo');
+    expect(weekdayCell?.querySelector('.print-col-weekday-date')?.textContent).toBe('04');
+    expect(weekdayCell?.classList.contains('print-col-date-stack')).toBe(true);
+  });
+
+  it('fasst in der leeren Auffüllzeile keine Datumsspalte mehr auf', () => {
+    // Der Februar 2021 hat 28 Tage und wird auf 31 Positionen aufgefüllt.
+    const march = buildYearCalendar({ year: 2021, selectedShift: 'C' }).months[1];
+    const container = render(
+      <PrintMonth month={march} annotationLabels={{}} annotationColors={{}} weekdayOverDate />,
+    );
+    const emptyRow = container.querySelector('.print-row-empty');
+    expect(emptyRow).not.toBeNull();
+    expect(emptyRow?.classList.contains('print-row-weekday-over-date')).toBe(true);
+    expect(emptyRow?.querySelector('.print-col-datum')).toBeNull();
+    // Das 31-Zeilen-Raster bleibt unverändert.
+    expect(container.querySelectorAll('.print-month-body > .print-row').length).toBe(PRINT_ROWS);
   });
 });

@@ -6,14 +6,16 @@
  * untereinander.
  */
 
-import type { AnnotationColorId, ColumnColorName, MonthCalendar } from '../domain/types';
-import { PrintMonth } from './PrintMonth';
+import type { AnnotationColorId, ColumnColorName, MonthCalendar } from '../domain/types.ts';
+import { PrintMonth } from './PrintMonth.tsx';
 
 export interface PrintHalfYearProps {
   months: MonthCalendar[];
   annotationLabels: Record<string, string>;
   /** Farben je Tag und Spalte (Spaltenname -> colorId). */
   annotationColors: Record<string, Partial<Record<ColumnColorName, AnnotationColorId>>>;
+  /** Anzeige-Option "Wochentag über Datum" (Standard: aus). */
+  weekdayOverDate?: boolean;
   side: 1 | 2;
 }
 
@@ -21,6 +23,7 @@ export function PrintHalfYear({
   months,
   annotationLabels,
   annotationColors,
+  weekdayOverDate = false,
   side,
 }: PrintHalfYearProps) {
   return (
@@ -31,6 +34,7 @@ export function PrintHalfYear({
           month={month}
           annotationLabels={annotationLabels}
           annotationColors={annotationColors}
+          weekdayOverDate={weekdayOverDate}
         />
       ))}
     </section>

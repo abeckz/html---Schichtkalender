@@ -194,6 +194,20 @@ export interface AnnotationColor {
 export interface AppSettings {
   selectedYear: number;
   selectedShift: ShiftId;
+  /**
+   * Anzeige-Option "Wochentag über Datum" (Standard: false).
+   *
+   * false: Der Monat nutzt zwei getrennte Spalten - links der Wochentag,
+   *        daneben die Tagesnummer.
+   * true:  Das Datum steht unter dem Wochentag in einer gemeinsamen Zelle;
+   *        die Tagesnummer-Spalte entfällt und der gewonnene Platz kommt der
+   *        großen Spalte mit den Bemerkungen (Information) zugute.
+   *
+   * Die Option ist rein darstellungsbezogen und ändert keine Fachdaten;
+   * sie wirkt jedoch - wie in der Spezifikation gefordert - sowohl in der
+   * Bildschirm- als auch in der Druckansicht.
+   */
+  weekdayOverDate: boolean;
 }
 
 /** Persistierte Annotationen, global nach dateKey. */

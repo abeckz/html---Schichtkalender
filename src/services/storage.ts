@@ -15,11 +15,11 @@ import type {
   PersistedState,
   ShiftId,
   UserDayAnnotation,
-} from '../domain/types';
-import { SHIFT_IDS } from '../config/shiftDefinitions';
-import { isAnnotationColorId, isColumnColorName } from '../config/annotationColors';
-import { DEFAULT_SETTINGS } from '../config/appDefaults';
-import { isValidDateKey } from '../utils/dateUtils';
+} from '../domain/types.ts';
+import { SHIFT_IDS } from '../config/shiftDefinitions.ts';
+import { isAnnotationColorId, isColumnColorName } from '../config/annotationColors.ts';
+import { DEFAULT_SETTINGS } from '../config/appDefaults.ts';
+import { isValidDateKey } from '../utils/dateUtils.ts';
 
 export const STORAGE_KEY = 'schichtkalender.state';
 export const STORAGE_VERSION = 1;
@@ -95,6 +95,12 @@ export function normalizeSettings(value: unknown): AppSettings {
     selectedShift: isShiftId(candidate.selectedShift)
       ? candidate.selectedShift
       : DEFAULT_SETTINGS.selectedShift,
+    // Rückwärtskompatibilität: Ältere Zustände kennen die Anzeige-Option
+    // nicht; sie wird dann auf den Standard (aus) gesetzt.
+    weekdayOverDate:
+      typeof candidate.weekdayOverDate === 'boolean'
+        ? candidate.weekdayOverDate
+        : DEFAULT_SETTINGS.weekdayOverDate,
   };
 }
 

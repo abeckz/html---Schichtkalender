@@ -12,9 +12,9 @@ import {
   saveSettings,
   writeState,
   type StorageLike,
-} from '../services/storage';
-import { DEFAULT_SETTINGS } from '../config/appDefaults';
-import type { AnnotationMap, PersistedState, UserDayAnnotation } from '../domain/types';
+} from '../services/storage.ts';
+import { DEFAULT_SETTINGS } from '../config/appDefaults.ts';
+import type { AnnotationMap, PersistedState, UserDayAnnotation } from '../domain/types.ts';
 
 /** In-Memory-Storage für Tests. */
 function createMemoryStorage(initial: Record<string, string> = {}): StorageLike & {
@@ -108,6 +108,7 @@ describe('Einstellungen', () => {
     expect(normalizeSettings({ selectedYear: 2024, selectedShift: 'A' })).toEqual({
       selectedYear: 2024,
       selectedShift: 'A',
+      weekdayOverDate: false,
     });
   });
 
@@ -115,13 +116,28 @@ describe('Einstellungen', () => {
     expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(normalizeSettings({ selectedYear: 1700, selectedShift: 'Z' })).toEqual(DEFAULT_SETTINGS);
   });
+
+  it('übernimmt die Anzeige-Option "Wochentag über Datum" und fällt sonst auf "aus" zurück', () => {
+    // Gesetzter Wert wird übernommen ...
+    expect(
+      normalizeSettings({ selectedYear: 2024, selectedShift: 'A', weekdayOverDate: true })
+        .weekdayOverDate,
+    ).toBe(true);
+    // ... fehlende oder ungültige Werte ergeben den Standard (aus).
+    expect(normalizeSettings({ selectedYear: 2024, selectedShift: 'A' }).weekdayOverDate).toBe(false);
+    expect(
+      normalizeSettings({ selectedYear: 2024, selectedShift: 'A', weekdayOverDate: 'x' } as never)
+        .weekdayOverDate,
+    ).toBe(false);
+    expect(DEFAULT_SETTINGS.weekdayOverDate).toBe(false);
+  });
 });
 
 
 describe('Lesen und Schreiben', () => {
   const state: PersistedState = {
     version: 1,
-    settings: { selectedYear: 2023, selectedShift: 'B' },
+    settings: { selectedYear: 2023, selectedShift: 'B', weekdayOverDate: false },
     annotations: {
       '2023-04-04': { dateKey: '2023-04-04', label: 'Urlaub', colors: { info: 'orange' } },
     },
@@ -194,9 +210,9 @@ describe('Lesen und Schreiben', () => {
     const annotations: AnnotationMap = {
       '2021-12-24': { dateKey: '2021-12-24', label: 'frei', colors: { info: 'pink' } },
     };
-    expect(saveSettings({ selectedYear: 2021, selectedShift: 'C' }, annotations, storage)).toBe(
-      true,
-    );
+    expect(
+      saveSettings({ selectedYear: 2021, selectedShift: 'C', weekdayOverDate: false }, annotations, storage),
+    ).toBe(true);
     const loaded = readState(storage);
     expect(getAnnotationColorId(loaded.annotations, '2021-12-24')).toBe('pink');
     expect(getAnnotationColorId(loaded.annotations, '2021-12-25')).toBeNull();

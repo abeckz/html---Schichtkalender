@@ -23,7 +23,7 @@ import {
   readState,
   writeState,
   type StorageLike,
-} from '../services/storage';
+} from '../services/storage.ts';
 
 export interface ColorLegendStore {
   colorLegend: ColorLegendMap;

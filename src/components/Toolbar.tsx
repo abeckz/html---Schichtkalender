@@ -6,13 +6,14 @@
  * niemals gedruckt.
  */
 
-import type { ShiftId } from '../domain/types';
-import { YearSelector } from './YearSelector';
-import { ShiftSelector } from './ShiftSelector';
-import { ThemeToggle } from './ThemeToggle';
-import { DataControls } from './DataControls';
-import type { ThemeStore } from '../services/themeStore';
-import type { PersistedState } from '../domain/types';
+import type { ShiftId } from '../domain/types.ts';
+import { YearSelector } from './YearSelector.tsx';
+import { ShiftSelector } from './ShiftSelector.tsx';
+import { ThemeToggle } from './ThemeToggle.tsx';
+import { WeekdayOverDateToggle } from './WeekdayOverDateToggle.tsx';
+import { DataControls } from './DataControls.tsx';
+import type { ThemeStore } from '../services/themeStore.ts';
+import type { PersistedState } from '../domain/types.ts';
 
 export interface ToolbarProps {
   year: number;
@@ -23,6 +24,10 @@ export interface ToolbarProps {
   canGoPrevious: boolean;
   canGoNext: boolean;
   onSelectShift: (shiftId: ShiftId) => void;
+  /** Anzeige-Option "Wochentag über Datum" (Standard: aus). */
+  weekdayOverDate: boolean;
+  /** Schaltet die Anzeige-Option "Wochentag über Datum" um. */
+  onToggleWeekdayOverDate: (enabled: boolean) => void;
   onOpenPrint: () => void;
   theme: ThemeStore;
   /** Sichert den Zustand als Datei; Rückgabe: Erfolg. */
@@ -44,6 +49,8 @@ export function Toolbar({
   canGoPrevious,
   canGoNext,
   onSelectShift,
+  weekdayOverDate,
+  onToggleWeekdayOverDate,
   onOpenPrint,
   theme,
   onSaveFile,
@@ -64,6 +71,7 @@ export function Toolbar({
           canGoNext={canGoNext}
         />
         <ShiftSelector selectedShift={selectedShift} onSelectShift={onSelectShift} />
+        <WeekdayOverDateToggle enabled={weekdayOverDate} onToggle={onToggleWeekdayOverDate} />
         {/* Anzeige (Hell/Dunkel) oben, Datei-Steuerung (Sichern/Laden) darunter. */}
         <div className="toolbar-stack">
           <ThemeToggle theme={theme} />

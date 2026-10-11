@@ -17,7 +17,7 @@ import {
   readState,
   writeState,
   type StorageLike,
-} from '../services/storage';
+} from '../services/storage.ts';
 
 export interface AnnotationStore {
   annotations: AnnotationMap;

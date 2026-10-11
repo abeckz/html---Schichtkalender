@@ -16,18 +16,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
-import type { AnnotationMap, ColorLegendMap } from '../domain/types';
-import { usedAnnotationColors } from '../config/annotationColors';
+import type { AnnotationMap, ColorLegendMap } from '../domain/types.ts';
+import { usedAnnotationColors } from '../config/annotationColors.ts';
 import {
   MAX_LEGEND_TEXT_LENGTH,
   normalizeColorLegend,
   normalizeLegendText,
-} from '../services/storage';
-import { parseState, serializeState } from '../services/persistence';
-import { DEFAULT_SETTINGS } from '../config/appDefaults';
-import { ColorLegendBox } from '../components/ColorLegendBox';
-import { ColorLegendEditor } from '../components/ColorLegendEditor';
-import { CalendarLegend } from '../components/CalendarLegend';
+  normalizeSettings,
+} from '../services/storage.ts';
+import { parseState, serializeState } from '../services/persistence.ts';
+import { DEFAULT_SETTINGS } from '../config/appDefaults.ts';
+import { ColorLegendBox } from '../components/ColorLegendBox.tsx';
+import { ColorLegendEditor } from '../components/ColorLegendEditor.tsx';
+import { CalendarLegend } from '../components/CalendarLegend.tsx';
 
 function render(element: React.ReactElement): { container: HTMLElement } {
   const container = document.createElement('div');
@@ -111,7 +112,10 @@ describe('Farblegende in Sicherungsdateien', () => {
       annotations: {},
       colorLegend,
     };
-    expect(parseState(serializeState(state))).toEqual(state);
+    expect(parseState(serializeState(state))).toEqual({
+      ...state,
+      settings: normalizeSettings(state.settings),
+    });
   });
 
   it('ergänzt eine fehlende Farblegende leer (Rückwärtskompatibilität)', () => {

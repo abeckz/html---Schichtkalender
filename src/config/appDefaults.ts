@@ -10,7 +10,7 @@
  * die verbindliche Referenzberechnung der Spezifikation vor.
  */
 
-import type { AppSettings } from '../domain/types';
+import type { AppSettings } from '../domain/types.ts';
 
 /** Fachliches Referenzjahr der Spezifikation. */
 export const REFERENCE_YEAR = 2021;
@@ -51,7 +51,17 @@ export const DEFAULT_YEAR = defaultYear();
 
 export const DEFAULT_SHIFT = 'C' as const;
 
+/**
+ * Standard der Anzeige-Option "Wochentag über Datum".
+ *
+ * Die Option ist standardmäßig aus: Wochentag und Tagesnummer stehen in
+ * getrennten Spalten. Erst mit dem Einschalten rückt das Datum unter den
+ * Wochentag und lässt die Tagesnummer-Spalte entfallen.
+ */
+export const DEFAULT_WEEKDAY_OVER_DATE = false;
+
 export const DEFAULT_SETTINGS: AppSettings = {
   selectedYear: DEFAULT_YEAR,
   selectedShift: DEFAULT_SHIFT,
+  weekdayOverDate: DEFAULT_WEEKDAY_OVER_DATE,
 };

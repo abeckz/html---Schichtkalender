@@ -5,15 +5,15 @@ import {
   canUseSavePicker,
   loadTextWithPicker,
   saveTextWithPicker,
-} from '../services/fileSystemAccess';
-import { downloadState, loadState, saveState } from '../services/persistence';
-import { DEFAULT_SETTINGS } from '../config/appDefaults';
-import { STORAGE_VERSION } from '../services/storage';
-import type { PersistedState } from '../domain/types';
+} from '../services/fileSystemAccess.ts';
+import { downloadState, loadState, saveState } from '../services/persistence.ts';
+import { DEFAULT_SETTINGS } from '../config/appDefaults.ts';
+import { STORAGE_VERSION } from '../services/storage.ts';
+import type { PersistedState } from '../domain/types.ts';
 
 const sampleState: PersistedState = {
   version: STORAGE_VERSION,
-  settings: { selectedYear: 2026, selectedShift: 'C' },
+  settings: { selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
   annotations: {
     '2026-03-15': { dateKey: '2026-03-15', label: 'Urlaub', colors: { info: 'yellow' } },
   },

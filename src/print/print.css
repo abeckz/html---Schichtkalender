@@ -217,6 +217,19 @@
   background: #ffffff;
 }
 
+/**
+ * Anzeige-Option "Wochentag über Datum": Wochentag und Datum teilen sich die
+ * linke Spalte, die Tagesnummer-Spalte entfällt. Ihre Breite wird der Spalte
+ * mit den Bemerkungen zugeschlagen (zweite Spalte = 1fr), sodass der
+ * verbleibende Platz vollständig der Information zugutekommt.
+ *
+ * Die Spaltenzahl bleibt bei fünf: statt der Tagesnummer übernimmt die
+ * KW-/F-Spalte die vierte Position, weil auf die Datumszelle verzichtet wird.
+ */
+.print-row.print-row-weekday-over-date {
+  grid-template-columns: 6.5mm 1fr 8mm 5mm;
+}
+
 .print-row:first-child {
   border-top: none;
 }
@@ -255,6 +268,23 @@
   justify-content: center;
   padding: 0 0.15mm;
   border-right: 0.25pt solid #c8ccd1;
+}
+
+/**
+ * Gemeinsame Spalte für Wochentag und Datum (Anzeige-Option "Wochentag über
+ * Datum"): das Datum steht unter dem Wochentag. Beide Werte werden als Block
+ * untereinander gesetzt; der senkrechte Trennstrich rechts bleibt erhalten,
+ * weil die Informationsspalte unmittelbar folgt.
+ */
+.print-row > .print-col-wo.print-col-date-stack {
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.05;
+  padding: 0 0.3mm;
+}
+
+.print-col-weekday-date {
+  font-variant-numeric: tabular-nums;
 }
 
 .print-row > .print-col-datum {

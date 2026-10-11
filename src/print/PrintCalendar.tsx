@@ -11,17 +11,19 @@
  */
 
 import { useMemo } from 'react';
-import type { AnnotationColorId, AnnotationMap, ColumnColorName, YearCalendar } from '../domain/types';
-import { usedAnnotationColors } from '../config/annotationColors';
-import { summarizeYear } from '../engines/calendarBuilder';
-import { PrintHeader } from './PrintHeader';
-import { PrintHalfYear } from './PrintHalfYear';
+import type { AnnotationColorId, AnnotationMap, ColumnColorName, YearCalendar } from '../domain/types.ts';
+import { usedAnnotationColors } from '../config/annotationColors.ts';
+import { summarizeYear } from '../engines/calendarBuilder.ts';
+import { PrintHeader } from './PrintHeader.tsx';
+import { PrintHalfYear } from './PrintHalfYear.tsx';
 
 export interface PrintCalendarProps {
   calendar: YearCalendar;
   annotations: AnnotationMap;
   /** Erklärungstexte der Farblegende des gedruckten Jahres. */
   colorLegend?: Partial<Record<AnnotationColorId, string>>;
+  /** Anzeige-Option "Wochentag über Datum" (Standard: aus). */
+  weekdayOverDate?: boolean;
   onPrint: () => void;
   onBack: () => void;
 }
@@ -30,6 +32,7 @@ export function PrintCalendar({
   calendar,
   annotations,
   colorLegend = {},
+  weekdayOverDate = false,
   onPrint,
   onBack,
 }: PrintCalendarProps) {
@@ -97,6 +100,7 @@ export function PrintCalendar({
             months={firstHalf}
             annotationLabels={annotationLabels}
             annotationColors={annotationColors}
+            weekdayOverDate={weekdayOverDate}
             side={1}
           />
         </article>
@@ -113,6 +117,7 @@ export function PrintCalendar({
             months={secondHalf}
             annotationLabels={annotationLabels}
             annotationColors={annotationColors}
+            weekdayOverDate={weekdayOverDate}
             side={2}
           />
         </article>

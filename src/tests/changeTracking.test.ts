@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { hasUnsavedChanges, isStateEmpty, stateSignature } from '../services/changeTracking';
-import { DEFAULT_SETTINGS } from '../config/appDefaults';
-import { STORAGE_VERSION } from '../services/storage';
-import type { PersistedState } from '../domain/types';
+import { hasUnsavedChanges, isStateEmpty, stateSignature } from '../services/changeTracking.ts';
+import { DEFAULT_SETTINGS } from '../config/appDefaults.ts';
+import { STORAGE_VERSION } from '../services/storage.ts';
+import type { PersistedState } from '../domain/types.ts';
 
 const emptyState: PersistedState = {
   version: STORAGE_VERSION,
@@ -13,7 +13,7 @@ const emptyState: PersistedState = {
 
 const sampleState: PersistedState = {
   version: STORAGE_VERSION,
-  settings: { selectedYear: 2026, selectedShift: 'C' },
+  settings: { selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
   annotations: {
     '2026-03-15': { dateKey: '2026-03-15', label: 'Urlaub', colors: { info: 'yellow' } },
   },
@@ -24,7 +24,7 @@ describe('Signatur des Zustands', () => {
   it('liefert für inhaltlich gleiche Zustände dieselbe Signatur', () => {
     const a: PersistedState = {
       version: 1,
-      settings: { selectedYear: 2026, selectedShift: 'C' },
+      settings: { selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
       annotations: {
         '2026-05-01': { dateKey: '2026-05-01', label: 'x', colors: { day: 'red', info: 'blue' } },
       },
@@ -33,7 +33,7 @@ describe('Signatur des Zustands', () => {
     // Andere Version, andere Schlüsselreihenfolge – gleicher Inhalt.
     const b: PersistedState = {
       version: 9,
-      settings: { selectedShift: 'C', selectedYear: 2026 },
+      settings: { selectedShift: 'C', selectedYear: 2026, weekdayOverDate: false },
       annotations: {
         '2026-05-01': {
           dateKey: '2026-05-01',
@@ -81,7 +81,7 @@ describe('Erkennung ungespeicherter Änderungen', () => {
     expect(
       isStateEmpty({
         version: STORAGE_VERSION,
-        settings: { selectedYear: 2026, selectedShift: 'C' },
+        settings: { selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
         annotations: {},
         colorLegend: {},
       }),

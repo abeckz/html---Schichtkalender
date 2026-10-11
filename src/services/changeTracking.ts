@@ -16,8 +16,8 @@
  */
 
 import type { PersistedState } from '../domain/types';
-import { DEFAULT_SETTINGS } from '../config/appDefaults';
-import { normalizeAnnotations, normalizeSettings, STORAGE_VERSION } from './storage';
+import { DEFAULT_SETTINGS } from '../config/appDefaults.ts';
+import { normalizeAnnotations, normalizeSettings, STORAGE_VERSION } from './storage.ts';
 
 /**
  * Berechnet eine stabile Signatur des Zustands.

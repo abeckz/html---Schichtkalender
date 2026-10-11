@@ -23,13 +23,15 @@ import type {
   CalendarDay,
   ColumnColorName,
   MonthCalendar as MonthCalendarModel,
-} from '../domain/types';
-import { annotationColors, getColorHex } from '../config/annotationColors';
-import { CalendarDayRow } from './CalendarDayRow';
+} from '../domain/types.ts';
+import { annotationColors, getColorHex } from '../config/annotationColors.ts';
+import { CalendarDayRow } from './CalendarDayRow.tsx';
 
 export interface MonthCalendarProps {
   month: MonthCalendarModel;
   annotations: AnnotationMap;
+  /** Anzeige-Option "Wochentag über Datum" (Standard: aus). */
+  weekdayOverDate?: boolean;
   onOpenEditor: (day: CalendarDay) => void;
   /** dateKeys der aktuell markierten Streifen-Auswahl. */
   selectedKeys?: ReadonlySet<string>;
@@ -102,6 +104,7 @@ function countMarkedShiftsByColorLookup(
 export function MonthCalendar({
   month,
   annotations,
+  weekdayOverDate = false,
   onOpenEditor,
   selectedKeys,
   selectedColumn,
@@ -111,6 +114,12 @@ export function MonthCalendar({
 }: MonthCalendarProps) {
   const { statistics } = month;
   const markedShiftCounts = countMarkedShiftsByColor(month.days, annotations);
+  // Die Anzeige-Option ändert ausschließlich das Spaltenraster des Monats:
+  // mit gesetztem Schalter steht das Datum unter dem Wochentag und die
+  // Tagesnummer-Spalte entfällt (der Platz kommt der Info-Spalte zugute).
+  const tableClassName = weekdayOverDate
+    ? 'day-table is-weekday-over-date'
+    : 'day-table';
   return (
     <section className="month-card" aria-label={`${month.name} ${month.year}`}>
       <header className="month-header">
@@ -125,12 +134,13 @@ export function MonthCalendar({
         </span>
       </header>
 
-      <div className="day-table" role="table" aria-label={`Tage im ${month.name}`}>
+      <div className={tableClassName} role="table" aria-label={`Tage im ${month.name}`}>
         {month.days.map((day) => (
           <CalendarDayRow
             key={day.dateKey}
             day={day}
             annotation={annotations[day.dateKey]}
+            weekdayOverDate={weekdayOverDate}
             onOpenEditor={onOpenEditor}
             isSelected={selectedKeys?.has(day.dateKey) ?? false}
             selectedColumn={selectedColumn}

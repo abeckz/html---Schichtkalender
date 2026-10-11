@@ -12,13 +12,13 @@
  * gespeichert wird ausschließlich der bestehende `PersistedState`.
  */
 
-import type { PersistedState } from '../domain/types';
+import type { PersistedState } from '../domain/types.ts';
 import {
   STORAGE_VERSION,
   normalizeAnnotations,
   normalizeColorLegend,
   normalizeSettings,
-} from './storage';
+} from './storage.ts';
 import {
   canUseOpenPicker,
   canUseSavePicker,

@@ -12,30 +12,39 @@ import type {
   CalendarDay,
   ColumnColorName,
   PersistedState,
-} from '../domain/types';
-import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder';
-import { usedAnnotationColors } from '../config/annotationColors';
-import { useSettingsStore } from '../services/settingsStore';
-import { useAnnotationStore } from '../services/annotationStore';
-import { useColorLegendStore } from '../services/colorLegendStore';
-import { useThemeStore } from '../services/themeStore';
-import { STORAGE_VERSION } from '../services/storage';
-import { saveState } from '../services/persistence';
-import { useUnsavedChangesGuard } from '../services/unsavedChanges';
-import { Toolbar } from './Toolbar';
-import { YearCalendar } from './YearCalendar';
-import { CalendarLegend } from './CalendarLegend';
-import { ColorLegendEditor } from './ColorLegendEditor';
-import { DayEditor } from './DayEditor';
-import { StreakEditor } from './StreakEditor';
-import { UnsavedChangesDialog } from './UnsavedChangesDialog';
-import { PrintCalendar } from '../print/PrintCalendar';
+} from '../domain/types.ts';
+import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder.ts';
+import { usedAnnotationColors } from '../config/annotationColors.ts';
+import { useSettingsStore } from '../services/settingsStore.ts';
+import { useAnnotationStore } from '../services/annotationStore.ts';
+import { useColorLegendStore } from '../services/colorLegendStore.ts';
+import { useThemeStore } from '../services/themeStore.ts';
+import { STORAGE_VERSION } from '../services/storage.ts';
+import { saveState } from '../services/persistence.ts';
+import { useUnsavedChangesGuard } from '../services/unsavedChanges.ts';
+import { Toolbar } from './Toolbar.tsx';
+import { YearCalendar } from './YearCalendar.tsx';
+import { CalendarLegend } from './CalendarLegend.tsx';
+import { ColorLegendEditor } from './ColorLegendEditor.tsx';
+import { DayEditor } from './DayEditor.tsx';
+import { StreakEditor } from './StreakEditor.tsx';
+import { UnsavedChangesDialog } from './UnsavedChangesDialog.tsx';
+import { PrintCalendar } from '../print/PrintCalendar.tsx';
 
 export type AppView = 'screen' | 'print';
 
 export function App() {
-  const { settings, setYear, setShift, setSettings, goToPreviousYear, goToNextYear, canGoToPreviousYear, canGoToNextYear } =
-    useSettingsStore();
+  const {
+    settings,
+    setYear,
+    setShift,
+    setWeekdayOverDate,
+    setSettings,
+    goToPreviousYear,
+    goToNextYear,
+    canGoToPreviousYear,
+    canGoToNextYear,
+  } = useSettingsStore();
   const { annotations, setAnnotation, resetAnnotation, setColumnColorForDateKeys, replaceAnnotations } =
     useAnnotationStore(settings);
   // Erklärtexte der Farblegende (jahresbezogen); rein darstellungsbezogen.
@@ -238,6 +247,8 @@ export function App() {
         canGoPrevious={canGoToPreviousYear}
         canGoNext={canGoToNextYear}
         onSelectShift={setShift}
+        weekdayOverDate={settings.weekdayOverDate}
+        onToggleWeekdayOverDate={setWeekdayOverDate}
         onOpenPrint={() => setView('print')}
         theme={theme}
         onSaveFile={handleSaveFile}
@@ -263,6 +274,7 @@ export function App() {
           <YearCalendar
             calendar={calendar}
             annotations={annotations}
+            weekdayOverDate={settings.weekdayOverDate}
             onOpenEditor={handleOpenEditor}
             selectedKeys={streakKeySet}
             selectedColumn={streakColumn}
@@ -277,6 +289,7 @@ export function App() {
             calendar={calendar}
             annotations={annotations}
             colorLegend={colorTexts}
+            weekdayOverDate={settings.weekdayOverDate}
             onPrint={handlePrint}
             onBack={() => setView('screen')}
           />

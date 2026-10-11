@@ -16,22 +16,22 @@ import { describe, expect, it } from 'vitest';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
-import { App } from '../components/App';
-import { countMarkedShiftsByColor, MonthCalendar } from '../components/MonthCalendar';
-import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder';
+import { App } from '../components/App.tsx';
+import { countMarkedShiftsByColor, MonthCalendar } from '../components/MonthCalendar.tsx';
+import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder.ts';
 
 /** Baut einen realen Monat für die Markierungs-Tests (März 2021, Schicht C). */
 function buildMarch2021(): import('../domain/types').MonthCalendar {
   return buildYearCalendar({ year: 2021, selectedShift: 'C' }).months[2];
 }
-import { DEFAULT_SHIFT } from '../config/appDefaults';
+import { DEFAULT_SHIFT } from '../config/appDefaults.ts';
 import {
   THEME_ATTRIBUTE,
   THEME_STORAGE_KEY,
   applyTheme,
   readThemePreference,
-} from '../services/themeStore';
-import { parseState, serializeState } from '../services/persistence';
+} from '../services/themeStore.ts';
+import { parseState, serializeState } from '../services/persistence.ts';
 
 /**
  * Startjahr der Anwendung: das aktuelle Jahr. Die Feiertagspr�fungen pr�fen
@@ -221,7 +221,11 @@ describe('Bildschirmdarstellung', () => {
       // Der persistierte Zustand bleibt vollständig erhalten (Rundreise).
       const persisted = JSON.parse(window.localStorage.getItem('schichtkalender.state') ?? '{}');
       expect(persisted.annotations).toEqual(storedAnnotations);
-      expect(persisted.settings).toEqual({ selectedYear: year, selectedShift: 'C' });
+      expect(persisted.settings).toEqual({
+        selectedYear: year,
+        selectedShift: 'C',
+        weekdayOverDate: false,
+      });
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }
@@ -643,7 +647,7 @@ describe('Bildschirmdarstellung', () => {
 
     const state = {
       version: 1,
-      settings: { selectedYear: 2022, selectedShift: 'B' as const },
+      settings: { selectedYear: 2022, selectedShift: 'B' as const, weekdayOverDate: false },
       annotations: {
         '2022-05-05': { dateKey: '2022-05-05', label: 'Schulung', colors: { info: 'green' as const } },
       },
@@ -722,6 +726,73 @@ describe('Bildschirmdarstellung', () => {
       expect(shiftRow?.className).not.toContain('has-color-info');
       expect(shiftRow?.className).not.toContain('has-color-weekday');
       expect(shiftRow?.className).not.toContain('has-color-day');
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+});
+
+describe('Anzeige-Option "Wochentag über Datum"', () => {
+  it('ist standardmäßig aus und lässt Datum und Wochentag in getrennten Zellen', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      const toggle = container.querySelector('.weekday-over-date-toggle .switch-button');
+      expect(toggle).not.toBeNull();
+      expect(toggle?.getAttribute('aria-checked')).toBe('false');
+      expect(toggle?.textContent).toBe('Aus');
+
+      // Ohne Schalter: getrennte Spalten, keine gestapelte Zelle.
+      expect(container.querySelector('.day-table.is-weekday-over-date')).toBeNull();
+      const row = container.querySelector('.day-row');
+      expect(row?.querySelector('.cell-day')).not.toBeNull();
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('schreibt das Datum unter den Wochentag und entfernt die Tagesnummer-Spalte', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      const toggle = container.querySelector('.weekday-over-date-toggle .switch-button');
+      click(toggle);
+
+      // Der Schalter meldet den eingeschalteten Zustand ...
+      expect(toggle?.getAttribute('aria-checked')).toBe('true');
+      expect(toggle?.textContent).toBe('Ein');
+
+      // ... und der Monat nutzt das gestapelte Raster.
+      expect(container.querySelector('.day-table.is-weekday-over-date')).not.toBeNull();
+
+      const row = container.querySelector('.day-row');
+      // Die eigene Tagesnummer-Zelle entfällt vollständig.
+      expect(row?.querySelector('.cell-day')).toBeNull();
+      // Das Datum steht unter dem Wochentag in derselben Zelle.
+      const weekdayCell = row?.querySelector('.cell-weekday');
+      expect(weekdayCell?.querySelector('.cell-weekday-name')?.textContent).toBe(
+        row?.querySelector('.cell-weekday-name')?.textContent,
+      );
+      expect(weekdayCell?.querySelector('.cell-weekday-date')?.textContent).toMatch(/^\d{2}$/);
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('behält die Anzeige-Option im Standard-Speicher', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const first = render(<App />);
+      const toggle = first.querySelector('.weekday-over-date-toggle .switch-button');
+      click(toggle);
+      unmountAll();
+
+      // Neue Sitzung: die Einstellung wird aus dem Speicher übernommen.
+      const second = render(<App />);
+      expect(
+        second.querySelector('.weekday-over-date-toggle .switch-button')?.getAttribute('aria-checked'),
+      ).toBe('true');
+      expect(second.querySelector('.day-table.is-weekday-over-date')).not.toBeNull();
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }
