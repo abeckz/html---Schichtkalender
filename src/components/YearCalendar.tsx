@@ -32,11 +32,9 @@ export interface YearCalendarProps {
   selectedColumn?: StreakTarget | null;
   /** Frei angelegte Zusatzspalten, geschlüsselt nach Monat (1..12). */
   extraColumns?: Record<number, ExtraColumns>;
-  /** Legt eine schmale Zusatzspalte an einer der beiden Trennlinien an. */
+  /** Legt eine neue, eigenständige Zusatzspalte an einer der beiden Trennlinien an. */
   onAddExtraColumn?: (month: number, side: ExtraColumnSide) => void;
-  /** Erweitert die Spalte unmittelbar an der Trennlinie um eine Einheit. */
-  onWidenExtraColumn?: (month: number, side: ExtraColumnSide, index: number) => void;
-  /** Entfernt bzw. verkleinert die Spalte unmittelbar an der Trennlinie. */
+  /** Entfernt die Spalte unmittelbar an der Trennlinie vollständig. */
   onRemoveExtraColumn?: (month: number, side: ExtraColumnSide, index: number) => void;
   onStreakStart?: (day: CalendarDay, column: StreakTarget) => void;
   onStreakEnter?: (day: CalendarDay) => void;
@@ -56,7 +54,6 @@ export function YearCalendar({
   selectedColumn,
   extraColumns,
   onAddExtraColumn,
-  onWidenExtraColumn,
   onRemoveExtraColumn,
   onStreakStart,
   onStreakEnter,
@@ -79,7 +76,6 @@ export function YearCalendar({
           selectedColumn={selectedColumn}
           extraColumns={extraColumns?.[month.month]}
           onAddExtraColumn={onAddExtraColumn}
-          onWidenExtraColumn={onWidenExtraColumn}
           onRemoveExtraColumn={onRemoveExtraColumn}
           onStreakStart={onStreakStart}
           onStreakEnter={onStreakEnter}

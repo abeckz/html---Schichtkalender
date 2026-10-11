@@ -238,7 +238,7 @@ export function collectPrintExtraTexts(
       if (rows.length === 0) continue;
 
       overlays.push({
-        id: `${dateKey}-${text.colorKey}`,
+        id: text.id,
         text: text.text,
         vertical: text.vertical,
         // Links liegende Spalten werden von links, rechts liegende von rechts

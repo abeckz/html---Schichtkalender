@@ -105,15 +105,22 @@ export function PrintCalendar({
   }, [annotations]);
 
   // Querliegende Texte der Zusatzspalten je Ankertag. Sie werden als
-  // Überlagerung über die markierte Zeilenspanne gezogen.
+  // Überlagerung über die markierte Zeilenspanne gezogen. Je Spalte liegt eine
+  // Liste unabhängiger Spannen-Texte vor; sie werden hier je Ankertag zu einer
+  // flachen Liste zusammengeführt.
   const extraTextsByDateKey = useMemo(() => {
     const map: Record<string, ExtraColumnText[]> = {};
     for (const [dateKey, annotation] of Object.entries(annotations)) {
       const texts = annotation.extraTexts;
       if (!texts) continue;
-      const list = Object.values(texts).filter(
-        (text): text is ExtraColumnText => Boolean(text) && text?.text !== '',
-      );
+      const list: ExtraColumnText[] = [];
+      for (const group of Object.values(texts) as ExtraColumnText[][]) {
+        if (!group) continue;
+        for (const text of group) {
+          if (!text || text.text === '') continue;
+          list.push(text);
+        }
+      }
       if (list.length > 0) map[dateKey] = list;
     }
     return map;

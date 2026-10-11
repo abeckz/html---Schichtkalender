@@ -1,0 +1,5 @@
+import { jsx as _jsx } from "react/jsx-runtime";
+import { MonthCalendar } from './MonthCalendar.tsx';
+export function YearCalendar({ calendar, annotations, weekdayOverDate = false, onOpenEditor, showShiftCalendar = true, anniversaries = {}, showBirthdays = true, showRecurringEvents = true, selectedKeys, selectedColumn, extraColumns, onAddExtraColumn, onRemoveExtraColumn, onStreakStart, onStreakEnter, onStreakEnd, }) {
+    return (_jsx("div", { className: "year-calendar", children: calendar.months.map((month) => (_jsx(MonthCalendar, { month: month, annotations: annotations, weekdayOverDate: weekdayOverDate, onOpenEditor: onOpenEditor, showShiftCalendar: showShiftCalendar, anniversaries: anniversaries, showBirthdays: showBirthdays, showRecurringEvents: showRecurringEvents, selectedKeys: selectedKeys, selectedColumn: selectedColumn, extraColumns: extraColumns?.[month.month], onAddExtraColumn: onAddExtraColumn, onRemoveExtraColumn: onRemoveExtraColumn, onStreakStart: onStreakStart, onStreakEnter: onStreakEnter, onStreakEnd: onStreakEnd }, month.month))) }));
+}

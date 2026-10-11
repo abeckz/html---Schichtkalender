@@ -8,11 +8,11 @@
  * Monats (oder bei Tastaturfokus) sichtbar; angezeigt wird ein von einem Kreis
  * umschlossenes Pluszeichen.
  *
- * Ein Klick legt eine neue, schmale Spalte auf dieser Seite des Monats an. Beim
- * wiederholten Anklicken derselben Trennlinie wächst die bereits dort liegende
- * Spalte, statt eine weitere anzulegen: nur die unmittelbar an der Trennlinie
- * liegende Spalte darf wachsen, damit die bereits sichtbaren Spalten ihre Lage
- * behalten und nur die Ereigniszelle schmaler wird.
+ * Ein Klick legt eine **neue, eigenständige** schmale Spalte auf dieser Seite
+ * des Monats an. Jede Spalte ist eine individuelle Spalte mit eigenem
+ * Farbschlüssel (`extra0`, `extra1`, …), eigenem Text und eigener Farbe; ein
+ * wiederholter Klick an derselben Trennlinie fügt daher eine weitere Spalte an
+ * der Linie ein, während die bereits sichtbaren Spalten nach außen rücken.
  *
  * Reines Bedienelement: es kennt keine Fachdaten und wird niemals gedruckt.
  */
@@ -23,14 +23,8 @@ import type { ExtraColumnSide } from '../services/settingsStore.ts';
 export interface ColumnInsertHandleProps {
   /** Seite der Trennlinie: 'left' links der Ereigniszelle, 'right' vor T/N. */
   side: ExtraColumnSide;
-  /**
-   * Index der Spalte, die an dieser Trennlinie liegt (0 = direkt an der Linie).
-   * Ohne vorhandene Spalte wird -1 übergeben; dann legt ein Klick die erste
-   * Spalte an.
-   */
-  nearEdgeIndex: number;
-  /** Führt den Klick aus (Spalte anlegen bzw. die Spalte an der Linie erweitern). */
-  onActivate: (side: ExtraColumnSide, nearEdgeIndex: number) => void;
+  /** Führt den Klick aus (legt eine neue, eigenständige Spalte an). */
+  onActivate: (side: ExtraColumnSide) => void;
 }
 
 /** Von einem Kreis umschlossenes Pluszeichen. */
@@ -72,20 +66,18 @@ export function MinusInCircle() {
   );
 }
 
-export function ColumnInsertHandle({ side, nearEdgeIndex, onActivate }: ColumnInsertHandleProps) {
+export function ColumnInsertHandle({ side, onActivate }: ColumnInsertHandleProps) {
   const label =
-    nearEdgeIndex >= 0
-      ? 'Spalte an der Trennlinie erweitern'
-      : side === 'left'
-        ? 'Neue schmale Spalte links von KW/T/N einfügen'
-        : 'Neue schmale Spalte links neben T/N einfügen';
+    side === 'left'
+      ? 'Neue schmale Zusatzspalte links der Ereigniszelle anfügen'
+      : 'Neue schmale Zusatzspalte vor T/N anfügen';
 
   const handleClick = (event: ReactMouseEvent<HTMLButtonElement>) => {
     // Der Klick steuert ausschließlich die Spaltenanlage; der Monatskopf hat
     // keine weitere Klickfunktion, die versehentlich ausgelöst werden könnte.
     event.preventDefault();
     event.stopPropagation();
-    onActivate(side, nearEdgeIndex);
+    onActivate(side);
   };
 
   return (
@@ -121,10 +113,9 @@ export interface ColumnRemoveHandleProps {
  *
  * Er sitzt - wie der `+`-Punkt - im Monatskopf auf der jeweiligen Trennlinie,
  * ist jedoch tiefer versetzt, damit sich beide Punkte nicht überlagern. Ein
- * Klick verkleinert die Spalte an der Trennlinie um eine Einheit bzw. entfernt
- * sie ganz, wenn sie nur eine Einheit breit ist. Ohne Spalte an der Linie
- * (nearEdgeIndex < 0) wird der Punkt nicht dargestellt: es gibt nichts zu
- * entfernen.
+ * Klick entfernt die Spalte an der Trennlinie vollständig; die übrigen Spalten
+ * der Seite rücken nach. Ohne Spalte an der Linie (nearEdgeIndex < 0) wird der
+ * Punkt nicht dargestellt: es gibt nichts zu entfernen.
  */
 export function ColumnRemoveHandle({ side, nearEdgeIndex, onActivate }: ColumnRemoveHandleProps) {
   if (nearEdgeIndex < 0) return null;

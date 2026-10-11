@@ -12,7 +12,6 @@ import { useCallback, useState } from 'react';
 import type { AppSettings, CalendarViewMode, ShiftId } from '../domain/types.ts';
 import {
   MAX_EXTRA_COLUMNS,
-  MAX_EXTRA_COLUMN_WIDTH,
   readState,
 } from '../services/storage.ts';
 import { MAX_YEAR, MIN_YEAR, isValidYear } from '../utils/dateUtils.ts';
@@ -44,28 +43,22 @@ export interface SettingsStore {
   /** Wechselt zwischen Schichtkalender und jahresloser Ansicht. */
   setViewMode: (mode: CalendarViewMode) => void;
   /**
-   * Legt eine schmale Zusatzspalte an: `side` = 'left' links der
+   * Legt eine **neue, eigenständige** Zusatzspalte an: `side` = 'left' links der
    * Ereigniszelle (zwischen Datum und Info), 'right' zwischen KW und T/N.
+   *
+   * Jede Spalte ist eine individuelle Spalte mit eigenem Farbschlüssel
+   * (`extra0`, `extra1`, …), eigenem Text und eigener Farbe. Ein wiederholter
+   * Klick an derselben Trennlinie legt daher eine weitere Spalte an (die neue
+   * Spalte entsteht an der Linie, die bereits vorhandenen rücken nach außen).
    */
   addExtraColumn: (month: number, side: ExtraColumnSide) => void;
   /**
-   * Erweitert eine vorhandene Zusatzspalte um eine Einheit.
+   * Entfernt eine Zusatzspalte vollständig (Bedienpunkt `−`).
    *
-   * Nur die direkt an der Trennlinie liegende Spalte darf wachsen; sonst würde
-   * sich die Anordnung der bereits vorhandenen Spalten verschieben (die neue
-   * Spalte soll die Ansicht nach außen schieben).
-   */
-  widenExtraColumn: (month: number, side: ExtraColumnSide, index: number) => void;
-  /**
-   * Entfernt eine Zusatzspalte vollständig bzw. verkleinert sie (Bedienpunkt
-   * `−`).
-   *
-   * Die Spalte unmittelbar an der Trennlinie (`index`) ist die einzige, die
-   * entfernt werden kann; ist sie breiter als eine Einheit, verliert sie nur
-   * eine Einheit, andernfalls entfällt sie ganz und die Anordnung der übrigen
-   * Spalten der Seite rückt nach. Die zugehörigen Farben und querliegenden
-   * Texte (`extraN`) werden beim Entfernen aus allen Annotationen des Monats
-   * geräumt.
+   * Die Spalte unmittelbar an der Trennlinie (`index`) entfällt als Ganzes; die
+   * übrigen Spalten der Seite rücken nach. Die zugehörigen Farben und
+   * querliegenden Texte (`extraN`) werden beim Entfernen aus allen Annotationen
+   * des Monats geräumt.
    */
   removeExtraColumn: (month: number, side: ExtraColumnSide, index: number) => void;
   /** Übernimmt Jahr und Schicht gemeinsam (z. B. beim Laden einer Datei). */
@@ -156,27 +149,6 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
     });
   }, []);
 
-  const widenExtraColumn = useCallback(
-    (month: number, side: ExtraColumnSide, index: number) => {
-      setSettings((current) => {
-        const existing = current.extraColumns[month];
-        if (!existing) return current;
-        const list = [...(side === 'left' ? existing.left : existing.right)];
-        if (index !== 0 || list.length === 0) return current;
-        if (list[0] + 1 > MAX_EXTRA_COLUMN_WIDTH) return current;
-        list[0] += 1;
-        return {
-          ...current,
-          extraColumns: {
-            ...current.extraColumns,
-            [month]: side === 'left' ? { left: list, right: existing.right } : { left: existing.left, right: list },
-          },
-        };
-      });
-    },
-    [],
-  );
-
   const removeExtraColumn = useCallback(
     (month: number, side: ExtraColumnSide, index: number) => {
       setSettings((current) => {
@@ -184,14 +156,9 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
         if (!existing) return current;
         const list = [...(side === 'left' ? existing.left : existing.right)];
         if (index !== 0 || list.length === 0) return current;
-        // Nur die Spalte an der Trennlinie lässt sich entfernen: ist sie
-        // breiter als eine Einheit, verliert sie eine Einheit; andernfalls
-        // entfällt sie ganz und die übrigen Spalten rücken nach.
-        if (list[0] > 1) {
-          list[0] -= 1;
-        } else {
-          list.shift();
-        }
+        // Jede Zusatzspalte ist eine eigenständige Spalte. Die Spalte an der
+        // Trennlinie (Index 0) entfällt vollständig, die übrigen rücken nach.
+        list.shift();
         // Ist die Liste danach leer, wird der Monatseintrag entfernt.
         const nextMonth = side === 'left' ? { left: list, right: existing.right } : { left: existing.left, right: list };
         const extraColumns = { ...current.extraColumns };
@@ -244,7 +211,6 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
     setShowRecurringEvents,
     setViewMode,
     addExtraColumn,
-    widenExtraColumn,
     removeExtraColumn,
     setSettings: replaceSettings,
     goToPreviousYear,

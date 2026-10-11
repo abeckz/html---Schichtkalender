@@ -143,32 +143,36 @@ export function collectExtraColumnTexts(
     if (!dayIndexByKey.has(dateKey)) continue;
     const texts = annotation.extraTexts;
     if (!texts) continue;
-    for (const text of Object.values(texts) as ExtraColumnText[]) {
-      if (!text || text.text === '') continue;
-      if (text.dateKeys[0] !== dateKey) continue;
-      const column = extraColumns.find((entry) => entry.colorKey === text.colorKey);
-      // Rechts liegende Spalten sind ohne Schichtkalender ausgeblendet.
-      if (!column || (column.side === 'right' && !showShiftCalendar)) continue;
-      const presentRows = text.dateKeys
-        .map((key) => dayIndexByKey.get(key))
-        .filter((index): index is number => index !== undefined)
-        .sort((a, b) => a - b);
-      if (presentRows.length === 0) continue;
-      const start = presentRows[0];
-      const end = presentRows[presentRows.length - 1];
-      overlays.push({
-        id: `${dateKey}-${text.colorKey}`,
-        colorKey: text.colorKey,
-        columnLabel: text.columnLabel,
-        text: text.text,
-        vertical: text.vertical,
-        // Am Anker-Tag entscheidet die persönliche Farbe der Zusatzspalte über
-        // die Textfarbe der Überlagerung (schwarz auf gefärbtem Feld).
-        colored: (annotation.extraColors?.[text.colorKey] ?? null) !== null,
-        gridColumn: extraColumnGridColumn(text.colorKey, extraColumns, weekdayOverDate),
-        gridRowStart: start + 1,
-        gridRowSpan: end - start + 1,
-      });
+    // Je Spalte eine Liste unabhängiger Spannen-Texte; alle sind darzustellen.
+    for (const group of Object.values(texts) as ExtraColumnText[][]) {
+      if (!group) continue;
+      for (const text of group) {
+        if (!text || text.text === '') continue;
+        if (text.dateKeys[0] !== dateKey) continue;
+        const column = extraColumns.find((entry) => entry.colorKey === text.colorKey);
+        // Rechts liegende Spalten sind ohne Schichtkalender ausgeblendet.
+        if (!column || (column.side === 'right' && !showShiftCalendar)) continue;
+        const presentRows = text.dateKeys
+          .map((key) => dayIndexByKey.get(key))
+          .filter((index): index is number => index !== undefined)
+          .sort((a, b) => a - b);
+        if (presentRows.length === 0) continue;
+        const start = presentRows[0];
+        const end = presentRows[presentRows.length - 1];
+        overlays.push({
+          id: text.id,
+          colorKey: text.colorKey,
+          columnLabel: text.columnLabel,
+          text: text.text,
+          vertical: text.vertical,
+          // Am Anker-Tag entscheidet die persönliche Farbe der Zusatzspalte über
+          // die Textfarbe der Überlagerung (schwarz auf gefärbtem Feld).
+          colored: (annotation.extraColors?.[text.colorKey] ?? null) !== null,
+          gridColumn: extraColumnGridColumn(text.colorKey, extraColumns, weekdayOverDate),
+          gridRowStart: start + 1,
+          gridRowSpan: end - start + 1,
+        });
+      }
     }
   }
   return overlays;
@@ -247,11 +251,9 @@ export interface MonthCalendarProps {
    * verdeckt wird. Die Schichtspalte T/N bleibt am rechten Rand.
    */
   extraColumns?: ExtraColumns;
-  /** Legt eine schmale Zusatzspalte an einer der beiden Trennlinien an. */
+  /** Legt eine neue, eigenständige Zusatzspalte an einer der beiden Trennlinien an. */
   onAddExtraColumn?: (month: number, side: ExtraColumnSide) => void;
-  /** Erweitert die Spalte unmittelbar an der Trennlinie um eine Einheit. */
-  onWidenExtraColumn?: (month: number, side: ExtraColumnSide, index: number) => void;
-  /** Entfernt bzw. verkleinert die Spalte unmittelbar an der Trennlinie. */
+  /** Entfernt die Spalte unmittelbar an der Trennlinie vollständig. */
   onRemoveExtraColumn?: (month: number, side: ExtraColumnSide, index: number) => void;
   onStreakStart?: (day: CalendarDay, column: StreakTarget) => void;
   onStreakEnter?: (day: CalendarDay) => void;
@@ -330,7 +332,6 @@ export function MonthCalendar({
   selectedColumn,
   extraColumns,
   onAddExtraColumn,
-  onWidenExtraColumn,
   onRemoveExtraColumn,
   onStreakStart,
   onStreakEnter,
@@ -410,20 +411,16 @@ export function MonthCalendar({
     .join(',');
 
   /**
-   * Klick auf einen Bedienpunkt: liegt an der Trennlinie noch keine
-   * Zusatzspalte, wird eine angelegt; andernfalls wächst die bereits dort
-   * liegende Spalte um eine Einheit. Dadurch bleibt die Lage der vorhandenen
-   * Spalten unverändert und die Ansicht wird nach außen geschoben.
+   * Klick auf einen `+`-Bedienpunkt: legt an der jeweiligen Trennlinie stets
+   * eine **neue, eigenständige** Zusatzspalte an. Ein wiederholter Klick legt
+   * daher eine weitere Spalte an (mit eigenem Farbschlüssel, eigenem Text und
+   * eigener Farbe); die bereits sichtbaren Spalten rücken nach außen.
    */
-  const handleInsertActivate = (side: ExtraColumnSide, nearEdgeIndex: number) => {
-    if (nearEdgeIndex >= 0) {
-      onWidenExtraColumn?.(month.month, side, nearEdgeIndex);
-      return;
-    }
+  const handleInsertActivate = (side: ExtraColumnSide) => {
     onAddExtraColumn?.(month.month, side);
   };
 
-  /** Klick auf den Minus-Bedienpunkt: verkleinert/entfernt die Spalte. */
+  /** Klick auf den Minus-Bedienpunkt: entfernt die Spalte an der Trennlinie. */
   const handleRemoveActivate = (side: ExtraColumnSide, nearEdgeIndex: number) => {
     onRemoveExtraColumn?.(month.month, side, nearEdgeIndex);
   };
@@ -518,18 +515,16 @@ export function MonthCalendar({
         {onAddExtraColumn && (
           <ColumnInsertHandle
             side="left"
-            nearEdgeIndex={leftColumns.length > 0 ? 0 : -1}
             onActivate={handleInsertActivate}
           />
         )}
         {onAddExtraColumn && showShiftCalendar && (
           <ColumnInsertHandle
             side="right"
-            nearEdgeIndex={rightColumns.length > 0 ? 0 : -1}
             onActivate={handleInsertActivate}
           />
         )}
-        {/* Minus-Punkte: entfernen/verkleinern die Spalte an der Trennlinie. */}
+        {/* Minus-Punkte: entfernen die Spalte an der Trennlinie vollständig. */}
         {onRemoveExtraColumn && leftColumns.length > 0 && (
           <ColumnRemoveHandle side="left" nearEdgeIndex={0} onActivate={handleRemoveActivate} />
         )}

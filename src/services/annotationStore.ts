@@ -22,6 +22,7 @@ import type {
 import {
   getDefaultStorage,
   normalizeAnnotation,
+  extraColumnTextId,
   MAX_EXTRA_TEXT_LENGTH,
   readState,
   writeState,
@@ -61,9 +62,10 @@ export interface AnnotationStore {
    * Setzt oder entfernt den querliegenden Text einer Zusatzspalte.
    *
    * Der Text gehört zu einer markierten Spanne und wird auf deren **oberster**
-   * Zelle (erstes Element von `dateKeys`) gespeichert; die übrigen Tage der
-   * Spanne werden von einem früheren Text desselben Schlüssels befreit, damit
-   * nur ein Eintrag je Spalte und Spanne existiert.
+   * Zelle (erstes Element von `dateKeys`) gespeichert. Dabei wird ausschließlich
+   * der Text **derselben Spanne** (Anker = kleinster markierter Tag) ersetzt;
+   * weitere, unabhängige Spannen derselben Spalte (z. B. oben und unten im
+   * Monat) bleiben mit eigenem Text erhalten.
    */
   setExtraColumnText: (
     dateKeys: readonly string[],
@@ -212,16 +214,26 @@ export function useAnnotationStore(
       if (span.length === 0) return;
       const anchor = span[0];
       const trimmed = text.slice(0, MAX_EXTRA_TEXT_LENGTH);
+      const targetId = extraColumnTextId(colorKey, anchor);
       setAnnotations((current) => {
         const next = { ...current };
-        // Zuerst einen früheren Text desselben Schlüssels im gesamten Zustand
-        // entfernen (Spanne kann sich verschoben haben), dann neu auf dem Anker
-        // setzen. So existiert höchstens ein Text je Spalten-Schlüssel und Tag.
-        const removeFrom = (target: Record<string, UserDayAnnotation>, dateKey: string) => {
+        // Ausschließlich die Spanne mit demselben Anker ersetzen: andere,
+        // unabhängige Spannen derselben Spalte bleiben erhalten.
+        const removeText = (
+          target: Record<string, UserDayAnnotation>,
+          dateKey: string,
+        ) => {
           const existing = target[dateKey];
-          if (!existing?.extraTexts?.[colorKey]) return;
+          const list = existing?.extraTexts?.[colorKey];
+          if (!existing || !list || list.length === 0) return;
+          const remaining = list.filter((entry) => entry.id !== targetId);
+          if (remaining.length === list.length) return;
           const extraTexts = { ...existing.extraTexts };
-          delete extraTexts[colorKey];
+          if (remaining.length > 0) {
+            extraTexts[colorKey] = remaining;
+          } else {
+            delete extraTexts[colorKey];
+          }
           const normalized = normalizeAnnotation({
             ...existing,
             extraTexts: Object.keys(extraTexts).length > 0 ? extraTexts : undefined,
@@ -233,12 +245,13 @@ export function useAnnotationStore(
           }
         };
         for (const dateKey of Object.keys(next)) {
-          removeFrom(next, dateKey);
+          removeText(next, dateKey);
         }
 
         if (trimmed === '') return next;
 
         const existing = next[anchor] ?? current[anchor];
+        const list = existing?.extraTexts?.[colorKey] ?? [];
         const normalized = normalizeAnnotation({
           dateKey: anchor,
           label: existing?.label ?? '',
@@ -246,14 +259,18 @@ export function useAnnotationStore(
           extraColors: existing?.extraColors,
           extraTexts: {
             ...(existing?.extraTexts ?? {}),
-            [colorKey]: {
-              colorKey,
-              columnLabel,
-              vertical,
-              text: trimmed,
-              dateKeys: span,
-              length: span.length,
-            } satisfies ExtraColumnText,
+            [colorKey]: [
+              ...list.filter((entry) => entry.id !== targetId),
+              {
+                id: targetId,
+                colorKey,
+                columnLabel,
+                vertical,
+                text: trimmed,
+                dateKeys: span,
+                length: span.length,
+              } satisfies ExtraColumnText,
+            ],
           },
         } as UserDayAnnotation);
         if (normalized) {

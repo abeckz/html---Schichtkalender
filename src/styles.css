@@ -1108,6 +1108,29 @@ body {
 }
 
 /**
+ * Markierte Zusatzspalte: der farbige Streifen soll über mehrere Tageszellen
+ * hinweg **ungebrochen** und randlos erscheinen.
+ *
+ * Zwei Störgrößen sorgen sonst für einen weißen Rand bzw. eine Unterbrechung:
+ *  - der Innenabstand der Zeile (`.day-row` `padding: 3px 4px`) lässt oben und
+ *    unten je 3 px weiß,
+ *  - die horizontale Zeilenlinie (`.day-row` `border-bottom: 1px`) schneidet
+ *    den Streifen an jeder Zeilengrenze durch.
+ *
+ * Die gefärbte Zelle wird daher um das senkrechte Zellen-Padding plus die halbe
+ * Linienstärke über die Zeilengrenzen hinausgezogen (negatives `margin` je
+ * 4 px) und mit `z-index` über die Linien der Nachbarzeilen gelegt. Die
+ * Rasterzeilen und Nachbarspalten bleiben unverändert; nur innerhalb der
+ * gefärbten Spalte verschwindet der Rand, sodass der Streifen randlos und
+ * ungebrochen erscheint.
+ */
+.cell-extra[style] {
+  position: relative;
+  z-index: 1;
+  margin: -4px 0;
+}
+
+/**
  * Überlagerungsebene für querliegende Texte der Zusatzspalten.
  *
  * Wichtig: `.day-table` ist eine Spalten-Flexbox; die Spaltenbreiten stehen
@@ -1117,12 +1140,17 @@ body {
  * und jeder Text wird aus den gemessenen Rechtecken der Zielzelle und der
  * markierten Zeilen exakt platziert (siehe `MonthCalendar`).
  * `pointer-events: none` lässt Klicks auf die Zellen darunter durchlaufen.
+ *
+ * `z-index: 2` hält die Textebene über den markierten Zusatzspalten-Zellen, die
+ * über `.cell-extra[style]` auf `z-index: 1` gehoben werden (durchgehender
+ * Farbstreifen). Mit dem bisherigen `z-index: 1` lag der Text nur aufgrund der
+ * DOM-Reihenfolge darüber - der höhere Wert macht das unabhängig davon.
  */
 .day-table-overlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
 
 /**
@@ -1148,9 +1176,18 @@ body {
 }
 
 .cell-extra-text.is-vertical {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
+  writing-mode: sideways-lr;
   line-height: 1;
+}
+
+/* Rückfallebene ohne `sideways-lr` (siehe `print.css`): die Leserichtung von
+   unten nach oben wird sonst über eine Drehung erreicht. Achtung: Diese
+   Variante wird im Druck als Bitmap gerastert und erscheint dort verpixelt. */
+@supports not (writing-mode: sideways-lr) {
+  .cell-extra-text.is-vertical {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
 }
 
 /**

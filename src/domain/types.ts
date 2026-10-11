@@ -90,10 +90,17 @@ export type StreakTarget = StreakColumnTarget | ExtraColumnUnitKey;
  * setzen kann. `length` ist die Anzahl der markierten Zellen (Zeilenhöhen) und
  * dient als Gradmaß für die zentrierte Platzierung.
  *
+ * In derselben Zusatzspalte dürfen mehrere, voneinander unabhängige Spannen
+ * (z. B. oben und unten im Monat) mit eigenem Text nebeneinander existieren.
+ * Sie werden über `id` unterschieden; die `id` folgt aus Farbschlüssel und
+ * Anker (`extra0@2026-01-20`) und bleibt über die Spanne hinweg stabil.
+ *
  * Ist `vertical` gesetzt (Checkbox "Querliegender Text"), wird der Text um 90°
  * nach links gedreht mittig über die Gesamtzahl der markierten Zellen gesetzt.
  */
 export interface ExtraColumnText {
+  /** Eindeutige Kennung innerhalb der Spalte (Farbschlüssel + Anker). */
+  id: string;
   /** Zusatzspalten-Farbschlüssel ('extra0', 'extra1', …). */
   colorKey: ExtraColumnColorKey;
   /** Anzeigename der Spalte (z. B. "Zusatzspalte 0"). */
@@ -317,11 +324,14 @@ export interface UserDayAnnotation {
   /**
    * Querliegende Texte der Zusatzspalten, deren Spanne auf diesem Tag beginnt.
    *
-   * Schlüssel ist der Farbschlüssel der Zusatzspalte (`extra0`, `extra1`, …).
-   * Der Eintrag liegt immer auf der obersten Zelle der markierten Spanne; die
-   * Darstellung zieht ihn über alle Zellen der Spanne (`dateKeys`).
+   * Schlüssel ist der Farbschlüssel der Zusatzspalte (`extra0`, `extra1`, …),
+   * Wert die **Liste** aller Spannen-Texte dieser Spalte, die an diesem Tag
+   * anfangen. So dürfen in derselben Spalte mehrere, unabhängige Markierungen
+   * mit eigenem Text nebeneinander bestehen (z. B. eine Spanne oben und eine
+   * weitere unten im Monat). Jeder Eintrag liegt auf der obersten Zelle seiner
+   * Spanne; die Darstellung zieht ihn über alle Zellen der Spanne (`dateKeys`).
    */
-  extraTexts?: Partial<Record<ExtraColumnColorKey, ExtraColumnText>>;
+  extraTexts?: Partial<Record<ExtraColumnColorKey, ExtraColumnText[]>>;
 }
 
 /** Monatskennzahlen. */

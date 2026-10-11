@@ -502,6 +502,26 @@
 }
 
 /**
+ * Markierte Zusatzspalte: der farbige Streifen soll über mehrere Zellen hinweg
+ * **ungebrochen** und randlos erscheinen.
+ *
+ * Im Druck hat die Tageszeile kein senkrechtes Innen-Padding; störend ist nur
+ * die dünne horizontale Zeilenlinie (`.print-row` `border-top: 0.25pt`), die
+ * den Streifen an jeder Zeilengrenze zerschneiden würde. Die gefärbte Zelle
+ * wird daher um die Linienstärke über die Zeilengrenzen hinausgezogen
+ * (negatives `margin` je 0.25pt) und mit `z-index` über die Linien der
+ * Nachbarzeilen gelegt. Da zwei benachbarte gefärbte Zellen die gemeinsame
+ * Grenze von beiden Seiten überdecken, verschwindet die Linie vollständig und
+ * der Streifen erscheint durchgehend. Rasterzeilen und Nachbarspalten bleiben
+ * unverändert.
+ */
+.print-row > .print-col-extra[style] {
+  position: relative;
+  z-index: 1;
+  margin: -0.25pt 0;
+}
+
+/**
  * Überlagerungsebene der querliegenden Texte im Druck.
  *
  * Wichtig: Sie liegt zwar als letztes Kind in `.print-month-body`
@@ -516,11 +536,19 @@
  * Kinder (die Texte) werden absolut positioniert: die Zeilenspanne in Prozent
  * der Rasterhöhe, die Spalte in Millimetern von links bzw. rechts. So liegt der
  * Text bündig über der markierten Spanne, ohne das Zeilenraster zu verändern.
+ *
+ * `z-index: 2` ist zwingend: die markierten Zusatzspalten-Zellen werden über
+ * `.print-row > .print-col-extra[style]` auf `z-index: 1` gehoben, damit ihr
+ * Farbstreifen die Zeilenlinien durchgehend überdeckt. Ohne eigenen Stapelwert
+ * (`z-index: auto`) läge die Textebene darunter und der querliegende Text wäre
+ * hinter dem Farbstreifen unsichtbar - sowohl in der Vorschau als auch im
+ * gedruckten PDF. Der höhere Wert hält den Text über den Zellen.
  */
 .print-month-overlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  z-index: 2;
 }
 
 /**
@@ -550,10 +578,31 @@
   overflow: hidden;
 }
 
+/**
+ * Querliegender Text: Leserichtung von unten nach oben.
+ *
+ * Früher wurde `writing-mode: vertical-rl` mit `transform: rotate(180deg)`
+ * kombiniert. Das `transform` zwingt den Browser, das Element in eine eigene
+ * Compositing-Ebene zu legen, die beim Drucken als Bitmap in
+ * Bildschirmauflösung gerastert wird - der Text erscheint dadurch im Druck
+ * verpixelt, obwohl die Vorschau scharf aussieht.
+ *
+ * `writing-mode: sideways-lr` erreicht dieselbe Leserichtung (von unten nach
+ * oben) rein über Textlayout, ganz ohne `transform`. Der Text bleibt dadurch
+ * vektoriell und wird auch im Druck scharf ausgegeben. Für Browser ohne
+ * `sideways-lr` bleibt der `rotate`-Weg als Rückfallebene erhalten.
+ */
 .print-extra-text.is-vertical {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
+  writing-mode: sideways-lr;
   line-height: 1;
+}
+
+/* Rückfallebene ohne `transform`-Unterstützung (siehe oben). */
+@supports not (writing-mode: sideways-lr) {
+  .print-extra-text.is-vertical {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
 }
 
 /**

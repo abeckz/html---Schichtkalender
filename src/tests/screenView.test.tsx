@@ -872,7 +872,7 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
     return card?.querySelectorAll('.day-row')[0]?.querySelectorAll('.cell-extra').length ?? 0;
   }
 
-  it('legt links eine schmale Spalte an und wiederholt das bei jedem Klick', () => {
+  it('legt bei jedem Klick eine neue, eigenständige Spalte an', () => {
     window.localStorage.removeItem('schichtkalender.state');
     try {
       const container = render(<App />);
@@ -887,21 +887,20 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
       expect(firstCard?.querySelectorAll('.day-row').length).toBe(31);
       expect(extraCellCount(firstCard)).toBe(1);
       expect(extraCellCount(cardOf(container, 'Februar 2026'))).toBe(0);
+      expect(firstCard?.style.getPropertyValue('--extra-left-width')).toBe('1.6em');
 
-      // Wiederholbar: der nächste Klick auf dieselbe Linie erweitert die
-      // vorhandene Spalte, statt eine zweite anzulegen (die Ansicht wird nach
-      // außen geschoben).
-      const widthsBefore = cardOf(container, 'Januar 2026')?.style.getPropertyValue(
-        '--extra-left-width',
-      );
+      // Jeder weitere Klick legt eine **weitere, eigenständige** Spalte an
+      // (eigener Farbschlüssel, eigenes Zieh-Ziel); die Ansicht wird nach außen
+      // geschoben. Die Spalten teilen sich also nicht denselben Farbschlüssel.
       click(handle(container, 'left'));
-      const widthsAfter = cardOf(container, 'Januar 2026')?.style.getPropertyValue(
-        '--extra-left-width',
-      );
-      expect(widthsBefore).toBe('1.6em');
-      expect(widthsAfter).toBe('3.2em');
-      // Die erweiterte Spalte besteht aus zwei Zellen ohne zusätzlichen Inhalt.
-      expect(extraCellCount(cardOf(container, 'Januar 2026'))).toBe(2);
+      const secondCard = cardOf(container, 'Januar 2026');
+      expect(secondCard?.style.getPropertyValue('--extra-left-width')).toBe('3.2em');
+      expect(extraCellCount(secondCard)).toBe(2);
+
+      const keys = Array.from(
+        secondCard!.querySelectorAll('.day-row')[0].querySelectorAll('.cell-extra'),
+      ).map((cell) => cell.getAttribute('data-extra-column-key'));
+      expect(new Set(keys).size).toBe(2);
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }
@@ -981,7 +980,7 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
       // Farbe und querliegender Text landen in der Persistenz (Anker = erster Tag).
       const persisted = JSON.parse(window.localStorage.getItem('schichtkalender.state') ?? '{}');
       expect(persisted.annotations['2026-01-01']?.extraColors?.extra0).toBe('red');
-      const text = persisted.annotations['2026-01-01']?.extraTexts?.extra0;
+      const text = persisted.annotations['2026-01-01']?.extraTexts?.extra0?.[0];
       expect(text?.text).toBe('Urlaub');
       expect(text?.vertical).toBe(true);
       expect(text?.dateKeys).toEqual(['2026-01-01', '2026-01-02', '2026-01-03']);
@@ -997,16 +996,15 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
     }
   });
 
-  it('hebt beim Ziehen nur die getroffene Breiteneinheit hervor', () => {
-    // Regression: Eine erweiterte Zusatzspalte besteht aus mehreren Zellen mit
-    // demselben Farbschlüssel. Früher wurde beim Ziehen die gesamte Spalte
-    // hervorgehoben; jetzt trägt jede Einheit ein eigenes Zieh-Ziel
-    // (`data-extra-unit-key`), sodass nur die Spalte unter dem Zeiger markiert
-    // wird - wie bei den festen Farbspalten.
+  it('hebt beim Ziehen nur die getroffene Spalte hervor', () => {
+    // Regression: Jede Zusatzspalte ist eine eigenständige Spalte mit eigenem
+    // Farbschlüssel (`extra0`, `extra1`, …). Beim Ziehen darf nur die getroffene
+    // Spalte hervorgehoben werden - nicht die benachbarte, deren Text/Farbe
+    // sonst mitgeändert würde.
     window.localStorage.removeItem('schichtkalender.state');
     try {
       const container = render(<App />);
-      // Zusatzspalte links anlegen und auf zwei Einheiten erweitern.
+      // Zwei eigenständige Spalten links anlegen.
       click(handle(container, 'left'));
       click(handle(container, 'left'));
       const card = cardOf(container, 'Januar 2026');
@@ -1014,11 +1012,11 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
       const startCells = rows[0].querySelectorAll('.cell-extra');
       expect(startCells.length).toBe(2);
 
-      // Beide Einheiten tragen denselben Farbschlüssel, aber eigene Zieh-Ziele.
+      // Jede Spalte hat einen eigenen Farbschlüssel und ein eigenes Zieh-Ziel.
       expect(startCells[0].getAttribute('data-extra-column-key')).toBe('extra0');
-      expect(startCells[1].getAttribute('data-extra-column-key')).toBe('extra0');
+      expect(startCells[1].getAttribute('data-extra-column-key')).toBe('extra1');
       expect(startCells[0].getAttribute('data-extra-unit-key')).toBe('extra0');
-      expect(startCells[1].getAttribute('data-extra-unit-key')).toBe('extra0#1');
+      expect(startCells[1].getAttribute('data-extra-unit-key')).toBe('extra1');
 
       const mouse = (element: Element, type: string, target?: Element) => {
         act(() => {
@@ -1027,7 +1025,7 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
           );
         });
       };
-      // Ziehen beginnt in der ZWEITEN Einheit.
+      // Ziehen beginnt in der ZWEITEN Spalte.
       mouse(rows[0], 'mousedown', startCells[1]);
       mouse(rows[1], 'mouseover');
 
@@ -1036,7 +1034,7 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
           .map((cell) => cell.classList.contains('is-column-selected'))
           .join(',');
 
-      // Nur die getroffene Einheit ist hervorgehoben - nicht die ganze Spalte.
+      // Nur die getroffene Spalte ist hervorgehoben - nicht die erste daneben.
       expect(selected(rows[0])).toBe('false,true');
       expect(selected(rows[1])).toBe('false,true');
       // Außerhalb der Auswahl bleibt alles unmarkiert.
@@ -1044,11 +1042,9 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
 
       mouse(rows[1], 'mouseup');
       act(() => window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })));
-      // Der eigene Zusatzspalten-Editor erscheint; die Farbe gilt anschließend
-      // für die gesamte (erweiterte) Spalte, weil beide Einheiten denselben
-      // Farbschlüssel tragen.
+      // Der eigene Zusatzspalten-Editor erscheint für die zweite Spalte.
       const editor = container.querySelector('.day-editor');
-      expect(editor?.textContent).toContain('Zusatzspalte 0');
+      expect(editor?.textContent).toContain('Zusatzspalte 1');
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }
@@ -1060,6 +1056,140 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
     const stylesheet = readStylesheet();
     const rule = /\.cell-weekday\s*,[\s\S]*?\.cell-extra\s*\{[^}]*cursor:\s*crosshair/s;
     expect(rule.test(stylesheet)).toBe(true);
+  });
+
+  /**
+   * Regression: Zwei unabhängige Markierungen derselben Zusatzspalte müssen mit
+   * eigenem Text nebeneinander bestehen können. Früher entfernte das Speichern
+   * eines Textes sämtliche Texte desselben Spalten-Schlüssels - die obere
+   * Markierung verlor ihren Text, sobald die untere bearbeitet wurde.
+   */
+  it('behält den Text zweier unabhängiger Markierungen derselben Zusatzspalte', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      // Eine Zusatzspalte links anlegen (Januar 2026).
+      click(handle(container, 'left'));
+      const card = cardOf(container, 'Januar 2026');
+      expect(card).not.toBeNull();
+
+      const mouse = (element: Element, type: string, target?: Element) => {
+        act(() => {
+          (target ?? element).dispatchEvent(
+            new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 }),
+          );
+        });
+      };
+
+      /** Führt ein Ziehen in der Zusatzspalte über die Zeilen `from..to` aus. */
+      const dragExtra = (from: number, to: number) => {
+        // Die Monatskarte nach jedem Render neu holen: nach dem Speichern wird
+        // die Ansicht neu aufgebaut, alte DOM-Referenzen wären veraltet.
+        const rows = Array.from(
+          cardOf(container, 'Januar 2026')!.querySelectorAll('.day-row'),
+        );
+        mouse(rows[from], 'mousedown', rows[from].querySelector('.cell-extra') ?? rows[from]);
+        for (let i = from + 1; i <= to; i += 1) {
+          act(() => {
+            rows[i].dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+          });
+        }
+        mouse(rows[to], 'mouseup', rows[to].querySelector('.cell-extra') ?? rows[to]);
+        act(() => window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })));
+      };
+
+      /** Trägt in den offenen Zusatzspalten-Editor einen Text ein und speichert. */
+      const saveText = (value: string) => {
+        const editor = container.querySelector('.day-editor');
+        expect(editor).not.toBeNull();
+        const textarea = editor!.querySelector('textarea') as HTMLTextAreaElement;
+        act(() => {
+          const setter = Object.getOwnPropertyDescriptor(
+            HTMLTextAreaElement.prototype,
+            'value',
+          )?.set;
+          setter?.call(textarea, value);
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        const saveButton = Array.from(editor!.querySelectorAll('button')).find(
+          (button) => button.textContent === 'Speichern',
+        );
+        click(saveButton ?? null);
+      };
+
+      // Obere Markierung (Zeilen 0–2) und untere Markierung (Zeilen 9–10).
+      dragExtra(0, 2);
+      saveText('Urlaub');
+      dragExtra(9, 10);
+      saveText('Schulung');
+
+      // Beide Texte liegen an ihren jeweiligen Ankern in derselben Spalte
+      // `extra0` (Anker 2026-01-01 und 2026-01-10).
+      const persisted = JSON.parse(window.localStorage.getItem('schichtkalender.state') ?? '{}');
+      const first = persisted.annotations['2026-01-01']?.extraTexts?.extra0 ?? [];
+      const second = persisted.annotations['2026-01-10']?.extraTexts?.extra0 ?? [];
+      expect(first).toHaveLength(1);
+      expect(second).toHaveLength(1);
+      expect(first[0].text).toBe('Urlaub');
+      expect(first[0].dateKeys).toEqual(['2026-01-01', '2026-01-02', '2026-01-03']);
+      expect(second[0].text).toBe('Schulung');
+      expect(second[0].dateKeys).toEqual(['2026-01-10', '2026-01-11']);
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  /**
+   * Regression: Eine über mehrere Tageszellen markierte Zusatzspalte wurde an
+   * jeder Zeilengrenze von der dünnen horizontalen Zeilenlinie durchschnitten
+   * und hatte durch das senkrechte Zellen-Padding der Zeile zusätzlich einen
+   * weißen Rand. Die gefärbte Zelle wird nun um Padding plus Linienstärke über
+   * die Zeilengrenzen hinausgezogen (negatives `margin`), damit der farbige
+   * Streifen randlos und ungebrochen erscheint.
+   */
+  it('zieht gefärbte Zusatzspalten über Padding und Zeilenlinie (ungebrochen)', () => {
+    const stylesheet = readStylesheet();
+    const rule = /\.cell-extra\[style\]\s*\{[^}]*margin:\s*-4px\s+0/s;
+    expect(rule.test(stylesheet)).toBe(true);
+  });
+
+  /**
+   * Regression: Der querliegende Text der Zusatzspalten lag hinter dem
+   * Farbstreifen der markierten Zelle. Die gefärbten Zellen werden über
+   * `.cell-extra[style]` auf `z-index: 1` gehoben (durchgehender Streifen);
+   * damit der Text sichtbar bleibt, muss die Überlagerungsebene einen höheren
+   * Stapelwert besitzen - nicht nur die spätere DOM-Reihenfolge für sich nutzen.
+   */
+  it('legt den querliegenden Text über den Farbstreifen (sichtbar)', () => {
+    const stylesheet = readStylesheet();
+    const cellRule = /\.cell-extra\[style\]\s*\{([^}]*)\}/s.exec(stylesheet)?.[1] ?? '';
+    const overlayRule = /\.day-table-overlay\s*\{([^}]*)\}/s.exec(stylesheet)?.[1] ?? '';
+
+    const cellZ = Number(/z-index:\s*(-?\d+)/.exec(cellRule)?.[1] ?? 'NaN');
+    const overlayZ = Number(/z-index:\s*(-?\d+)/.exec(overlayRule)?.[1] ?? 'NaN');
+
+    expect(Number.isFinite(cellZ)).toBe(true);
+    expect(Number.isFinite(overlayZ)).toBe(true);
+    expect(overlayZ).toBeGreaterThan(cellZ);
+  });
+
+  /**
+   * Regression: Der querliegende Text wurde mit `writing-mode: vertical-rl`
+   * plus `transform: rotate(180deg)` gedreht. Ein `transform` legt das Element
+   * auf eine eigene Compositing-Ebene, die der Browser beim Drucken als Bitmap
+   * in Bildschirmauflösung rastert - der Text erschien im Ausdruck verpixelt.
+   * `writing-mode: sideways-lr` erreicht dieselbe Leserichtung rein über
+   * Textlayout und bleibt vektoriell (scharfer Druck).
+   */
+  it('dreht den querliegenden Text ohne transform (scharfer Druck)', () => {
+    const stylesheet = readStylesheet();
+    // Die Grundregel nutzt `sideways-lr` (vektoriell) ohne `transform`.
+    const base = /\.cell-extra-text\.is-vertical\s*\{([^}]*)\}/s;
+    const baseBody = base.exec(stylesheet)?.[1] ?? '';
+    expect(baseBody).toContain('writing-mode: sideways-lr');
+    expect(baseBody).not.toContain('transform');
+    // Nur die Rückfallebene (ohne `sideways-lr`-Unterstützung) darf drehen.
+    expect(/@supports not \(writing-mode: sideways-lr\)/.test(stylesheet)).toBe(true);
   });
 
   it('behält die angelegten Spalten über eine neue Sitzung', () => {
@@ -1087,7 +1217,7 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
         container.querySelector('.column-remove-handle[data-extra-column-side="left"]'),
       ).toBeNull();
 
-      // Zwei Spalten links anlegen (erste Linie anlegen/dann erweitern).
+      // Zwei eigenständige Spalten links anlegen.
       click(handle(container, 'left'));
       click(handle(container, 'left'));
       expect(extraCellCount(cardOf(container, 'Januar 2026'))).toBe(2);
@@ -1098,14 +1228,14 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
       ) as HTMLElement | null;
       expect(minus).not.toBeNull();
 
-      // Erster Klick verkleinert die Spalte an der Linie um eine Einheit.
+      // Erster Klick entfernt die Spalte an der Trennlinie vollständig.
       click(minus);
       expect(extraCellCount(cardOf(container, 'Januar 2026'))).toBe(1);
       expect(
         cardOf(container, 'Januar 2026')?.style.getPropertyValue('--extra-left-width'),
       ).toBe('1.6em');
 
-      // Zweiter Klick entfernt die Spalte vollständig.
+      // Zweiter Klick entfernt die verbliebene Spalte vollständig.
       click(
         container.querySelector('.column-remove-handle[data-extra-column-side="left"]'),
       );

@@ -26,7 +26,7 @@ import { useAnnotationStore } from '../services/annotationStore.ts';
 import { useAnniversaryStore } from '../services/anniversaryStore.ts';
 import { useColorLegendStore } from '../services/colorLegendStore.ts';
 import { useThemeStore } from '../services/themeStore.ts';
-import { STORAGE_VERSION } from '../services/storage.ts';
+import { STORAGE_VERSION, extraColumnTextId } from '../services/storage.ts';
 import { saveState } from '../services/persistence.ts';
 import { useUnsavedChangesGuard } from '../services/unsavedChanges.ts';
 import { monthDayOfDateKey } from '../utils/dateUtils.ts';
@@ -56,7 +56,6 @@ export function App() {
     setShowRecurringEvents,
     setViewMode,
     addExtraColumn,
-    widenExtraColumn,
     removeExtraColumn,
     setSettings,
     goToPreviousYear,
@@ -272,7 +271,7 @@ export function App() {
   );
 
   /**
-   * Verkleinert/entfernt eine Zusatzspalte an der Trennlinie und verschiebt die
+   * Entfernt eine Zusatzspalte an der Trennlinie und verschiebt die
    * Annotationen (`extraN`) der verbleibenden Spalten um eine Position nach
    * innen, damit Farben und querliegende Texte bei ihrer Spalte bleiben.
    */
@@ -437,7 +436,6 @@ export function App() {
               selectedColumn={streakColumn}
               extraColumns={settings.extraColumns}
               onAddExtraColumn={addExtraColumn}
-              onWidenExtraColumn={widenExtraColumn}
               onRemoveExtraColumn={handleRemoveExtraColumn}
               onStreakStart={handleStreakStart}
               onStreakEnter={handleStreakEnter}
@@ -486,14 +484,24 @@ export function App() {
             ] ?? null
           }
           initialText={
-            annotations[editingExtraColumn.dateKeys[0]]?.extraTexts?.[
-              editingExtraColumn.colorKey
-            ]?.text ?? ''
+            // Der Editor bearbeitet die Spanne mit dem Anker (kleinster Tag).
+            // Innerhalb der Spalte kann es weitere unabhängige Spannen geben;
+            // gesucht wird daher gezielt der Text dieser Spanne (id aus
+            // Farbschlüssel + Anker).
+            findExtraColumnText(
+              annotations[editingExtraColumn.dateKeys[0]]?.extraTexts?.[
+                editingExtraColumn.colorKey
+              ],
+              editingExtraColumn.dateKeys[0] ?? '',
+            )?.text ?? ''
           }
           initialVertical={
-            annotations[editingExtraColumn.dateKeys[0]]?.extraTexts?.[
-              editingExtraColumn.colorKey
-            ]?.vertical ?? true
+            findExtraColumnText(
+              annotations[editingExtraColumn.dateKeys[0]]?.extraTexts?.[
+                editingExtraColumn.colorKey
+              ],
+              editingExtraColumn.dateKeys[0] ?? '',
+            )?.vertical ?? true
           }
           onSave={handleSaveExtraColumn}
           onSaveText={setExtraColumnText}
@@ -636,22 +644,42 @@ function shiftExtraMap<T>(
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
+/**
+ * Sucht in der Liste der querliegenden Texte einer Zusatzspalte den Eintrag,
+ * dessen Spanne am Anker (`anchorKey`) beginnt. Da in derselben Spalte mehrere
+ * unabhängige Spannen existieren dürfen, ist dies der gezielte Zugriff für den
+ * Zusatzspalten-Editor.
+ */
+function findExtraColumnText(
+  texts: readonly ExtraColumnText[] | undefined,
+  anchorKey: string,
+): ExtraColumnText | undefined {
+  return texts?.find((text) => text.dateKeys[0] === anchorKey);
+}
+
 /** Verschiebt die querliegenden Texte eines Monats um eine Position nach innen. */
 function shiftExtraTextMap(
-  map: Partial<Record<ExtraColumnColorKey, ExtraColumnText>> | undefined,
+  map: Partial<Record<ExtraColumnColorKey, ExtraColumnText[]>> | undefined,
   startKey: number,
-): Partial<Record<ExtraColumnColorKey, ExtraColumnText>> | undefined {
+): Partial<Record<ExtraColumnColorKey, ExtraColumnText[]>> | undefined {
   if (!map) return undefined;
-  const result: Partial<Record<ExtraColumnColorKey, ExtraColumnText>> = {};
-  for (const [key, value] of Object.entries(map) as Array<[ExtraColumnColorKey, ExtraColumnText]>) {
+  const result: Partial<Record<ExtraColumnColorKey, ExtraColumnText[]>> = {};
+  for (const [key, list] of Object.entries(map) as Array<[ExtraColumnColorKey, ExtraColumnText[]]>) {
     const index = extraColumnIndex(key);
+    if (!list || list.length === 0) continue;
     if (index < startKey) {
-      result[key] = value;
+      result[key] = list;
     } else if (index > startKey) {
       const newKey = `extra${index - 1}` as ExtraColumnColorKey;
-      result[newKey] = { ...value, colorKey: newKey };
+      // Farbschlüssel und `id` der Texte mitführen, damit die Bindung an die
+      // (jetzt umbenannte) Spalte erhalten bleibt.
+      result[newKey] = list.map((text) => ({
+        ...text,
+        colorKey: newKey,
+        id: extraColumnTextId(newKey, text.dateKeys[0] ?? ''),
+      }));
     }
-    // index === startKey: Text der entfernten Spalte entfällt.
+    // index === startKey: Texte der entfernten Spalte entfallen.
   }
   return Object.keys(result).length > 0 ? result : undefined;
 }

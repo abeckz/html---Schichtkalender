@@ -725,6 +725,7 @@ describe('PrintMonth – Zusatzspalten', () => {
         extraTextsByDateKey={{
           '2026-01-01': [
             {
+              id: 'extra0@2026-01-01',
               colorKey: 'extra0',
               columnLabel: 'Zusatzspalte 0',
               vertical: true,
@@ -762,6 +763,7 @@ describe('PrintMonth – Zusatzspalten', () => {
         extraTextsByDateKey={{
           '2026-01-10': [
             {
+              id: 'extra1@2026-01-10',
               colorKey: 'extra1',
               columnLabel: 'Zusatzspalte 1',
               vertical: true,
@@ -789,6 +791,7 @@ describe('PrintMonth – Zusatzspalten', () => {
         extraTextsByDateKey={{
           '2026-01-01': [
             {
+              id: 'extra0@2026-01-01',
               colorKey: 'extra0',
               columnLabel: 'Zusatzspalte 0',
               vertical: true,
@@ -823,6 +826,7 @@ describe('PrintMonth – Zusatzspalten', () => {
         extraTextsByDateKey={{
           '2026-01-01': [
             {
+              id: 'extra0@2026-01-01',
               colorKey: 'extra0',
               columnLabel: 'Zusatzspalte 0',
               vertical: true,
@@ -846,5 +850,62 @@ describe('PrintMonth – Zusatzspalten', () => {
     expect(overlayRule).toMatch(/inset:\s*0/);
     expect(overlayRule).not.toMatch(/grid-row/);
     expect(overlayRule).not.toMatch(/grid-column/);
+  });
+
+  /**
+   * Regression: Der querliegende Drucktext lag **hinter** dem Farbstreifen der
+   * markierten Zusatzspalte und war dadurch weder in der Vorschau noch im
+   * gedruckten PDF sichtbar.
+   *
+   * Ursache: die gefärbten Zusatzspalten-Zellen werden über
+   * `.print-row > .print-col-extra[style]` auf `z-index: 1` gehoben, damit ihr
+   * Streifen die Zeilenlinien durchgehend überdeckt. Die Textebene
+   * (`.print-month-overlay`) hatte keinen eigenen Stapelwert (`auto`) und lag
+   * damit darunter. Sie muss einen höheren `z-index` als die Zellen besitzen.
+   */
+  it('legt den querliegenden Drucktext über den Farbstreifen (sichtbar)', () => {
+    const stylesheet = readPrintStylesheet();
+    const cellRule =
+      /\.print-row\s*>\s*\.print-col-extra\[style\]\s*\{([^}]*)\}/s.exec(stylesheet)?.[1] ?? '';
+    const overlayRule = /\.print-month-overlay\s*\{([^}]*)\}/s.exec(stylesheet)?.[1] ?? '';
+
+    const cellZ = Number(/z-index:\s*(-?\d+)/.exec(cellRule)?.[1] ?? 'NaN');
+    const overlayZ = Number(/z-index:\s*(-?\d+)/.exec(overlayRule)?.[1] ?? 'NaN');
+
+    expect(Number.isFinite(cellZ)).toBe(true);
+    expect(Number.isFinite(overlayZ)).toBe(true);
+    // Der Text muss über den gefärbten Zellen liegen.
+    expect(overlayZ).toBeGreaterThan(cellZ);
+  });
+
+  /**
+   * Regression: Der querliegende Drucktext wurde mit `writing-mode: vertical-rl`
+   * plus `transform: rotate(180deg)` gedreht. Ein `transform` legt das Element
+   * auf eine eigene Compositing-Ebene, die Chrome beim Drucken als Bitmap in
+   * Bildschirmauflösung rastert - der Text erschien im Ausdruck verpixelt.
+   * `writing-mode: sideways-lr` erreicht dieselbe Leserichtung rein über
+   * Textlayout und bleibt vektoriell (scharfer Druck).
+   */
+  it('dreht den querliegenden Drucktext ohne transform (scharfer Druck)', () => {
+    const stylesheet = readPrintStylesheet();
+    const base = /\.print-extra-text\.is-vertical\s*\{([^}]*)\}/s;
+    const baseBody = base.exec(stylesheet)?.[1] ?? '';
+    expect(baseBody).toContain('writing-mode: sideways-lr');
+    expect(baseBody).not.toContain('transform');
+    // Nur die Rückfallebene (ohne `sideways-lr`-Unterstützung) darf drehen.
+    expect(/@supports not \(writing-mode: sideways-lr\)/.test(stylesheet)).toBe(true);
+  });
+
+  /**
+   * Regression: Eine über mehrere Zellen markierte Zusatzspalte wurde an jeder
+   * Zeilengrenze von der dünnen horizontalen Zeilenlinie (`.print-row`
+   * `border-top`) durchschnitten und war dadurch schwer zu lesen. Die gefärbte
+   * Zelle wird nun um die Linienstärke über die Zeilengrenzen hinausgezogen
+   * (negatives `margin`), damit der farbige Streifen ungebrochen erscheint.
+   */
+  it('zieht gefärbte Zusatzspalten über die Zeilenlinie (ungebrochener Streifen)', () => {
+    const stylesheet = readPrintStylesheet();
+    const rule = /\.print-row\s*>\s*\.print-col-extra\[style\]\s*\{[^}]*margin:\s*-0\.25pt\s+0/s;
+    expect(rule.test(stylesheet)).toBe(true);
   });
 });

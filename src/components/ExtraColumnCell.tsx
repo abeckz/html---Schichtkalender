@@ -60,6 +60,12 @@ export interface ExtraColumnLayout {
  * die linke Seite beginnt bei 0, die rechte zählt hinter den linken Spalten
  * weiter. So kollidieren die persönlichen Farben der linken und rechten
  * Zusatzspalten nicht mehr im selben Tagesdatensatz.
+ *
+ * Seit dem Wegfall des „Erweiterns" hat jede neu angelegte Zusatzspalte die
+ * Breite 1 und damit genau einen Farbschlüssel (eine Zelle je Tageszeile). Der
+ * Code für breitere Spalten (`width > 1`, mehrere Einheiten mit Suffix `#n`)
+ * bleibt nur erhalten, um ältere gespeicherte Zustände weiterhin korrekt
+ * darzustellen.
  */
 export function buildExtraColumnLayout(columns: ExtraColumns | undefined): ExtraColumnLayout {
   const left = buildExtraColumnSide(columns?.left, 'left', 0);

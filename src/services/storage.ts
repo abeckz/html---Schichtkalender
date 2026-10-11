@@ -108,14 +108,26 @@ export function normalizeAnnotation(value: unknown): UserDayAnnotation | null {
     }
   }
 
-  // Querliegende Texte der Zusatzspalten (`extra0`, `extra1`, …).
-  const extraTexts: Partial<Record<ExtraColumnColorKey, ExtraColumnText>> = {};
+  // Querliegende Texte der Zusatzspalten (`extra0`, `extra1`, …). Je Spalte
+  // liegt eine Liste von Spannen-Texten vor, damit mehrere unabhängige
+  // Markierungen derselben Spalte nebeneinander bestehen können. Zur
+  // Rückwärtskompatibilität wird auch das frühere Einzel-Objekt je Spalte
+  // übernommen.
+  const extraTexts: Partial<Record<ExtraColumnColorKey, ExtraColumnText[]>> = {};
   const rawExtraTexts = (candidate as { extraTexts?: unknown }).extraTexts;
   if (rawExtraTexts && typeof rawExtraTexts === 'object') {
     for (const [key, value] of Object.entries(rawExtraTexts as Record<string, unknown>)) {
       if (!isExtraColumnColorKey(key)) continue;
-      const text = normalizeExtraColumnText(value, key);
-      if (text) extraTexts[key] = text;
+      const entries = Array.isArray(value) ? value : [value];
+      const list: ExtraColumnText[] = [];
+      const seenIds = new Set<string>();
+      for (const entry of entries) {
+        const text = normalizeExtraColumnText(entry, key);
+        if (!text || seenIds.has(text.id)) continue;
+        seenIds.add(text.id);
+        list.push(text);
+      }
+      if (list.length > 0) extraTexts[key] = list;
     }
   }
 
@@ -151,12 +163,27 @@ function normalizeExtraText(value: unknown): string {
 }
 
 /**
+ * Stabiler Anzeige-Schlüssel eines Zusatzspalten-Textes.
+ *
+ * Er verbindet Farbschlüssel und Anker (oberster Tag der Spanne). Da in einer
+ * Spalte mehrere unabhängige Spannen existieren dürfen, ist allein der
+ * Farbschlüssel nicht eindeutig; der Anker unterscheidet die Spannen.
+ */
+export function extraColumnTextId(
+  colorKey: ExtraColumnColorKey,
+  anchor: string,
+): string {
+  return `${colorKey}@${anchor}`;
+}
+
+/**
  * Bereinigt einen querliegenden Text einer Zusatzspalte.
  *
  * Erwartet als `fallbackKey` den Farbschlüssel der Spalte (aus dem Map-Schlüssel).
  * Liefert null, wenn weder Text noch Spanne gültig sind bzw. kein Text vorliegt.
  * Die Spanne (`dateKeys`) wird auf gültige, eindeutige Datumsschlüssel beschränkt
- * und chronologisch sortiert; `length` folgt aus ihrer Länge.
+ * und chronologisch sortiert; `length` folgt aus ihrer Länge. Die `id` folgt
+ * (bzw. wird neu bestimmt) aus Farbschlüssel und Anker.
  */
 export function normalizeExtraColumnText(
   value: unknown,
@@ -179,7 +206,9 @@ export function normalizeExtraColumnText(
   }
   dateKeys.sort();
   if (dateKeys.length === 0 && text === '') return null;
+  const anchor = dateKeys[0] ?? '';
   return {
+    id: extraColumnTextId(colorKey, anchor),
     colorKey,
     columnLabel:
       typeof candidate.columnLabel === 'string'
