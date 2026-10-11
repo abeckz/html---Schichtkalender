@@ -42,13 +42,17 @@ describe('Verbindliche Ereignisse 2021', () => {
   const references: Array<[string, string[]]> = [
     ['2021-01-01', ['Neujahr']],
     ['2021-01-06', ['Heilige Drei Könige']],
-    ['2021-02-16', ['Fastnacht']],
+    ['2021-02-14', ['Valentinstag']],
+    ['2021-02-15', ['Rosenmontag']],
+    ['2021-02-16', ['Faschingsdienstag']],
+    ['2021-02-17', ['Aschermittwoch']],
     ['2021-03-27', ['Beginn Sommerzeit']],
     ['2021-04-02', ['Karfreitag']],
     ['2021-04-04', ['Ostersonntag']],
     ['2021-04-05', ['Ostermontag']],
     ['2021-05-01', ['Maifeiertag']],
-    ['2021-05-13', ['Christi Himmelfahrt']],
+    ['2021-05-09', ['Muttertag']],
+    ['2021-05-13', ['Christi Himmelfahrt', 'Vatertag']],
     ['2021-05-23', ['Pfingstsonntag']],
     ['2021-05-24', ['Pfingstmontag']],
     ['2021-06-03', ['Fronleichnam']],
@@ -152,7 +156,12 @@ describe('Bezahlte Feiertage', () => {
       'Silvester',
       'Ostersonntag',
       'Pfingstsonntag',
-      'Fastnacht',
+      'Rosenmontag',
+      'Faschingsdienstag',
+      'Aschermittwoch',
+      'Valentinstag',
+      'Muttertag',
+      'Vatertag',
       'Reformationstag',
     ];
     for (const name of unpaid) {
@@ -178,9 +187,10 @@ describe('Ereignisse über mehrere Jahre', () => {
     expect(namesOn(y2027, '2027-12-25')).toEqual(['1. Weihnachtstag']);
 
     const y2028 = generateCalendarEvents(2028);
-    // 2028 ist ein Schaltjahr; der 29.02. ist zufällig der Fastnachtsdienstag.
-    expect(namesOn(y2028, '2028-02-29')).toEqual(['Fastnacht']);
-    expect(namesOn(y2028, '2028-02-28')).toEqual([]);
+    // 2028 ist ein Schaltjahr; der 29.02. fällt in die Fastnacht.
+    expect(namesOn(y2028, '2028-02-28')).toEqual(['Rosenmontag']);
+    expect(namesOn(y2028, '2028-02-29')).toEqual(['Faschingsdienstag']);
+    expect(namesOn(y2028, '2028-03-01')).toEqual(['Aschermittwoch']);
     expect(namesOn(y2028, '2028-01-01')).toEqual(['Neujahr']);
   });
 
@@ -254,7 +264,12 @@ describe('Gesetzliche Feiertage in Rheinland-Pfalz (Markierung "F")', () => {
       'Reformationstag',
       'Heiligabend',
       'Silvester',
-      'Fastnacht',
+      'Rosenmontag',
+      'Faschingsdienstag',
+      'Aschermittwoch',
+      'Valentinstag',
+      'Muttertag',
+      'Vatertag',
       'Beginn Sommerzeit',
       'Ende Sommerzeit',
       'Erntedank',

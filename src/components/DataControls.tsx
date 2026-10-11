@@ -74,10 +74,10 @@ export function DataControls({ onSave, onLoad }: DataControlsProps) {
   return (
     <div className="toolbar-group data-controls" role="group" aria-label="Speichern und Laden">
       <button type="button" className="secondary-button" onClick={() => void handleSave()}>
-        Sichern…
+        Sichern
       </button>
       <button type="button" className="secondary-button" onClick={() => void handleLoad()}>
-        Laden…
+        Laden
       </button>
       <input
         ref={inputRef}

@@ -59,7 +59,7 @@ export function DataControls({ onSave, onLoad }) {
         onLoad(state);
         setStatus('Daten geladen.');
     };
-    return (_jsxs("div", { className: "toolbar-group data-controls", role: "group", "aria-label": "Speichern und Laden", children: [_jsx("button", { type: "button", className: "secondary-button", onClick: () => void handleSave(), children: "Sichern\u2026" }), _jsx("button", { type: "button", className: "secondary-button", onClick: () => void handleLoad(), children: "Laden\u2026" }), _jsx("input", { ref: inputRef, type: "file", accept: "application/json,.json", className: "visually-hidden", "aria-hidden": "true", tabIndex: -1, onChange: (event) => {
+    return (_jsxs("div", { className: "toolbar-group data-controls", role: "group", "aria-label": "Speichern und Laden", children: [_jsx("button", { type: "button", className: "secondary-button", onClick: () => void handleSave(), children: "Sichern" }), _jsx("button", { type: "button", className: "secondary-button", onClick: () => void handleLoad(), children: "Laden" }), _jsx("input", { ref: inputRef, type: "file", accept: "application/json,.json", className: "visually-hidden", "aria-hidden": "true", tabIndex: -1, onChange: (event) => {
                     void handleFile(event.target.files?.[0]);
                     // Auswahl zurücksetzen, damit dieselbe Datei erneut gewählt werden kann.
                     event.target.value = '';

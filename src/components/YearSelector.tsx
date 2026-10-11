@@ -1,11 +1,12 @@
 /**
  * Jahr-Auswahl mit Vorjahr/Folgejahr.
  *
- * Reines Screen-Element: wird im Druck niemals angezeigt.
+ * Reines Screen-Element: wird im Druck niemals angezeigt. Das Auswahlfeld
+ * trägt keinen eigenen Feldtitel mehr; der zugängliche Name (aria-label)
+ * bleibt erhalten.
  */
 
 import { SELECTABLE_YEARS } from '../config/appDefaults';
-import { MIN_YEAR, MAX_YEAR } from '../utils/dateUtils';
 
 export interface YearSelectorProps {
   year: number;
@@ -40,21 +41,18 @@ export function YearSelector({
       >
         ‹
       </button>
-      <label className="field">
-        <span className="field-label">Jahr</span>
-        <select
-          className="year-select"
-          value={year}
-          onChange={(event) => onSelectYear(Number(event.target.value))}
-          aria-label="Jahr"
-        >
-          {years.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </label>
+      <select
+        className="year-select"
+        value={year}
+        onChange={(event) => onSelectYear(Number(event.target.value))}
+        aria-label="Jahr"
+      >
+        {years.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
       <button
         type="button"
         className="icon-button"
@@ -65,9 +63,6 @@ export function YearSelector({
       >
         ›
       </button>
-      <span className="field-hint">
-        {MIN_YEAR}–{MAX_YEAR} möglich
-      </span>
     </div>
   );
 }

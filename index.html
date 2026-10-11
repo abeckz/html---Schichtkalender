@@ -15,9 +15,9 @@
           // Anzeige, ohne die gespeicherte Einstellung zu verändern.
           var forced = /(?:^|[?&])theme=(dark|light)(?:&|$)/.exec(window.location.search);
           if (forced) stored = forced[1];
-          // Startansicht grundsätzlich dunkel: ohne ausdrückliche Wahl (und
-          // ohne Adressparameter) beginnt die Anzeige im Dunkelmodus.
-          var wantsDark = stored ? stored !== 'light' : true;
+          // Startansicht grundsätzlich dunkel: nur die ausdrückliche Wahl
+          // "Hell" beginnt hell; sonst (auch ohne Einstellung) dunkel.
+          var wantsDark = stored !== 'light';
           document.documentElement.setAttribute('data-theme', wantsDark ? 'dark' : 'light');
         } catch (error) {
           document.documentElement.setAttribute('data-theme', 'dark');

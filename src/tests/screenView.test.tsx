@@ -30,7 +30,6 @@ import {
   THEME_STORAGE_KEY,
   applyTheme,
   readThemePreference,
-  resolveTheme,
 } from '../services/themeStore';
 import { parseState, serializeState } from '../services/persistence';
 
@@ -492,7 +491,7 @@ describe('Bildschirmdarstellung', () => {
   it('schaltet die Anzeige zwischen Hell und Dunkel um', () => {
     const container = render(<App />);
     const buttons = Array.from(container.querySelectorAll('.theme-button'));
-    expect(buttons.length).toBe(3);
+    expect(buttons.length).toBe(2);
 
     // Startansicht ist grundsätzlich der Dunkelmodus.
     const darkButton = buttons.find((button) => button.textContent?.includes('Dunkel'));
@@ -815,11 +814,13 @@ describe('ThemeStore', () => {
     expect(readThemePreference(storage, '?themes=light')).toBe('dark');
   });
 
-  it('löst die Einstellung "system" gegen die Systemeinstellung auf', () => {
-    expect(resolveTheme('system', 'dark')).toBe('dark');
-    expect(resolveTheme('system', 'light')).toBe('light');
-    expect(resolveTheme('dark', 'light')).toBe('dark');
-    expect(resolveTheme('light', 'dark')).toBe('light');
+  it('löst die gespeicherte Einstellung direkt auf', () => {
+    // Ohne Modus "System" entspricht das angewendete Theme der Einstellung.
+    const storage = { getItem: () => 'light', setItem: () => undefined };
+    expect(readThemePreference(storage, '')).toBe('light');
+    expect(readThemePreference({ getItem: () => 'dark', setItem: () => undefined }, '')).toBe(
+      'dark',
+    );
   });
 
   it('setzt das Theme-Attribut am Wurzelelement', () => {

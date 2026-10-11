@@ -1,17 +1,16 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 /**
- * Umschalter für die Anzeige (System / Hell / Dunkel).
+ * Umschalter für die Anzeige (Hell / Dunkel).
  *
  * Reines Bedienelement der Bildschirmansicht: wird niemals gedruckt und
  * beeinflusst keine Fachdaten. Die Auswahl ist eine zugängliche
  * Radio-Gruppe; der aktive Zustand wird zusätzlich über das Symbol
- * (◐/☀/☾) transportiert, also nicht ausschließlich über Farbe.
+ * (☀/☾) transportiert, also nicht ausschließlich über Farbe.
  */
 import { ThemeToggleButton } from './ThemeToggleButton';
 import { themePreferenceNames, } from '../services/themeStore';
-const OPTIONS = ['system', 'light', 'dark'];
+const OPTIONS = ['light', 'dark'];
 const SYMBOLS = {
-    system: '◐',
     light: '☀',
     dark: '☾',
 };

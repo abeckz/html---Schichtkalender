@@ -1,14 +1,14 @@
 /**
- * ThemeStore (Hell / Dunkel / System).
+ * ThemeStore (Hell / Dunkel).
  *
  * Die Anzeige ist eine reine Komfortfunktion: Sie beeinflusst niemals die
  * Fachlogik (Kalenderberechnung, Annotationen, Persistenz) und niemals die
  * Druckansicht. Der Wert wird getrennt vom übrigen Zustand gespeichert,
  * damit ein beschädigter Eintrag nur das Theme zurücksetzt.
  *
- * Zugriffe sind defensiv gekapselt: bei fehlendem localStorage, fehlendem
- * matchMedia oder defekten Werten wird auf "system" zurückgefallen. Es
- * wird nie geworfen.
+ * Zugriffe sind defensiv gekapselt: bei fehlendem localStorage oder
+ * defekten Werten wird auf den Dunkelmodus zurückgefallen. Es wird nie
+ * geworfen.
  *
  * Die Vorbelegung erfolgt bereits im HTML (Inline-Skript), damit beim
  * Öffnen kein heller Blitz entsteht. Ein erzwungener Anzeigewert aus der
@@ -27,10 +27,9 @@ export const THEME_QUERY_PARAMETER = 'theme';
  * Ohne ausdrückliche Wahl beginnt die Startansicht grundsätzlich dunkel.
  */
 export const DEFAULT_THEME_PREFERENCE = 'dark';
-const THEME_PREFERENCES = ['system', 'light', 'dark'];
+const THEME_PREFERENCES = ['light', 'dark'];
 /** Deutscher Anzeigename einer Theme-Einstellung. */
 export const themePreferenceNames = {
-    system: 'System',
     light: 'Hell',
     dark: 'Dunkel',
 };
@@ -77,23 +76,6 @@ export function writeThemePreference(preference, storage = getDefaultStorage()) 
         return false;
     }
 }
-/** Systemeinstellung des Betriebssystems/Browsers ("dunkel" als Standard). */
-export function getSystemTheme() {
-    try {
-        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function')
-            return 'light';
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    catch {
-        return 'light';
-    }
-}
-/** Löst eine Einstellung zum tatsächlich anzuwendenden Theme auf. */
-export function resolveTheme(preference, systemTheme) {
-    if (preference === 'system')
-        return systemTheme;
-    return preference;
-}
 /** Setzt das Theme-Attribut am Wurzelelement (idempotent). */
 export function applyTheme(resolved, root) {
     const target = root ?? (typeof document === 'undefined' ? null : document.documentElement);
@@ -102,40 +84,22 @@ export function applyTheme(resolved, root) {
     target.setAttribute(THEME_ATTRIBUTE, resolved);
 }
 /**
- * Theme-Hook: hält die Einstellung, beobachtet die Systemeinstellung im
- * Modus "system" und spiegelt das Ergebnis in data-theme am <html>.
+ * Theme-Hook: hält die Einstellung und spiegelt sie in data-theme am <html>.
+ *
+ * Ohne ausdrückliche Wahl gilt der Dunkelmodus. Ein Modus "System" entfällt
+ * vollständig.
  */
 export function useThemeStore() {
     const [preference, setPreferenceState] = useState(() => readThemePreference());
-    const [systemTheme, setSystemTheme] = useState(() => getSystemTheme());
-    // Systemeinstellung live verfolgen (nur solange sie relevant ist).
     useEffect(() => {
-        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function')
-            return;
-        const query = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleChange = () => setSystemTheme(query.matches ? 'dark' : 'light');
-        handleChange();
-        // Ältere Browser kennen addEventListener am MediaQueryList nicht.
-        if (typeof query.addEventListener === 'function') {
-            query.addEventListener('change', handleChange);
-            return () => query.removeEventListener('change', handleChange);
-        }
-        query.addListener?.(handleChange);
-        return () => query.removeListener?.(handleChange);
-    }, []);
-    const resolved = resolveTheme(preference, systemTheme);
-    useEffect(() => {
-        applyTheme(resolved);
-    }, [resolved]);
+        applyTheme(preference);
+    }, [preference]);
     const setPreference = useCallback((next) => {
         setPreferenceState(next);
         writeThemePreference(next);
     }, []);
     const toggle = useCallback(() => {
-        // Ausgehend vom sichtbaren Theme wechseln, damit ein Klick im
-        // Systemmodus immer sofort den erwarteten Effekt hat.
-        const visible = resolveTheme(preference, systemTheme);
-        setPreference(visible === 'dark' ? 'light' : 'dark');
-    }, [preference, systemTheme, setPreference]);
-    return { preference, resolved, setPreference, toggle };
+        setPreference(preference === 'dark' ? 'light' : 'dark');
+    }, [preference, setPreference]);
+    return { preference, resolved: preference, setPreference, toggle };
 }

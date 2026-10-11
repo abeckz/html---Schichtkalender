@@ -64,8 +64,11 @@ export function Toolbar({
           canGoNext={canGoNext}
         />
         <ShiftSelector selectedShift={selectedShift} onSelectShift={onSelectShift} />
-        <DataControls onSave={onSaveFile} onLoad={onLoadFile} />
-        <ThemeToggle theme={theme} />
+        {/* Anzeige (Hell/Dunkel) oben, Datei-Steuerung (Sichern/Laden) darunter. */}
+        <div className="toolbar-stack">
+          <ThemeToggle theme={theme} />
+          <DataControls onSave={onSaveFile} onLoad={onLoadFile} />
+        </div>
         <button type="button" className="primary-button" onClick={onOpenPrint}>
           Druckansicht
         </button>

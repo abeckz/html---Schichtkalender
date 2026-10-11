@@ -37,12 +37,13 @@ export interface FixedEventDefinition {
  * der Namen bleibt erhalten, damit Termin und Schicht weiterhin gemeinsam
  * sichtbar sind.
  * Der Reformationstag ist in Rheinland-Pfalz kein gesetzlicher Feiertag.
- * Brauchtumstage (Heiligabend, Silvester, Fastnacht ...) werden ebenfalls
+ * Brauchtumstage (Heiligabend, Silvester, Valentinstag ...) werden ebenfalls
  * normal (ohne "F") angezeigt.
  */
 export const fixedEvents: readonly FixedEventDefinition[] = [
   { id: 'new-year', name: 'Neujahr', month: 1, day: 1, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },
   { id: 'epiphany', name: 'Heilige Drei Könige', month: 1, day: 6, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 20 },
+  { id: 'valentines-day', name: 'Valentinstag', month: 2, day: 14, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 40 },
   { id: 'labour-day', name: 'Maifeiertag', month: 5, day: 1, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },
   { id: 'assumption', name: 'Mariä Himmelfahrt', month: 8, day: 15, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 20 },
   { id: 'german-unity', name: 'Tag der Deutschen Einheit', month: 10, day: 3, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },
@@ -65,11 +66,14 @@ export const easterRelativeEvents: readonly {
   isPublicHoliday: boolean;
   priority: number;
 }[] = [
-  { id: 'carnival', name: 'Fastnacht', offset: -47, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 40 },
+  { id: 'rose-monday', name: 'Rosenmontag', offset: -48, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 40 },
+  { id: 'carnival-tuesday', name: 'Faschingsdienstag', offset: -47, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 40 },
+  { id: 'ash-wednesday', name: 'Aschermittwoch', offset: -46, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 40 },
   { id: 'good-friday', name: 'Karfreitag', offset: -2, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },
   { id: 'easter-sunday', name: 'Ostersonntag', offset: 0, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 20 },
   { id: 'easter-monday', name: 'Ostermontag', offset: 1, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },
   { id: 'ascension', name: 'Christi Himmelfahrt', offset: 39, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },
+  { id: 'fathers-day', name: 'Vatertag', offset: 39, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 40 },
   { id: 'whitsun-sunday', name: 'Pfingstsonntag', offset: 49, countsAsPaidNormalShiftHoliday: false, isPublicHoliday: false, priority: 20 },
   { id: 'whitsun-monday', name: 'Pfingstmontag', offset: 50, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },
   { id: 'corpus-christi', name: 'Fronleichnam', offset: 60, countsAsPaidNormalShiftHoliday: true, isPublicHoliday: true, priority: 10 },

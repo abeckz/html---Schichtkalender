@@ -7,6 +7,7 @@
  *  - Osterfestkreis (berechnet aus dem gregorianischen Ostersonntag)
  *  - Sommerzeitbeginn/-ende (letzter Sonntag im März/Oktober)
  *  - Erntedank (erster Sonntag im Oktober)
+ *  - Muttertag (zweiter Sonntag im Mai)
  *  - Adventssonntage (deterministisch aus Weihnachten)
  *  - Volkstrauertag, Totensonntag, Buß- und Bettag
  *
@@ -78,6 +79,8 @@ export function generateCalendarEvents(year) {
     events.push(createEvent('dst-end', 'Ende Sommerzeit', lastWeekdayOfMonth(year, 10, 7), false, false, 50));
     // Erntedank: erster Sonntag im Oktober
     events.push(createEvent('harvest-festival', 'Erntedank', firstWeekdayOfMonth(year, 10, 7), false, false, 40));
+    // Muttertag: zweiter Sonntag im Mai
+    events.push(createEvent('mothers-day', 'Muttertag', addDaysToKey(firstWeekdayOfMonth(year, 5, 7), 7), false, false, 40));
     // Advent (1. bis 4.), deterministisch aus Weihnachten
     const fourthAdvent = getFourthAdvent(year);
     const adventNames = [

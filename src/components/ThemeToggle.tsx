@@ -1,10 +1,10 @@
 /**
- * Umschalter für die Anzeige (System / Hell / Dunkel).
+ * Umschalter für die Anzeige (Hell / Dunkel).
  *
  * Reines Bedienelement der Bildschirmansicht: wird niemals gedruckt und
  * beeinflusst keine Fachdaten. Die Auswahl ist eine zugängliche
  * Radio-Gruppe; der aktive Zustand wird zusätzlich über das Symbol
- * (◐/☀/☾) transportiert, also nicht ausschließlich über Farbe.
+ * (☀/☾) transportiert, also nicht ausschließlich über Farbe.
  */
 
 import { ThemeToggleButton } from './ThemeToggleButton';
@@ -18,10 +18,9 @@ export interface ThemeToggleProps {
   theme: ThemeStore;
 }
 
-const OPTIONS: readonly ThemePreference[] = ['system', 'light', 'dark'];
+const OPTIONS: readonly ThemePreference[] = ['light', 'dark'];
 
 const SYMBOLS: Record<ThemePreference, string> = {
-  system: '◐',
   light: '☀',
   dark: '☾',
 };
