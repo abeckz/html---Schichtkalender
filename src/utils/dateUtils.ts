@@ -60,6 +60,16 @@ export function isValidYear(year: number): boolean {
   return Number.isInteger(year) && year >= MIN_YEAR && year <= MAX_YEAR;
 }
 
+/**
+ * Prüft ein plausibles Geburtsjahr.
+ *
+ * Zulässig ist ein ganzzahliges Jahr zwischen dem kleinsten unterstützten
+ * Jahr und dem größten unterstützten Jahr (MIN_YEAR..MAX_YEAR).
+ */
+export function isPlausibleBirthYear(value: unknown): value is number {
+  return typeof value === 'number' && isValidYear(value);
+}
+
 /** Wirft einen Fehler, wenn das Jahr außerhalb des Bereichs liegt. */
 export function assertValidYear(year: number): void {
   if (!isValidYear(year)) {
@@ -263,4 +273,70 @@ export function formatShortDate(dateKey: string): string {
   const parts = parseDateKey(dateKey);
   if (!parts) throw new RangeError(`Ungültiger dateKey: ${dateKey}`);
   return `${String(parts.day).padStart(2, '0')}.${String(parts.month).padStart(2, '0')}.${parts.year}`;
+}
+
+/* ------------------------------------------------ Jahreslose Jahrestage (MM-DD) */
+
+/** Monat-Tag-Schlüssel ohne Jahr, z. B. "03-15". */
+export type MonthDayKey = string;
+
+/** Regulärer Ausdruck eines Monat-Tag-Schlüssels "MM-DD". */
+const MONTH_DAY_PATTERN = /^(\d{2})-(\d{2})$/;
+
+/**
+ * Prüft einen Monat-Tag-Schlüssel "MM-DD".
+ *
+ * Der Tag wird gegen den längsten möglichen Monat (31) geprüft; der 29.02.
+ * ist damit zulässig, ohne ein konkretes Jahr zu kennen.
+ */
+export function isMonthDayKey(value: unknown): value is MonthDayKey {
+  if (typeof value !== 'string') return false;
+  const match = MONTH_DAY_PATTERN.exec(value);
+  if (!match) return false;
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > getDaysInMonth(2000, month)) return false;
+  return true;
+}
+
+/** Zerlegt einen Monat-Tag-Schlüssel; null bei ungültigem Wert. */
+export function parseMonthDayKey(value: string): { month: number; day: number } | null {
+  if (!isMonthDayKey(value)) return null;
+  const match = MONTH_DAY_PATTERN.exec(value);
+  // Der reguläre Ausdruck hat bereits geprüft; die Zugriffe sind damit sicher.
+  return { month: Number(match![1]), day: Number(match![2]) };
+}
+
+/** Monat-Tag-Schlüssel aus Jahr, Monat und Tag. */
+export function toMonthDayKey(month: number, day: number): MonthDayKey {
+  return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** Monat-Tag-Schlüssel eines Kalendertagesschlüssels ("YYYY-MM-DD" -> "MM-DD"). */
+export function monthDayOfDateKey(dateKey: string): MonthDayKey | null {
+  const parts = parseDateKey(dateKey);
+  if (!parts) return null;
+  return toMonthDayKey(parts.month, parts.day);
+}
+
+/**
+ * Baut aus einem Monat-Tag-Schlüssel und einem Jahr einen dateKey ("YYYY-MM-DD").
+ *
+ * Der 29.02. wird für Nicht-Schaltjahre auf den 28.02. gelegt, damit jeder
+ * Eintrag in jedem Jahr darstellbar bleibt. Liefert null bei ungültigem
+ * Monat-Tag-Schlüssel.
+ */
+export function monthDayToDateKey(monthDay: MonthDayKey, year: number): string | null {
+  const parts = parseMonthDayKey(monthDay);
+  if (!parts) return null;
+  const day = Math.min(parts.day, getDaysInMonth(year, parts.month));
+  return toDateKey(year, parts.month, day);
+}
+
+/** Deutsches Datum ohne Jahr, z. B. "15. März". */
+export function formatMonthDay(monthDay: MonthDayKey): string {
+  const parts = parseMonthDayKey(monthDay);
+  if (!parts) return monthDay;
+  return `${parts.day}. ${MONTH_NAMES[parts.month - 1]}`;
 }

@@ -9,31 +9,34 @@ const emptyState: PersistedState = {
   settings: { ...DEFAULT_SETTINGS },
   annotations: {},
   colorLegend: {},
+  anniversaries: {},
 };
 
 const sampleState: PersistedState = {
   version: STORAGE_VERSION,
-  settings: { selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
+  settings: { ...DEFAULT_SETTINGS, selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
   annotations: {
     '2026-03-15': { dateKey: '2026-03-15', label: 'Urlaub', colors: { info: 'yellow' } },
   },
   colorLegend: {},
+  anniversaries: {},
 };
 
 describe('Signatur des Zustands', () => {
   it('liefert für inhaltlich gleiche Zustände dieselbe Signatur', () => {
     const a: PersistedState = {
       version: 1,
-      settings: { selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
+      settings: { ...DEFAULT_SETTINGS, selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
       annotations: {
         '2026-05-01': { dateKey: '2026-05-01', label: 'x', colors: { day: 'red', info: 'blue' } },
       },
       colorLegend: {},
+      anniversaries: {},
     };
     // Andere Version, andere Schlüsselreihenfolge – gleicher Inhalt.
     const b: PersistedState = {
       version: 9,
-      settings: { selectedShift: 'C', selectedYear: 2026, weekdayOverDate: false },
+      settings: { ...DEFAULT_SETTINGS, selectedShift: 'C', selectedYear: 2026, weekdayOverDate: false },
       annotations: {
         '2026-05-01': {
           dateKey: '2026-05-01',
@@ -42,6 +45,7 @@ describe('Signatur des Zustands', () => {
         },
       },
       colorLegend: {},
+      anniversaries: {},
     };
     expect(stateSignature(a)).toBe(stateSignature(b));
   });
@@ -81,9 +85,10 @@ describe('Erkennung ungespeicherter Änderungen', () => {
     expect(
       isStateEmpty({
         version: STORAGE_VERSION,
-        settings: { selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
+        settings: { ...DEFAULT_SETTINGS, selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
         annotations: {},
         colorLegend: {},
+        anniversaries: {},
       }),
     ).toBe(true);
   });

@@ -111,6 +111,7 @@ describe('Farblegende in Sicherungsdateien', () => {
       settings: DEFAULT_SETTINGS,
       annotations: {},
       colorLegend,
+      anniversaries: {},
     };
     expect(parseState(serializeState(state))).toEqual({
       ...state,

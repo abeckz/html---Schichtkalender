@@ -1,0 +1,76 @@
+Keine Messergebnisse im DOM gefunden (Exit 0, 440759 Zeichen).
+<!DOCTYPE html>
+<html lang="de" data-theme="dark"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>BASF Schichtkalender</title>
+    <script>
+      // Anzeige (Hell/Dunkel) sofort setzen, damit beim Öffnen der Datei
+      // kein heller Blitz entsteht. Fehler dürfen die App nie blockieren.
+      (function () {
+        try {
+          var stored = window.localStorage.getItem('schichtkalender.theme');
+          // Test-/Vorschauhilfe: ?theme=dark bzw. ?theme=light erzwingt eine
+          // Anzeige, ohne die gespeicherte Einstellung zu verändern.
+          var forced = /(?:^|[?&])theme=(dark|light)(?:&|$)/.exec(window.location.search);
+          if (forced) stored = forced[1];
+          // Startansicht grundsätzlich dunkel: nur die ausdrückliche Wahl
+          // "Hell" beginnt hell; sonst (auch ohne Einstellung) dunkel.
+          var wantsDark = stored !== 'light';
+          document.documentElement.setAttribute('data-theme', wantsDark ? 'dark' : 'light');
+        } catch (error) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+    <script type="module" crossorigin="">(function(){const t=document.createElement("link").relList;if(t&&t.supports&&t.supports("modulepreload"))return;for(const l of document.querySelectorAll('link[rel="modulepreload"]'))r(l);new MutationObserver(l=>{for(const i of l)if(i.type==="childList")for(const o of i.addedNodes)o.tagName==="LINK"&&o.rel==="modulepreload"&&r(o)}).observe(document,{childList:!0,subtree:!0});function n(l){const i={};return l.integrity&&(i.integrity=l.integrity),l.referrerPolicy&&(i.referrerPolicy=l.referrerPolicy),l.crossOrigin==="use-credentials"?i.credentials="include":l.crossOrigin==="anonymous"?i.credentials="omit":i.credentials="same-origin",i}function r(l){if(l.ep)return;l.ep=!0;const i=n(l);fetch(l.href,i)}})();var Tu={exports:{}},Wl={},Lu={exports:{}},R={};/**
+ * @license React
+ * react.production.min.js
+ *
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */var Lr=Symbol.for("react.element"),$f=Symbol.for("react.portal"),Uf=Symbol.for("react.fragment"),Bf=Symbol.for("react.strict_mode"),Kf=Symbol.for("react.profiler"),Wf=Symbol.for("react.provider"),Yf=Symbol.for("react.context"),Vf=Symbol.for("react.forward_ref"),bf=Symbol.for("react.suspense"),Qf=Symbol.for("react.memo"),Gf=Symbol.for("react.lazy"),Zs=Symbol.iterator;function Xf(e){return e===null||typeof e!="object"?null:(e=Zs&&e[Zs]||e["@@iterator"],typeof e=="function"?e:null)}var Pu={isMounted:function(){return!1},enqueueForceUpdate:function(){},enqueueReplaceState:function(){},enqueueSetState:function(){}},Au=Object.assign,Du={};function Dn(e,t,n){this.props=e,this.context=t,this.refs=Du,this.up
+--- Ende ---
+ComputedStyle(left(card)).right;
+      right(card).click();
+    },
+    function (r, card) {
+      r.cellsAfterRightClick = cells(card);
+      r.widthRightAfterClick = card.style.getPropertyValue('--extra-right-width');
+      r.rightHandleAfterRightClick = getComputedStyle(right(card)).right;
+      r.leftHandleAfterRightClick = getComputedStyle(left(card)).right;
+      r.shiftColumnRight = getComputedStyle(card.querySelector('.day-row .cell-shift')).right;
+      r.stored = window.localStorage.getItem('schichtkalender.state');
+      var hole = document.createElement('pre');
+      hole.id = 'probe-result';
+      hole.textContent = JSON.stringify(r);
+      document.body.appendChild(hole);
+    },
+  ];
+  var result = {};
+  function card() { return document.querySelector('.month-card'); }
+  function rows(c) { return c.querySelectorAll('.day-row'); }
+  function cells(c) { return rows(c)[0] ? rows(c)[0].querySelectorAll('.cell-extra').length : -1; }
+  function left(c) { return c.querySelector('.column-insert-handle[data-extra-column-side="left"]'); }
+  function right(c) { return c.querySelector('.column-insert-handle[data-extra-column-side="right"]'); }
+
+  var index = 0;
+  function run() {
+    if (index >= steps.length) return;
+    var current = steps[index];
+    index += 1;
+    requestAnimationFrame(function () {
+      current(result, card());
+      requestAnimationFrame(run);
+    });
+  }
+  setTimeout(run, 200);
+});
+</script>
+  
+
+</body></html>
+

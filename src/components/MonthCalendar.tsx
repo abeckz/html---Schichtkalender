@@ -20,12 +20,37 @@
 import type {
   AnnotationColorId,
   AnnotationMap,
+  AnniversaryMap,
   CalendarDay,
   ColumnColorName,
+  ExtraColumns,
   MonthCalendar as MonthCalendarModel,
 } from '../domain/types.ts';
 import { annotationColors, getColorHex } from '../config/annotationColors.ts';
 import { CalendarDayRow } from './CalendarDayRow.tsx';
+import {
+  buildExtraColumnLayout,
+  extraColumnUnitCount,
+  type ExtraColumnDisplay,
+} from './ExtraColumnCell.tsx';
+import { ColumnInsertHandle } from './ColumnInsertHandle.tsx';
+import type { ExtraColumnSide } from '../services/settingsStore.ts';
+
+/** Breite einer Spalteneinheit in em; muss zum Raster in styles.css passen. */
+export const EXTRA_COLUMN_UNIT_EM = 1.6;
+
+/**
+ * Baut die Trackliste der Zusatzspalten einer Seite.
+ *
+ * `repeat()` in CSS kennt keinen variablen Zähler; die Spuren müssen daher als
+ * fertige Zeichenkette vorliegen. Je Einheit entsteht genau ein Track der
+ * Breite `unitEm` (Leerzeichen-getrennt, mit führendem Leerzeichen);
+ * bei 0 Einheiten bleibt die Zeichenkette leer.
+ */
+function extraTracks(units: number, unitEm: number): string {
+  if (units <= 0) return '';
+  return ` ${`${unitEm}em `.repeat(units).trim()}`;
+}
 
 export interface MonthCalendarProps {
   month: MonthCalendarModel;
@@ -33,10 +58,32 @@ export interface MonthCalendarProps {
   /** Anzeige-Option "Wochentag über Datum" (Standard: aus). */
   weekdayOverDate?: boolean;
   onOpenEditor: (day: CalendarDay) => void;
+  /** Anzeige-Checkbox "Schichtkalender" (Standard: an). */
+  showShiftCalendar?: boolean;
+  /** Jahreslose Geburtstage und wiederkehrende Ereignisse. */
+  anniversaries?: AnniversaryMap;
+  /** Anzeige-Checkbox "Geburtstag" (Standard: an). */
+  showBirthdays?: boolean;
+  /** Anzeige-Checkbox "wdh. Ereignis" (Standard: an). */
+  showRecurringEvents?: boolean;
   /** dateKeys der aktuell markierten Streifen-Auswahl. */
   selectedKeys?: ReadonlySet<string>;
   /** Spalte, die während der aktuellen Streifen-Auswahl hervorgehoben wird. */
   selectedColumn?: ColumnColorName | null;
+  /**
+   * Frei angelegte Zusatzspalten des Monats.
+   *
+   * Sie liegen links der Ereignis-/Info-Zelle (zwischen Datum und Info) sowie
+   * rechts der KW-Zelle (zwischen KW und T/N). Jede Spalte belegt einen eigenen
+   * Rasterslot; da die Gesamtbreite fest ist und die Info-Spalte den Rest
+   * aufnimmt, wird beim Anlegen nur die Info-Spalte schmaler, ohne dass etwas
+   * verdeckt wird. Die Schichtspalte T/N bleibt am rechten Rand.
+   */
+  extraColumns?: ExtraColumns;
+  /** Legt eine schmale Zusatzspalte an einer der beiden Trennlinien an. */
+  onAddExtraColumn?: (month: number, side: ExtraColumnSide) => void;
+  /** Erweitert die Spalte unmittelbar an der Trennlinie um eine Einheit. */
+  onWidenExtraColumn?: (month: number, side: ExtraColumnSide, index: number) => void;
   onStreakStart?: (day: CalendarDay, column: ColumnColorName) => void;
   onStreakEnter?: (day: CalendarDay) => void;
   onStreakEnd?: () => void;
@@ -106,8 +153,15 @@ export function MonthCalendar({
   annotations,
   weekdayOverDate = false,
   onOpenEditor,
+  showShiftCalendar = true,
+  anniversaries = {},
+  showBirthdays = true,
+  showRecurringEvents = true,
   selectedKeys,
   selectedColumn,
+  extraColumns,
+  onAddExtraColumn,
+  onWidenExtraColumn,
   onStreakStart,
   onStreakEnter,
   onStreakEnd,
@@ -120,18 +174,122 @@ export function MonthCalendar({
   const tableClassName = weekdayOverDate
     ? 'day-table is-weekday-over-date'
     : 'day-table';
+
+  // Frei angelegte Zusatzspalten: Anzeigemodell sowie das Spaltenraster des
+  // Monats. Die Breite wird als CSS-Variable gesetzt, damit alle Zeilen des
+  // Monats dieselbe Aufteilung verwenden und die Ansicht nach außen wächst.
+  const layout = buildExtraColumnLayout(extraColumns);
+  const leftUnits = extraColumnUnitCount(extraColumns?.left);
+  const rightUnits = extraColumnUnitCount(extraColumns?.right);
+  /**
+   * Spaltenraster des Monats als CSS-Variablen.
+   *
+   * `--day-row-columns` ist die vollständige Trackliste der Tageszeilen;
+   * `--day-row-columns-weekday-over-date` die Variante mit gemeinsamem Feld für
+   * Wochentag und Datum (sowie die beiden `-no-shift`-Varianten ohne
+   * Schichtspalte). Diese Zeichenketten werden hier gebaut, weil `repeat()` in
+   * CSS keinen variablen Zähler kennt.
+   *
+   * `--extra-left-width` / `--extra-right-width` sind die Gesamtbreiten; sie
+   * dienen ausschließlich der Positionierung der Bedienpunkte. Wichtig: Jede
+   * Zusatzspalte belegt genau EINEN Rastertrack. Sonst würden die zusätzlichen
+   * Zellen das Raster verschieben (KW/T-N rutschen nach innen), weil mehr
+   * Zellen als Spuren vorhanden wären.
+   */
+  const extraUnitEm = EXTRA_COLUMN_UNIT_EM;
+  const leftTracks = extraTracks(leftUnits, extraUnitEm);
+  const rightTracks = extraTracks(rightUnits, extraUnitEm);
+  /**
+   * Spaltenraster des Monats.
+   *
+   * Reihenfolge: Wochentag | Datum | [Zusatz links] | Info/Ereignis |
+   * KW | [Zusatz rechts] | T/N.
+   *
+   * Die Zusatzspalten der Seite `left` liegen damit unmittelbar LINKS der
+   * Ereignis-/Info-Zelle (zwischen Datum und Info), die der Seite `right`
+   * rechts der KW-Zelle (zwischen KW und T/N).
+   */
+  const columnWidths: Record<string, string> = {
+    '--extra-left-width': `${leftUnits * extraUnitEm}em`,
+    '--extra-right-width': `${rightUnits * extraUnitEm}em`,
+    '--day-row-columns': `2.4em 2.4em${leftTracks} minmax(0, 1fr) 3.2em${rightTracks} 2.2em`,
+    '--day-row-columns-weekday-over-date': `3.6em${leftTracks} minmax(0, 1fr) 3.2em${rightTracks} 2.2em`,
+    '--day-row-columns-no-shift': `2.4em 2.4em${leftTracks} minmax(0, 1fr) 3.2em`,
+    '--day-row-columns-no-shift-weekday-over-date': `3.6em${leftTracks} minmax(0, 1fr) 3.2em`,
+  };
+  const leftColumns = layout.left;
+  const rightColumns = layout.right;
+  // Links vor der KW-/T-N-Spalte, rechts unmittelbar nach der KW-Spalte. Ohne
+  // Schichtspalte (Anzeige-Checkbox "Schichtkalender" aus) entfällt die rechte
+  // Trennlinie und damit auch die rechts liegenden Zusatzspalten.
+  const extraColumnsForRow: ExtraColumnDisplay[] = showShiftCalendar
+    ? [...leftColumns, ...rightColumns]
+    : leftColumns;
+
+  /**
+   * Klick auf einen Bedienpunkt: liegt an der Trennlinie noch keine
+   * Zusatzspalte, wird eine angelegt; andernfalls wächst die bereits dort
+   * liegende Spalte um eine Einheit. Dadurch bleibt die Lage der vorhandenen
+   * Spalten unverändert und die Ansicht wird nach außen geschoben.
+   */
+  const handleInsertActivate = (side: ExtraColumnSide, nearEdgeIndex: number) => {
+    if (nearEdgeIndex >= 0) {
+      onWidenExtraColumn?.(month.month, side, nearEdgeIndex);
+      return;
+    }
+    onAddExtraColumn?.(month.month, side);
+  };
+
   return (
-    <section className="month-card" aria-label={`${month.name} ${month.year}`}>
-      <header className="month-header">
-        <span className="month-stat" title="Werktage Montag bis Freitag">
-          {statistics.weekdayCount} Werktage
-        </span>
-        <h2 className="month-title" aria-label={`${month.name}, ${statistics.weekdayCount} Werktage, ${statistics.requiredShiftCount} Sollschichten`}>
+    <section
+      className={showShiftCalendar ? 'month-card' : 'month-card is-shift-hidden'}
+      aria-label={`${month.name} ${month.year}`}
+      style={columnWidths}
+    >
+      <header
+        className={
+          weekdayOverDate ? 'month-header is-weekday-over-date' : 'month-header'
+        }
+      >
+        {showShiftCalendar ? (
+          <span className="month-stat" title="Werktage Montag bis Freitag">
+            {statistics.weekdayCount} Werktage
+          </span>
+        ) : (
+          <span className="month-stat" aria-hidden="true" />
+        )}
+        <h2 className="month-title" aria-label={month.name}>
           {month.name}
         </h2>
-        <span className="month-stat" title="Sollschichten (T + N)">
-          {statistics.requiredShiftCount} Soll
-        </span>
+        {showShiftCalendar ? (
+          <span className="month-stat" title="Sollschichten (T + N)">
+            {statistics.requiredShiftCount} Soll
+          </span>
+        ) : (
+          <span className="month-stat" aria-hidden="true" />
+        )}
+
+        {/*
+          Bedienpunkte auf den vertikalen Trennlinien: links vor der KW-Spalte,
+          rechts vor der Schichtspalte T/N. Sie werden erst beim Überfahren des
+          Monatskopfs sichtbar. Rechts ist der Punkt um die Breite der bereits
+          rechts liegenden Zusatzspalten eingerückt, damit er genau auf der
+          Trennlinie sitzt.
+        */}
+        {onAddExtraColumn && (
+          <ColumnInsertHandle
+            side="left"
+            nearEdgeIndex={leftColumns.length > 0 ? 0 : -1}
+            onActivate={handleInsertActivate}
+          />
+        )}
+        {onAddExtraColumn && showShiftCalendar && (
+          <ColumnInsertHandle
+            side="right"
+            nearEdgeIndex={rightColumns.length > 0 ? 0 : -1}
+            onActivate={handleInsertActivate}
+          />
+        )}
       </header>
 
       <div className={tableClassName} role="table" aria-label={`Tage im ${month.name}`}>
@@ -142,6 +300,11 @@ export function MonthCalendar({
             annotation={annotations[day.dateKey]}
             weekdayOverDate={weekdayOverDate}
             onOpenEditor={onOpenEditor}
+            showShiftCalendar={showShiftCalendar}
+            anniversaries={anniversaries}
+            showBirthdays={showBirthdays}
+            showRecurringEvents={showRecurringEvents}
+            extraColumns={extraColumnsForRow}
             isSelected={selectedKeys?.has(day.dateKey) ?? false}
             selectedColumn={selectedColumn}
             onStreakStart={onStreakStart}
@@ -151,24 +314,26 @@ export function MonthCalendar({
         ))}
       </div>
 
-      <footer className="month-footer">
-        <span>{statistics.dayShiftCount} × T</span>
-        <span>{statistics.nightShiftCount} × N</span>
-        {markedShiftCounts.length > 0 && (
-          <span className="month-footer-marked" title="Markierte Schichten (T/N) je Farbe">
-            {markedShiftCounts.map(({ colorId, count }) => (
-              <span
-                key={colorId}
-                className="month-footer-chip"
-                style={{ backgroundColor: getColorHex(colorId) ?? undefined }}
-                title={`${count} markierte ${count === 1 ? 'Schicht' : 'Schichten'}`}
-              >
-                {count}
-              </span>
-            ))}
-          </span>
-        )}
-      </footer>
+      {showShiftCalendar && (
+        <footer className="month-footer">
+          <span>{statistics.dayShiftCount} × T</span>
+          <span>{statistics.nightShiftCount} × N</span>
+          {markedShiftCounts.length > 0 && (
+            <span className="month-footer-marked" title="Markierte Schichten (T/N) je Farbe">
+              {markedShiftCounts.map(({ colorId, count }) => (
+                <span
+                  key={colorId}
+                  className="month-footer-chip"
+                  style={{ backgroundColor: getColorHex(colorId) ?? undefined }}
+                  title={`${count} markierte ${count === 1 ? 'Schicht' : 'Schichten'}`}
+                >
+                  {count}
+                </span>
+              ))}
+            </span>
+          )}
+        </footer>
+      )}
     </section>
   );
 }

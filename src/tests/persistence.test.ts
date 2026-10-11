@@ -14,12 +14,13 @@ import type { PersistedState } from '../domain/types.ts';
 
 const sampleState: PersistedState = {
   version: STORAGE_VERSION,
-  settings: { selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
+  settings: { ...DEFAULT_SETTINGS, selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
   annotations: {
     '2026-03-15': { dateKey: '2026-03-15', label: 'Urlaub', colors: { info: 'yellow' } },
     '2026-04-01': { dateKey: '2026-04-01', label: '', colors: { weekday: 'red' } },
   },
   colorLegend: {},
+  anniversaries: {},
 };
 
 describe('Dateiname', () => {
@@ -48,17 +49,24 @@ describe('Serialisierung', () => {
     const text = serializeState(sampleState);
     expect(text).toContain('\n');
     const parsed = JSON.parse(text);
-    expect(Object.keys(parsed).sort()).toEqual(['annotations', 'colorLegend', 'settings', 'version']);
+    expect(Object.keys(parsed).sort()).toEqual([
+      'anniversaries',
+      'annotations',
+      'colorLegend',
+      'settings',
+      'version',
+    ]);
   });
 
   it('bereinigt ungültige Werte bereits beim Serialisieren', () => {
     const text = serializeState({
       version: 999,
-      settings: { selectedYear: 1200, selectedShift: 'Z' as never, weekdayOverDate: false },
+      settings: { ...DEFAULT_SETTINGS, selectedYear: 1200, selectedShift: 'Z' as never, weekdayOverDate: false },
       annotations: {
         bad: { dateKey: 'kein-datum', label: 'x' } as never,
       },
       colorLegend: {},
+      anniversaries: {},
     });
     const loaded = parseState(text);
     expect(loaded?.version).toBe(STORAGE_VERSION);

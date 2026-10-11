@@ -125,10 +125,10 @@ describe('PrintCalendar', () => {
     const annotatedRow = container.querySelector('[data-date-key="2021-03-15"]');
     expect(annotatedRow).not.toBeNull();
     expect(annotatedRow?.textContent).toContain('Urlaub');
-    // Die persönliche Farbe liegt auf der Info-Spalte (nicht auf der ganzen
-    // Zeile). jsdom normalisiert Hexwerte zu rgb(); #FFE000 (sattes Gelb)
-    // entspricht rgb(255, 224, 0).
-    const infoCell = annotatedRow?.querySelector('.print-col-info');
+    // Die persönliche Farbe liegt auf dem Tageseditor-Textblock (nicht auf der
+    // ganzen Info-Spalte), damit sie nicht auf Jahrestage übergeht. jsdom
+    // normalisiert Hexwerte zu rgb(); #FFE000 (sattes Gelb) wird rgb(255, 224, 0).
+    const infoCell = annotatedRow?.querySelector('.print-col-info-text');
     expect(infoCell?.getAttribute('style')).toContain('rgb(255, 224, 0)');
 
     const neujahrRow = container.querySelector('[data-date-key="2021-01-01"]');
@@ -197,6 +197,35 @@ describe('PrintCalendar', () => {
     expect(info?.textContent).not.toContain('|');
     // Drei Zeilen -> kleinste Schriftstufe.
     expect(info?.classList.contains('label-lines-3')).toBe(true);
+  });
+
+  it('stellt Geburtstage im Druck ganz oben und färbt nur den Tageseditor-Eintrag', () => {
+    const container = render(
+      <PrintCalendar
+        calendar={calendar}
+        annotations={{
+          '2021-03-15': { dateKey: '2021-03-15', label: 'Frühschicht', colors: { info: 'yellow' } },
+        }}
+        anniversaries={{
+          '03-15': [{ id: 'b1', monthDay: '03-15', name: 'Anna', kind: 'birthday', birthYear: 1990 }],
+        }}
+        onPrint={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    const info = container.querySelector('[data-date-key="2021-03-15"] .print-col-info') as HTMLElement;
+    // Beschriftung (1 Zeile) + Geburtstag (1 Zeile) → zwei Zeilen.
+    expect(info.classList.contains('label-lines-2')).toBe(true);
+    // Jahrestage stehen ganz oben, der Tageseditor-Eintrag darunter.
+    const children = Array.from(info.children) as HTMLElement[];
+    expect(children[0].classList.contains('print-col-anniversaries')).toBe(true);
+    expect(children[1].classList.contains('print-col-info-text')).toBe(true);
+    // Nur der Tageseditor-Eintrag ist eingefärbt; die Jahrestage nicht.
+    const infoText = info.querySelector('.print-col-info-text') as HTMLElement;
+    expect(infoText.getAttribute('style')).toContain('rgb(255, 224, 0)');
+    const anniversaries = info.querySelector('.print-col-anniversaries') as HTMLElement;
+    expect(anniversaries.getAttribute('style')).toBeNull();
+    expect(info.getAttribute('style')).toBeNull();
   });
 
   it('zeigt die KW ausschließlich am Montag', () => {
@@ -420,6 +449,8 @@ describe('PrintCalendar', () => {
       'Werktage = Anzahl Montag bis Freitag',
       'Sollschichten = Anzahl T + N',
       'F = Gesetzlicher Feiertag',
+      '🎂 = Geburtstag (Alter in Klammern)',
+      '🔁 = wiederkehrendes Ereignis',
     ]);
   });
 

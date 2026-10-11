@@ -1,0 +1,31 @@
+Keine Messergebnisse im DOM gefunden.
+<!DOCTYPE html>
+<html lang="de" data-theme="dark"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>BASF Schichtkalender</title>
+    <script>
+      // Anzeige (Hell/Dunkel) sofort setzen, damit beim Öffnen der Datei
+      // kein heller Blitz entsteht. Fehler dürfen die App nie blockieren.
+      (function () {
+        try {
+          var stored = window.localStorage.getItem('schichtkalender.theme');
+          // Test-/Vorschauhilfe: ?theme=dark bzw. ?theme=light erzwingt eine
+          // Anzeige, ohne die gespeicherte Einstellung zu verändern.
+          var forced = /(?:^|[?&])theme=(dark|light)(?:&|$)/.exec(window.location.search);
+          if (forced) stored = forced[1];
+          // Startansicht grundsätzlich dunkel: nur die ausdrückliche Wahl
+          // "Hell" beginnt hell; sonst (auch ohne Einstellung) dunkel.
+          var wantsDark = stored !== 'light';
+          document.documentElement.setAttribute('data-theme', wantsDark ? 'dark' : 'light');
+        } catch (error) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+    <script type="module" crossorigin="" src="./assets/index-DyhubUni.js"></script>
+    <link rel="stylesheet" crossorigin="" href="./assets/index-DTi7xmf1.css">
+  </head>
+  <body>
+    <div id="root"><div class="app"><header class="toolbar no-print"><h1 class="app-title">BASF Schichtkalender</h1><div class="toolbar-controls" id="toolbar-controls"><div class="toolbar-group" role="group" aria-label="Jahr wählen"><button type="button" class="icon-button" aria-label="Vorjahr" title="Vorjahr">‹</button><select class="year-select" aria-label="Jahr"><option value="2020">2020</option><option value="2021">2021</option><option value="2022">2022</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</

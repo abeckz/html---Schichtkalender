@@ -13,11 +13,12 @@ import type { PersistedState } from '../domain/types.ts';
 
 const sampleState: PersistedState = {
   version: STORAGE_VERSION,
-  settings: { selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
+  settings: { ...DEFAULT_SETTINGS, selectedYear: 2026, selectedShift: 'C', weekdayOverDate: false },
   annotations: {
     '2026-03-15': { dateKey: '2026-03-15', label: 'Urlaub', colors: { info: 'yellow' } },
   },
   colorLegend: {},
+  anniversaries: {},
 };
 
 /** Baut eine minimale window-Attrappe mit optionaler File System Access API. */

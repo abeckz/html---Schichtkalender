@@ -25,6 +25,7 @@
 
 import type {
   AnnotationColorId,
+  AnniversaryMap,
   CalendarDay,
   ColumnColorName,
   MonthCalendar as MonthCalendarModel,
@@ -32,7 +33,8 @@ import type {
 import { getColorHex } from '../config/annotationColors.ts';
 import { getPrintEventName } from '../config/eventDefinitions.ts';
 import { hasPublicHoliday } from '../engines/eventEngine.ts';
-import { labelLineClass } from '../utils/textFit.ts';
+import { matchesForDateKey, formatIntervalLabel } from '../engines/anniversaryEngine.ts';
+import { cellLineClass } from '../utils/textFit.ts';
 import { countMarkedShiftsByColorTable } from '../components/MonthCalendar.tsx';
 
 /** Feste Rasterhöhe: jeder Monatsblock besitzt genau 31 Tagespositionen. */
@@ -58,6 +60,14 @@ export interface PrintMonthProps {
    *        die Breite hinzu.
    */
   weekdayOverDate?: boolean;
+  /** Anzeige-Checkbox "Schichtkalender" (Standard: an). */
+  showShiftCalendar?: boolean;
+  /** Jahreslose Geburtstage und wiederkehrende Ereignisse. */
+  anniversaries?: AnniversaryMap;
+  /** Anzeige-Checkbox "Geburtstag" (Standard: an). */
+  showBirthdays?: boolean;
+  /** Anzeige-Checkbox "wdh. Ereignis" (Standard: an). */
+  showRecurringEvents?: boolean;
 }
 
 interface PrintRow {
@@ -103,11 +113,48 @@ export function PublicHolidayMark() {
   );
 }
 
+/**
+ * Textbausteine der Jahrestage eines Tages für den Druck.
+ *
+ * Geburtstage erscheinen mit Torten-Emoji und - sofern ein Geburtsjahr
+ * vorliegt - dem Alter in Klammern; wiederkehrende Ereignisse mit
+ * Wiederholungssymbol. Die beiden Anzeige-Checkboxen steuern, welche Art
+ * übernommen wird.
+ */
+export function buildAnniversaryPrintParts(
+  day: CalendarDay,
+  year: number,
+  anniversaries: AnniversaryMap | undefined,
+  showBirthdays: boolean,
+  showRecurringEvents: boolean,
+): string[] {
+  if (!anniversaries) return [];
+  return matchesForDateKey(anniversaries, day.dateKey, year)
+    .filter(
+      ({ entry }) =>
+        (entry.kind === 'birthday' && showBirthdays) ||
+        (entry.kind === 'recurring' && showRecurringEvents),
+    )
+    .map(({ entry, age }) => {
+      if (entry.kind === 'birthday') {
+        const agePart = age !== undefined ? ` (${age})` : '';
+        return `🎂 ${entry.name}${agePart}`;
+      }
+      const intervalPart = ` (${formatIntervalLabel(entry)})`;
+      return `🔁 ${entry.name}${intervalPart}`;
+    });
+}
+
+
 export function PrintMonth({
   month,
   annotationLabels,
   annotationColors,
   weekdayOverDate = false,
+  showShiftCalendar = true,
+  anniversaries,
+  showBirthdays = true,
+  showRecurringEvents = true,
 }: PrintMonthProps) {
   const rows = buildRows(month);
   const markedShiftCounts = countMarkedShiftsByColorTable(month.days, annotationColors);
@@ -118,15 +165,26 @@ export function PrintMonth({
     ? 'print-row print-row-empty print-row-weekday-over-date'
     : 'print-row print-row-empty';
   return (
-    <div className="print-month" data-month={month.month}>
+    <div
+      className={showShiftCalendar ? 'print-month' : 'print-month is-shift-hidden'}
+      data-month={month.month}
+    >
       <div className="print-month-header">
-        <span className="print-month-stat" title="Werktage Montag bis Freitag">
-          {month.statistics.weekdayCount} Werktage
-        </span>
+        {showShiftCalendar ? (
+          <span className="print-month-stat" title="Werktage Montag bis Freitag">
+            {month.statistics.weekdayCount} Werktage
+          </span>
+        ) : (
+          <span className="print-month-stat" aria-hidden="true" />
+        )}
         <span className="print-month-name">{month.name.toUpperCase()}</span>
-        <span className="print-month-stat print-month-stat-end" title="Sollschichten (T + N)">
-          {month.statistics.requiredShiftCount} Sollschichten
-        </span>
+        {showShiftCalendar ? (
+          <span className="print-month-stat print-month-stat-end" title="Sollschichten (T + N)">
+            {month.statistics.requiredShiftCount} Sollschichten
+          </span>
+        ) : (
+          <span className="print-month-stat print-month-stat-end" aria-hidden="true" />
+        )}
       </div>
       <div className="print-month-body">
         {rows.map((row) => {
@@ -138,7 +196,7 @@ export function PrintMonth({
                 {!weekdayOverDate && <span className="print-col-datum" />}
                 <span className="print-col-info" />
                 <span className="print-col-kw" />
-                <span className="print-col-schicht" />
+                {showShiftCalendar && <span className="print-col-schicht" />}
               </div>
             );
           }
@@ -151,8 +209,22 @@ export function PrintMonth({
           const infoHex = getColorHex(colors.info ?? null);
           const schichtHex = getColorHex(colors.shift ?? null);
           const columnStyle = (hex: string | null) => (hex ? { backgroundColor: hex } : undefined);
-          const information = buildPrintInformation(day, label);
-          const infoLineClass = label !== '' ? labelLineClass(label) : '';
+          const anniversaryParts = buildAnniversaryPrintParts(
+            day,
+            month.year,
+            anniversaries,
+            showBirthdays,
+            showRecurringEvents,
+          );
+          const baseInformation = buildPrintInformation(day, label);
+          // Adaptive Schrift über den gesamten Zellinhalt: Die Beschriftung
+          // folgt den DayEditor-Regeln, jeder Jahrestag belegt zusätzlich eine
+          // Zeile (siehe `cellLineClass`). Ohne Beschriftung und ohne
+          // Jahrestage (nur Terminnamen) bleibt die normale Zeilengröße.
+          const infoLineClass =
+            label !== '' || anniversaryParts.length > 0
+              ? cellLineClass(baseInformation, anniversaryParts.length)
+              : '';
           const classNames = ['print-row'];
           if (weekdayOverDate) classNames.push('print-row-weekday-over-date');
           if (day.isWeekend) classNames.push('is-weekend');
@@ -183,42 +255,55 @@ export function PrintMonth({
                   {String(day.day).padStart(2, '0')}
                 </span>
               )}
-              <span className={`print-col-info ${infoLineClass}`.trim()} style={columnStyle(infoHex)}>
-                {information}
+              <span className={`print-col-info ${infoLineClass}`.trim()}>
+                {anniversaryParts.length > 0 && (
+                  <span className="print-col-anniversaries">
+                    {anniversaryParts.join(' · ')}
+                  </span>
+                )}
+                {baseInformation !== '' && (
+                  <span className="print-col-info-text" style={columnStyle(infoHex)}>
+                    {baseInformation}
+                  </span>
+                )}
               </span>
               <span className="print-col-kw">
                 {day.isoWeekday === 1 && <span className="print-week">{day.isoWeek}</span>}
                 {hasPublicHoliday(day) && <PublicHolidayMark />}
               </span>
-              <span className="print-col-schicht" style={columnStyle(schichtHex)}>
-                {day.shiftLabel}
-              </span>
+              {showShiftCalendar && (
+                <span className="print-col-schicht" style={columnStyle(schichtHex)}>
+                  {day.shiftLabel}
+                </span>
+              )}
             </div>
           );
         })}
       </div>
-      <div className="print-month-footer">
-        <span className="print-footer-shift">
-          {month.statistics.dayShiftCount} × T
-        </span>
-        <span className="print-footer-shift">
-          {month.statistics.nightShiftCount} × N
-        </span>
-        {markedShiftCounts.length > 0 && (
-          <span className="print-footer-marked" title="Markierte Schichten (T/N) je Farbe">
-            {markedShiftCounts.map(({ colorId, count }) => (
-              <span
-                key={colorId}
-                className="print-month-chip"
-                style={{ backgroundColor: getColorHex(colorId) ?? undefined }}
-                title={`${count} markierte ${count === 1 ? 'Schicht' : 'Schichten'}`}
-              >
-                {count}
-              </span>
-            ))}
+      {showShiftCalendar && (
+        <div className="print-month-footer">
+          <span className="print-footer-shift">
+            {month.statistics.dayShiftCount} × T
           </span>
-        )}
-      </div>
+          <span className="print-footer-shift">
+            {month.statistics.nightShiftCount} × N
+          </span>
+          {markedShiftCounts.length > 0 && (
+            <span className="print-footer-marked" title="Markierte Schichten (T/N) je Farbe">
+              {markedShiftCounts.map(({ colorId, count }) => (
+                <span
+                  key={colorId}
+                  className="print-month-chip"
+                  style={{ backgroundColor: getColorHex(colorId) ?? undefined }}
+                  title={`${count} markierte ${count === 1 ? 'Schicht' : 'Schichten'}`}
+                >
+                  {count}
+                </span>
+              ))}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

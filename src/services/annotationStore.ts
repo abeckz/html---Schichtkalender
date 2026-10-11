@@ -10,7 +10,13 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { AnnotationColorId, AnnotationMap, AppSettings, ColumnColorName } from '../domain/types';
+import type {
+  AnnotationColorId,
+  AnnotationMap,
+  AppSettings,
+  ColumnColorName,
+  ExtraColumnColorKey,
+} from '../domain/types';
 import {
   getDefaultStorage,
   normalizeAnnotation,
@@ -21,8 +27,22 @@ import {
 
 export interface AnnotationStore {
   annotations: AnnotationMap;
-  /** Setzt oder entfernt eine Annotation. Leere Werte löschen den Eintrag. */
-  setAnnotation: (dateKey: string, label: string, colorId: AnnotationColorId | null) => void;
+  /**
+   * Setzt oder entfernt eine Annotation. Leere Werte löschen den Eintrag.
+   *
+   * `extraColors` (optional) setzt die persönlichen Farben der frei angelegten
+   * Zusatzspalten des Tages. Fehlt der Parameter vollständig, bleiben die
+   * vorhandenen Zusatzspalten-Farben unverändert erhalten (z. B. beim
+   * Streifen-Einfärben). Wird die Map übergeben, ersetzt sie die Farben der
+   * Zusatzspalten vollständig; ein Eintrag mit `null` entfernt die Farbe
+   * dieser Spalte.
+   */
+  setAnnotation: (
+    dateKey: string,
+    label: string,
+    colorId: AnnotationColorId | null,
+    extraColors?: Partial<Record<ExtraColumnColorKey, AnnotationColorId | null>>,
+  ) => void;
   /** Entfernt nur Beschriftung und Farbe eines Tages. */
   resetAnnotation: (dateKey: string) => void;
   /**
@@ -62,13 +82,23 @@ export function useAnnotationStore(
     setAnnotations(readState(storage).annotations);
   }, [storage]);
 
-  // Jede Änderung sofort persistieren.
+  // Jede Änderung sofort persistieren; die übrigen Zustandsbereiche werden
+  // dabei aus dem Speicher übernommen, damit sie nicht überschrieben werden.
   useEffect(() => {
-    writeState({ version: 1, settings, annotations, colorLegend: {} }, storage);
+    const persisted = readState(storage);
+    writeState(
+      { version: 1, settings, annotations, colorLegend: persisted.colorLegend, anniversaries: persisted.anniversaries },
+      storage,
+    );
   }, [settings, annotations, storage]);
 
   const setAnnotation = useCallback(
-    (dateKey: string, label: string, colorId: AnnotationColorId | null) => {
+    (
+      dateKey: string,
+      label: string,
+      colorId: AnnotationColorId | null,
+      extraColors?: Partial<Record<ExtraColumnColorKey, AnnotationColorId | null>>,
+    ) => {
       setAnnotations((current) => {
         const existing = current[dateKey];
         const colors = { ...(existing?.colors ?? {}) };
@@ -77,7 +107,32 @@ export function useAnnotationStore(
         } else {
           delete colors.info;
         }
-        const normalized = normalizeAnnotation({ dateKey, label, colors });
+        // Zusatzspalten-Farben: fehlt der Parameter, bleiben die bestehenden
+        // erhalten; wird er übergeben, ersetzt er sie vollständig. Ein Wert von
+        // null entfernt nur die Farbe dieser einen Spalte.
+        let extra: Partial<Record<ExtraColumnColorKey, AnnotationColorId>> | undefined =
+          existing?.extraColors;
+        if (extraColors !== undefined) {
+          const merged: Partial<Record<ExtraColumnColorKey, AnnotationColorId>> = {
+            ...(existing?.extraColors ?? {}),
+          };
+          for (const [key, value] of Object.entries(extraColors) as Array<
+            [ExtraColumnColorKey, AnnotationColorId | null | undefined]
+          >) {
+            if (value) {
+              merged[key] = value;
+            } else {
+              delete merged[key];
+            }
+          }
+          extra = Object.keys(merged).length > 0 ? merged : undefined;
+        }
+        const normalized = normalizeAnnotation({
+          dateKey,
+          label,
+          colors,
+          extraColors: extra,
+        });
         const next = { ...current };
         if (normalized) {
           next[dateKey] = normalized;
@@ -116,7 +171,12 @@ export function useAnnotationStore(
           } else {
             delete colors[column];
           }
-          const normalized = normalizeAnnotation({ dateKey, label, colors });
+          const normalized = normalizeAnnotation({
+            dateKey,
+            label,
+            colors,
+            extraColors: existing?.extraColors,
+          });
           if (normalized) {
             next[dateKey] = normalized;
           } else {

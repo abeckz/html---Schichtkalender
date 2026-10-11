@@ -11,7 +11,13 @@
  */
 
 import { useMemo } from 'react';
-import type { AnnotationColorId, AnnotationMap, ColumnColorName, YearCalendar } from '../domain/types.ts';
+import type {
+  AnnotationColorId,
+  AnnotationMap,
+  AnniversaryMap,
+  ColumnColorName,
+  YearCalendar,
+} from '../domain/types.ts';
 import { usedAnnotationColors } from '../config/annotationColors.ts';
 import { summarizeYear } from '../engines/calendarBuilder.ts';
 import { PrintHeader } from './PrintHeader.tsx';
@@ -24,6 +30,14 @@ export interface PrintCalendarProps {
   colorLegend?: Partial<Record<AnnotationColorId, string>>;
   /** Anzeige-Option "Wochentag über Datum" (Standard: aus). */
   weekdayOverDate?: boolean;
+  /** Anzeige-Checkbox "Schichtkalender" (Standard: an). */
+  showShiftCalendar?: boolean;
+  /** Jahreslose Geburtstage und wiederkehrende Ereignisse. */
+  anniversaries?: AnniversaryMap;
+  /** Anzeige-Checkbox "Geburtstag" (Standard: an). */
+  showBirthdays?: boolean;
+  /** Anzeige-Checkbox "wdh. Ereignis" (Standard: an). */
+  showRecurringEvents?: boolean;
   onPrint: () => void;
   onBack: () => void;
 }
@@ -33,6 +47,10 @@ export function PrintCalendar({
   annotations,
   colorLegend = {},
   weekdayOverDate = false,
+  showShiftCalendar = true,
+  anniversaries = {},
+  showBirthdays = true,
+  showRecurringEvents = true,
   onPrint,
   onBack,
 }: PrintCalendarProps) {
@@ -95,12 +113,17 @@ export function PrintCalendar({
             workedShiftCount={workedShiftCount}
             usedColors={usedColors}
             colorLegend={colorLegend}
+            showShiftCalendar={showShiftCalendar}
           />
           <PrintHalfYear
             months={firstHalf}
             annotationLabels={annotationLabels}
             annotationColors={annotationColors}
             weekdayOverDate={weekdayOverDate}
+            showShiftCalendar={showShiftCalendar}
+            anniversaries={anniversaries}
+            showBirthdays={showBirthdays}
+            showRecurringEvents={showRecurringEvents}
             side={1}
           />
         </article>
@@ -112,12 +135,17 @@ export function PrintCalendar({
             workedShiftCount={workedShiftCount}
             usedColors={usedColors}
             colorLegend={colorLegend}
+            showShiftCalendar={showShiftCalendar}
           />
           <PrintHalfYear
             months={secondHalf}
             annotationLabels={annotationLabels}
             annotationColors={annotationColors}
             weekdayOverDate={weekdayOverDate}
+            showShiftCalendar={showShiftCalendar}
+            anniversaries={anniversaries}
+            showBirthdays={showBirthdays}
+            showRecurringEvents={showRecurringEvents}
             side={2}
           />
         </article>

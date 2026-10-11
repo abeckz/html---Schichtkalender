@@ -9,10 +9,25 @@
  */
 
 import { useCallback, useState } from 'react';
-import type { AppSettings, ShiftId } from '../domain/types.ts';
-import { readState } from '../services/storage.ts';
+import type { AppSettings, CalendarViewMode, ShiftId } from '../domain/types.ts';
+import {
+  MAX_EXTRA_COLUMNS,
+  MAX_EXTRA_COLUMN_WIDTH,
+  readState,
+} from '../services/storage.ts';
 import { MAX_YEAR, MIN_YEAR, isValidYear } from '../utils/dateUtils.ts';
 import { SELECTABLE_YEARS } from '../config/appDefaults.ts';
+
+/**
+ * Seite einer Zusatzspalte.
+ *
+ * - 'left':  links der Ereignis-/Info-Zelle (zwischen Datum und Info); die neue
+ *            Spalte schiebt Info, KW und Schicht (T/N) nach rechts, wobei die
+ *            Info-Spalte den Rest der Breite abgibt,
+ * - 'right': zwischen der KW-Spalte und der Schichtspalte; die neue Spalte
+ *            schiebt die Schichtspalte (T/N) nach rechts.
+ */
+export type ExtraColumnSide = 'left' | 'right';
 
 export interface SettingsStore {
   settings: AppSettings;
@@ -20,6 +35,27 @@ export interface SettingsStore {
   setShift: (shiftId: ShiftId) => void;
   /** Schaltet die Anzeige-Option "Wochentag über Datum" um. */
   setWeekdayOverDate: (enabled: boolean) => void;
+  /** Anzeige-Checkbox "Schichtkalender". */
+  setShowShiftCalendar: (enabled: boolean) => void;
+  /** Anzeige-Checkbox "Geburtstag". */
+  setShowBirthdays: (enabled: boolean) => void;
+  /** Anzeige-Checkbox "wdh. Ereignis". */
+  setShowRecurringEvents: (enabled: boolean) => void;
+  /** Wechselt zwischen Schichtkalender und jahresloser Ansicht. */
+  setViewMode: (mode: CalendarViewMode) => void;
+  /**
+   * Legt eine schmale Zusatzspalte an: `side` = 'left' links der
+   * Ereigniszelle (zwischen Datum und Info), 'right' zwischen KW und T/N.
+   */
+  addExtraColumn: (month: number, side: ExtraColumnSide) => void;
+  /**
+   * Erweitert eine vorhandene Zusatzspalte um eine Einheit.
+   *
+   * Nur die direkt an der Trennlinie liegende Spalte darf wachsen; sonst würde
+   * sich die Anordnung der bereits vorhandenen Spalten verschieben (die neue
+   * Spalte soll die Ansicht nach außen schieben).
+   */
+  widenExtraColumn: (month: number, side: ExtraColumnSide, index: number) => void;
   /** Übernimmt Jahr und Schicht gemeinsam (z. B. beim Laden einer Datei). */
   setSettings: (next: Partial<AppSettings>) => void;
   goToPreviousYear: () => void;
@@ -57,6 +93,11 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
         : persisted.selectedYear,
       selectedShift: initial?.selectedShift ?? persisted.selectedShift,
       weekdayOverDate: initial?.weekdayOverDate ?? persisted.weekdayOverDate,
+      showShiftCalendar: initial?.showShiftCalendar ?? persisted.showShiftCalendar,
+      showBirthdays: initial?.showBirthdays ?? persisted.showBirthdays,
+      showRecurringEvents: initial?.showRecurringEvents ?? persisted.showRecurringEvents,
+      viewMode: initial?.viewMode ?? persisted.viewMode,
+      extraColumns: initial?.extraColumns ?? persisted.extraColumns,
     };
   });
 
@@ -72,12 +113,69 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
     setSettings((current) => ({ ...current, weekdayOverDate: enabled }));
   }, []);
 
+  const setShowShiftCalendar = useCallback((enabled: boolean) => {
+    setSettings((current) => ({ ...current, showShiftCalendar: enabled }));
+  }, []);
+
+  const setShowBirthdays = useCallback((enabled: boolean) => {
+    setSettings((current) => ({ ...current, showBirthdays: enabled }));
+  }, []);
+
+  const setShowRecurringEvents = useCallback((enabled: boolean) => {
+    setSettings((current) => ({ ...current, showRecurringEvents: enabled }));
+  }, []);
+
+  const setViewMode = useCallback((mode: CalendarViewMode) => {
+    setSettings((current) => ({ ...current, viewMode: mode }));
+  }, []);
+
+  const addExtraColumn = useCallback((month: number, side: ExtraColumnSide) => {
+    setSettings((current) => {
+      const existing = current.extraColumns[month];
+      const left = [...(existing?.left ?? [])];
+      const right = [...(existing?.right ?? [])];
+      const target = side === 'left' ? left : right;
+      if (target.length >= MAX_EXTRA_COLUMNS) return current;
+      target.unshift(1);
+      return {
+        ...current,
+        extraColumns: { ...current.extraColumns, [month]: { left, right } },
+      };
+    });
+  }, []);
+
+  const widenExtraColumn = useCallback(
+    (month: number, side: ExtraColumnSide, index: number) => {
+      setSettings((current) => {
+        const existing = current.extraColumns[month];
+        if (!existing) return current;
+        const list = [...(side === 'left' ? existing.left : existing.right)];
+        if (index !== 0 || list.length === 0) return current;
+        if (list[0] + 1 > MAX_EXTRA_COLUMN_WIDTH) return current;
+        list[0] += 1;
+        return {
+          ...current,
+          extraColumns: {
+            ...current.extraColumns,
+            [month]: side === 'left' ? { left: list, right: existing.right } : { left: existing.left, right: list },
+          },
+        };
+      });
+    },
+    [],
+  );
+
   const replaceSettings = useCallback((next: Partial<AppSettings>) => {
     setSettings((current) => ({
       selectedYear:
         next.selectedYear !== undefined ? clampYear(next.selectedYear) : current.selectedYear,
       selectedShift: next.selectedShift ?? current.selectedShift,
       weekdayOverDate: next.weekdayOverDate ?? current.weekdayOverDate,
+      showShiftCalendar: next.showShiftCalendar ?? current.showShiftCalendar,
+      showBirthdays: next.showBirthdays ?? current.showBirthdays,
+      showRecurringEvents: next.showRecurringEvents ?? current.showRecurringEvents,
+      viewMode: next.viewMode ?? current.viewMode,
+      extraColumns: next.extraColumns ?? current.extraColumns,
     }));
   }, []);
 
@@ -100,6 +198,12 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
     setYear,
     setShift,
     setWeekdayOverDate,
+    setShowShiftCalendar,
+    setShowBirthdays,
+    setShowRecurringEvents,
+    setViewMode,
+    addExtraColumn,
+    widenExtraColumn,
     setSettings: replaceSettings,
     goToPreviousYear,
     goToNextYear,

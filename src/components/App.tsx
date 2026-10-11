@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   AnnotationColorId,
+  AnniversaryEntry,
   CalendarDay,
   ColumnColorName,
   PersistedState,
@@ -17,16 +18,22 @@ import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder.ts'
 import { usedAnnotationColors } from '../config/annotationColors.ts';
 import { useSettingsStore } from '../services/settingsStore.ts';
 import { useAnnotationStore } from '../services/annotationStore.ts';
+import { useAnniversaryStore } from '../services/anniversaryStore.ts';
 import { useColorLegendStore } from '../services/colorLegendStore.ts';
 import { useThemeStore } from '../services/themeStore.ts';
 import { STORAGE_VERSION } from '../services/storage.ts';
 import { saveState } from '../services/persistence.ts';
 import { useUnsavedChangesGuard } from '../services/unsavedChanges.ts';
+import { monthDayOfDateKey, parseDateKey } from '../utils/dateUtils.ts';
+import { anniversariesAt } from '../engines/anniversaryEngine.ts';
+import { buildExtraColumnLayout } from './ExtraColumnCell.tsx';
 import { Toolbar } from './Toolbar.tsx';
 import { YearCalendar } from './YearCalendar.tsx';
 import { CalendarLegend } from './CalendarLegend.tsx';
 import { ColorLegendEditor } from './ColorLegendEditor.tsx';
-import { DayEditor } from './DayEditor.tsx';
+import { DayEditor, type ExtraColumnColorField } from './DayEditor.tsx';
+import { AnniversaryEditor } from './AnniversaryEditor.tsx';
+import { AnniversaryYearCalendar } from './AnniversaryYearCalendar.tsx';
 import { StreakEditor } from './StreakEditor.tsx';
 import { UnsavedChangesDialog } from './UnsavedChangesDialog.tsx';
 import { PrintCalendar } from '../print/PrintCalendar.tsx';
@@ -39,6 +46,12 @@ export function App() {
     setYear,
     setShift,
     setWeekdayOverDate,
+    setShowShiftCalendar,
+    setShowBirthdays,
+    setShowRecurringEvents,
+    setViewMode,
+    addExtraColumn,
+    widenExtraColumn,
     setSettings,
     goToPreviousYear,
     goToNextYear,
@@ -52,11 +65,16 @@ export function App() {
     settings,
     annotations,
   );
+  // Jahreslose Geburtstage und wiederkehrende Ereignisse (nach Monat-Tag "MM-DD").
+  const { anniversaries, replaceDay, resetAnniversary, replaceAnniversaries } =
+    useAnniversaryStore(settings);
   // Anzeige-Einstellung (Hell/Dunkel): reine Darstellung, keine Fachdaten.
   const theme = useThemeStore();
 
   const [view, setView] = useState<AppView>('screen');
   const [editingDay, setEditingDay] = useState<CalendarDay | null>(null);
+  // Jahrestag-Tag, dessen Editor gerade geöffnet ist ("MM-DD" oder null).
+  const [editingAnniversary, setEditingAnniversary] = useState<string | null>(null);
   // Farbe, deren Erklärung gerade bearbeitet wird (öffnet den Eingabedialog).
   const [editingLegendColor, setEditingLegendColor] = useState<AnnotationColorId | null>(null);
 
@@ -69,8 +87,8 @@ export function App() {
 
   // Aktueller Zustand als ein Objekt; Grundlage für Signatur und Speicherung.
   const currentState: PersistedState = useMemo(
-    () => ({ version: STORAGE_VERSION, settings, annotations, colorLegend }),
-    [settings, annotations, colorLegend],
+    () => ({ version: STORAGE_VERSION, settings, annotations, colorLegend, anniversaries }),
+    [settings, annotations, colorLegend, anniversaries],
   );
 
   // Überwachung ungespeicherter Änderungen: blockiert das Schließen des
@@ -121,9 +139,63 @@ export function App() {
 
   const streakKeySet = useMemo(() => new Set(streakKeys), [streakKeys]);
 
+  /**
+   * Farbfelder der frei angelegten Zusatzspalten für den geöffneten Tag.
+   *
+   * Die Zusatzspalten sind je Monat angelegt; für den bearbeiteten Tag werden
+   * alle Spalten seines Monats mit ihrem stabilen Farbschlüssel und der aktuell
+   * gesetzten Farbe aufgelistet. Ohne Zusatzspalten bleibt die Liste leer.
+   */
+  const editingDayExtraFields = useMemo<ExtraColumnColorField[]>(() => {
+    if (!editingDay) return [];
+    const parts = parseDateKey(editingDay.dateKey);
+    if (!parts) return [];
+    const monthColumns = settings.extraColumns[parts.month];
+    if (!monthColumns) return [];
+    const layout = buildExtraColumnLayout(monthColumns);
+    const currentExtra = annotations[editingDay.dateKey]?.extraColors ?? {};
+    // Die Anzeige führt links vor rechts; doppelte Farbschlüssel entstehen nur
+    // bei erweiterten Spalten und werden dabei zu einem Feld zusammengefasst.
+    const seen = new Set<string>();
+    const fields: ExtraColumnColorField[] = [];
+    for (const column of [...layout.left, ...layout.right]) {
+      if (seen.has(column.colorKey)) continue;
+      seen.add(column.colorKey);
+      fields.push({
+        key: column.colorKey,
+        label: `Zusatzspalte ${column.name.split('·')[0]}`,
+        colorId: currentExtra[column.colorKey] ?? null,
+      });
+    }
+    return fields;
+  }, [editingDay, settings.extraColumns, annotations]);
+
   const handleOpenEditor = useCallback((day: CalendarDay) => {
     setEditingDay(day);
   }, []);
+
+  // Öffnet den Jahrestag-Editor für einen Kalendertag (Jahres- oder
+  // jahreslose Ansicht). Der Monat-Tag-Schlüssel ist jahresunabhängig.
+  const handleOpenAnniversary = useCallback((day: CalendarDay) => {
+    setEditingAnniversary(monthDayOfDateKey(day.dateKey));
+  }, []);
+
+  // Speichert alle Einträge eines Tages (mehrere Geburtstage und mehrere
+  // wiederkehrende Ereignisse). Der Editor liefert die vollständige Liste; sie
+  // ersetzt die bisherigen Einträge des Tages in einem Schritt.
+  const handleSaveAnniversary = useCallback(
+    (monthDay: string, entries: AnniversaryEntry[]) => {
+      replaceDay(monthDay, entries);
+    },
+    [replaceDay],
+  );
+
+  const handleResetAnniversary = useCallback(
+    (monthDay: string) => {
+      resetAnniversary(monthDay);
+    },
+    [resetAnniversary],
+  );
 
   const handleStreakStart = useCallback((day: CalendarDay, column: ColumnColorName) => {
     setStreakActive(true);
@@ -186,7 +258,13 @@ export function App() {
   // (Chrome/Edge), sonst als Download. Nach Erfolg gilt der Zustand als
   // gesichert (keine Warnung mehr beim Schließen).
   const handleSaveFile = useCallback(async (): Promise<boolean> => {
-    const state: PersistedState = { version: STORAGE_VERSION, settings, annotations, colorLegend };
+    const state: PersistedState = {
+      version: STORAGE_VERSION,
+      settings,
+      annotations,
+      colorLegend,
+      anniversaries,
+    };
     const outcome = await saveState(state);
     if (outcome === 'saved') {
       unsaved.markSaved(state);
@@ -194,7 +272,7 @@ export function App() {
       return true;
     }
     return false;
-  }, [settings, annotations, colorLegend, unsaved]);
+  }, [settings, annotations, colorLegend, anniversaries, unsaved]);
 
   // Datei laden: übernimmt Einstellungen und Annotationen gemeinsam. Die
   // Werte sind bereits durch parseState bereinigt; der Handler bleibt daher
@@ -205,15 +283,17 @@ export function App() {
       setSettings(state.settings);
       replaceAnnotations(state.annotations);
       replaceColorLegend(state.colorLegend);
+      replaceAnniversaries(state.anniversaries);
       unsaved.markLoaded(state);
       // Nach dem Laden keine offene Tages-/Streifen-/Legenden-Auswahl stehen lassen.
       setEditingDay(null);
+      setEditingAnniversary(null);
       setEditingLegendColor(null);
       setStreakKeys([]);
       setStreakColumn(null);
       setStreakDays([]);
     },
-    [setSettings, replaceAnnotations, replaceColorLegend, unsaved],
+    [setSettings, replaceAnnotations, replaceColorLegend, replaceAnniversaries, unsaved],
   );
 
   // Im Hinweis-Fenster: jetzt sichern (bei Erfolg schließt das Fenster).
@@ -249,6 +329,14 @@ export function App() {
         onSelectShift={setShift}
         weekdayOverDate={settings.weekdayOverDate}
         onToggleWeekdayOverDate={setWeekdayOverDate}
+        showShiftCalendar={settings.showShiftCalendar}
+        onToggleShowShiftCalendar={setShowShiftCalendar}
+        showBirthdays={settings.showBirthdays}
+        onToggleShowBirthdays={setShowBirthdays}
+        showRecurringEvents={settings.showRecurringEvents}
+        onToggleShowRecurringEvents={setShowRecurringEvents}
+        viewMode={settings.viewMode}
+        onToggleViewMode={(anniversaries) => setViewMode(anniversaries ? 'anniversaries' : 'shift')}
         onOpenPrint={() => setView('print')}
         theme={theme}
         onSaveFile={handleSaveFile}
@@ -258,31 +346,48 @@ export function App() {
       />
 
       {view === 'screen' ? (
-        <main className="screen-view screen-only">
-          {!collapsed && (
-            <div className="legend-box" id="legend-box">
-              <CalendarLegend
-                year={settings.selectedYear}
-                selectedShift={settings.selectedShift}
-                workedShiftCount={workedShiftCount}
-                usedColors={usedColors}
-                colorTexts={colorTexts}
-                onEditColor={setEditingLegendColor}
-              />
-            </div>
-          )}
-          <YearCalendar
-            calendar={calendar}
-            annotations={annotations}
-            weekdayOverDate={settings.weekdayOverDate}
-            onOpenEditor={handleOpenEditor}
-            selectedKeys={streakKeySet}
-            selectedColumn={streakColumn}
-            onStreakStart={handleStreakStart}
-            onStreakEnter={handleStreakEnter}
-            onStreakEnd={handleStreakEnd}
-          />
-        </main>
+        settings.viewMode === 'anniversaries' ? (
+          <main className="screen-view screen-only">
+            <AnniversaryYearCalendar
+              year={settings.selectedYear}
+              anniversaries={anniversaries}
+              onOpenEditor={handleOpenAnniversary}
+            />
+          </main>
+        ) : (
+          <main className="screen-view screen-only">
+            {!collapsed && (
+              <div className="legend-box" id="legend-box">
+                <CalendarLegend
+                  year={settings.selectedYear}
+                  selectedShift={settings.selectedShift}
+                  workedShiftCount={workedShiftCount}
+                  usedColors={usedColors}
+                  colorTexts={colorTexts}
+                  onEditColor={setEditingLegendColor}
+                />
+              </div>
+            )}
+            <YearCalendar
+              calendar={calendar}
+              annotations={annotations}
+              weekdayOverDate={settings.weekdayOverDate}
+              onOpenEditor={handleOpenEditor}
+              showShiftCalendar={settings.showShiftCalendar}
+              anniversaries={anniversaries}
+              showBirthdays={settings.showBirthdays}
+              showRecurringEvents={settings.showRecurringEvents}
+              selectedKeys={streakKeySet}
+              selectedColumn={streakColumn}
+              extraColumns={settings.extraColumns}
+              onAddExtraColumn={addExtraColumn}
+              onWidenExtraColumn={widenExtraColumn}
+              onStreakStart={handleStreakStart}
+              onStreakEnter={handleStreakEnter}
+              onStreakEnd={handleStreakEnd}
+            />
+          </main>
+        )
       ) : (
         <main className="screen-view">
           <PrintCalendar
@@ -290,6 +395,10 @@ export function App() {
             annotations={annotations}
             colorLegend={colorTexts}
             weekdayOverDate={settings.weekdayOverDate}
+            showShiftCalendar={settings.showShiftCalendar}
+            anniversaries={anniversaries}
+            showBirthdays={settings.showBirthdays}
+            showRecurringEvents={settings.showRecurringEvents}
             onPrint={handlePrint}
             onBack={() => setView('screen')}
           />
@@ -302,9 +411,20 @@ export function App() {
           selectedShift={settings.selectedShift}
           initialLabel={annotations[editingDay.dateKey]?.label ?? ''}
           initialColorId={annotations[editingDay.dateKey]?.colors.info ?? null}
+          extraColumnFields={editingDayExtraFields}
           onSave={setAnnotation}
           onReset={resetAnnotation}
           onClose={() => setEditingDay(null)}
+        />
+      )}
+
+      {editingAnniversary && (
+        <AnniversaryEditor
+          monthDay={editingAnniversary}
+          initialEntries={anniversariesAt(anniversaries, editingAnniversary)}
+          onSave={(entries) => handleSaveAnniversary(editingAnniversary, entries)}
+          onReset={() => handleResetAnniversary(editingAnniversary)}
+          onClose={() => setEditingAnniversary(null)}
         />
       )}
 

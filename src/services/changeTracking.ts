@@ -40,12 +40,16 @@ export function stateSignature(state: PersistedState): string {
       .map((dateKey) => {
         const annotation = annotations[dateKey];
         const colors = annotation.colors ?? {};
+        const extraColors = annotation.extraColors ?? {};
         return {
           dateKey,
           label: annotation.label,
           colors: Object.keys(colors)
             .sort()
             .map((column) => [column, colors[column as keyof typeof colors]]),
+          extraColors: Object.keys(extraColors)
+            .sort()
+            .map((key) => [key, extraColors[key as keyof typeof extraColors]]),
         };
       }),
   };

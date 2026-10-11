@@ -6,11 +6,12 @@
  * niemals gedruckt.
  */
 
-import type { ShiftId } from '../domain/types.ts';
+import type { ShiftId, CalendarViewMode } from '../domain/types.ts';
 import { YearSelector } from './YearSelector.tsx';
 import { ShiftSelector } from './ShiftSelector.tsx';
 import { ThemeToggle } from './ThemeToggle.tsx';
-import { WeekdayOverDateToggle } from './WeekdayOverDateToggle.tsx';
+import { ToggleSwitch } from './ToggleSwitch.tsx';
+import { CheckboxField } from './CheckboxField.tsx';
 import { DataControls } from './DataControls.tsx';
 import type { ThemeStore } from '../services/themeStore.ts';
 import type { PersistedState } from '../domain/types.ts';
@@ -24,10 +25,22 @@ export interface ToolbarProps {
   canGoPrevious: boolean;
   canGoNext: boolean;
   onSelectShift: (shiftId: ShiftId) => void;
-  /** Anzeige-Option "Wochentag über Datum" (Standard: aus). */
+  /** Anzeige-Umschalter "Wochentag über Datum" (Standard: aus). */
   weekdayOverDate: boolean;
   /** Schaltet die Anzeige-Option "Wochentag über Datum" um. */
   onToggleWeekdayOverDate: (enabled: boolean) => void;
+  /** Anzeige-Kästchen "Schichtkalender" (Standard: an). */
+  showShiftCalendar: boolean;
+  onToggleShowShiftCalendar: (enabled: boolean) => void;
+  /** Anzeige-Kästchen "Geburtstage" (Standard: an). */
+  showBirthdays: boolean;
+  onToggleShowBirthdays: (enabled: boolean) => void;
+  /** Anzeige-Kästchen "Wiederkehrende Ereignisse" (Standard: an). */
+  showRecurringEvents: boolean;
+  onToggleShowRecurringEvents: (enabled: boolean) => void;
+  /** Betriebsart der Ansicht: Schichtkalender oder jahreslose Ansicht. */
+  viewMode: CalendarViewMode;
+  onToggleViewMode: (anniversaries: boolean) => void;
   onOpenPrint: () => void;
   theme: ThemeStore;
   /** Sichert den Zustand als Datei; Rückgabe: Erfolg. */
@@ -51,6 +64,14 @@ export function Toolbar({
   onSelectShift,
   weekdayOverDate,
   onToggleWeekdayOverDate,
+  showShiftCalendar,
+  onToggleShowShiftCalendar,
+  showBirthdays,
+  onToggleShowBirthdays,
+  showRecurringEvents,
+  onToggleShowRecurringEvents,
+  viewMode,
+  onToggleViewMode,
   onOpenPrint,
   theme,
   onSaveFile,
@@ -71,7 +92,49 @@ export function Toolbar({
           canGoNext={canGoNext}
         />
         <ShiftSelector selectedShift={selectedShift} onSelectShift={onSelectShift} />
-        <WeekdayOverDateToggle enabled={weekdayOverDate} onToggle={onToggleWeekdayOverDate} />
+        {/*
+          Anzeige-Gruppe: zuerst die Kästchen (Mehrfachauswahl), darunter die
+          Umschalter (Ein/Aus). Alle Elemente stehen untereinander in einer
+          Spalte, damit ihre Positionen sauber fluchten.
+        */}
+        <div className="toolbar-group display-toggles">
+          <div className="checkbox-group" role="group" aria-label="Anzeigen im Kalender">
+            <CheckboxField
+              label="Schichtkalender"
+              checked={showShiftCalendar}
+              onChange={onToggleShowShiftCalendar}
+              title="Schichtspalte (T/N), Schichtkennzahlen und Soll-/Werktagsangaben ein-/ausblenden"
+            />
+            <CheckboxField
+              label="Geburtstage"
+              checked={showBirthdays}
+              onChange={onToggleShowBirthdays}
+              title="Geburtstage in Kalender und Druck ein-/ausblenden"
+            />
+            <CheckboxField
+              label="Wiederkehrende Ereignisse"
+              checked={showRecurringEvents}
+              onChange={onToggleShowRecurringEvents}
+              title="Wiederkehrende Ereignisse in Kalender und Druck ein-/ausblenden"
+            />
+          </div>
+          <div className="toggle-group" role="group" aria-label="Anzeige-Optionen">
+            <ToggleSwitch
+              label="Wochentag über Datum"
+              checked={weekdayOverDate}
+              onChange={onToggleWeekdayOverDate}
+              title="Datum unter den Wochentag setzen (Tagesnummer-Spalte entfällt)"
+            />
+            {/* Umschalter der Betriebsart: Schichtkalender <-> jahreslose Ansicht. */}
+            <ToggleSwitch
+              label="Geburtstag & wiederkehrende Ereignisse"
+              checked={viewMode === 'anniversaries'}
+              onChange={onToggleViewMode}
+              title="Jahreslose Ansicht ohne Schichten und ohne feste Tage ein-/ausschalten"
+              stateLabels={['An', 'Aus']}
+            />
+          </div>
+        </div>
         {/* Anzeige (Hell/Dunkel) oben, Datei-Steuerung (Sichern/Laden) darunter. */}
         <div className="toolbar-stack">
           <ThemeToggle theme={theme} />

@@ -34,10 +34,39 @@ export type AnnotationColorId =
  * - 'shift': Schichtrhythmus T/N
  *
  * 'info' ist die Informationsspalte; sie wird weiterhin über den DayEditor
- * eingefärbt (persönliche Tagesfarbe). Damit sind in einer Zeile bis zu vier
+ * eingefärbt (persönliche Tagesfarbe). Damit sind in einer Zeile bis vier
  * verschiedene Farben möglich.
+ *
+ * Zusätzlich kann der Benutzer je Monat schmale, freie Spalten anlegen
+ * (`Zusatzspalte`). Deren Farben werden wie die der Informationsspalte über den
+ * DayEditor gesetzt (persönliche Tagesfarbe des Tages in dieser Spalte).
  */
 export type ColumnColorName = 'weekday' | 'day' | 'shift' | 'info';
+
+/**
+ * Schlüssel der Farbe einer Zusatzspalte in den persönlichen Tagesmarkierungen.
+ *
+ * Die Zusatzspalten sind je Monat frei anlegbar und fortlaufend nummeriert;
+ * `0` steht für die erste, `1` für die zweite Spalte usw. Damit bleiben die
+ * Schlüssel stabil, auch wenn links oder rechts weitere Spalten hinzukommen.
+ */
+export type ExtraColumnColorKey = `extra${number}`;
+
+/**
+ * Anordnung der Zusatzspalten eines Monats.
+ *
+ * - `left`: schmale Spalten zwischen der großen Kommentarspalte und der
+ *   KW-Spalte (sie schieben KW und T/N nach rechts),
+ * - `right`: schmale Spalten zwischen der KW-Spalte und der Schichtspalte T/N
+ *   (sie schieben T/N nach rechts).
+ *
+ * Beide Listen führen die Anzahl der angelegten Spalten (`width` = Anzahl der
+ * Einheiten à ~1,6 em). Das Feld wird als Ganzes gespeichert.
+ */
+export interface ExtraColumns {
+  left: number[];
+  right: number[];
+}
 
 /** Definition eines Schichtsystems (datengetrieben, zyklisch). */
 export interface ShiftDefinition {
@@ -100,6 +129,107 @@ export interface CalendarDay {
   isSunday: boolean;
 }
 
+/**
+ * Art eines wiederkehrenden Jahrestages.
+ *
+ * - 'birthday': Geburtstag; das Geburtsjahr ist optional und dient
+ *   ausschließlich der Altersanzeige in der Jahresansicht.
+ * - 'recurring': wiederkehrendes Ereignis; die Wiederholung wird über ein
+ *   Intervall in Jahren beschrieben.
+ */
+export type AnniversaryKind = 'birthday' | 'recurring';
+
+/**
+ * Rhythmus-Art eines wiederkehrenden Ereignisses.
+ *
+ * Das Ereignis trägt immer einen Monat-Tag-Anker (die Einträge sind
+ * jahreslos). Der Anker ist zugleich das erste Auftreten:
+ *
+ * - 'daily':   alle `intervalCount` Tage ab dem Anker.
+ * - 'weekly':  alle `intervalCount` Wochen; angezeigt wird der Wochentag des
+ *              Ankers (z. B. „jeden 2. Dienstag").
+ * - 'monthly': alle `intervalCount` Monate; angezeigt wird der n-te Wochentag
+ *              des Ankers im Monat (z. B. „jeden 2. Dienstag").
+ * - 'yearly':  alle `intervalCount` Jahre am Ankerdatum.
+ *
+ * `intervalCount` ist immer ein positiver Zähler; 1 steht für „jeden/jedes".
+ */
+export type AnniversaryIntervalKind = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+/**
+ * Ein wiederkehrender Jahrestag (Geburtstag oder Ereignis).
+ *
+ * Die Einträge sind bewusst jahreslos: gespeichert wird ausschließlich der
+ * Monat-Tag-Schlüssel (Format "MM-DD"). Dadurch erscheint derselbe Eintrag
+ * automatisch in jedem Jahr und die jahreslose Ansicht ist ohne
+ * Jahresberechnung möglich.
+ *
+ * Da an einem Kalendertag mehrere Geburtstage und mehrere wiederkehrende
+ * Ereignisse stehen können, werden die Einträge eines Tages als Liste geführt.
+ * Jeder Eintrag trägt eine eindeutige `id`, über die er in dieser Liste
+ * identifiziert und verändert wird.
+ */
+export interface AnniversaryEntry {
+  /** Eindeutige Kennung des Eintrags (innerhalb eines Tages). */
+  id: string;
+  /** Monat-Tag-Schlüssel im Format "MM-DD" (jahreslos). */
+  monthDay: string;
+  /** Name der Person bzw. des Ereignisses (max. 50 Zeichen). */
+  name: string;
+  kind: AnniversaryKind;
+  /**
+   * Geburtsjahr (nur bei kind === 'birthday' und nur optional).
+   * Wird zur Berechnung des Alters in der Jahresansicht verwendet.
+   */
+  birthYear?: number;
+  /**
+   * Rhythmus-Art des wiederkehrenden Ereignisses (nur bei kind === 'recurring').
+   * Fehlend bedeutet 'yearly' (Rückwärtskompatibilität mit früheren Zuständen).
+   */
+  intervalKind?: AnniversaryIntervalKind;
+  /**
+   * Zähler des Rhythmus (nur bei kind === 'recurring').
+   * 1 = jeden Tag / jede Woche / jeden Monat / jedes Jahr. Standard ist 1.
+   */
+  intervalCount?: number;
+  /**
+   * Veraltetes Wiederholungsintervall in Jahren (nur bei kind === 'recurring').
+   *
+   * Wird nur noch gelesen, um ältere Zustände und Dateien zu übernehmen:
+   * ein Eintrag ohne `intervalKind`/`intervalCount` gilt als „alle `interval`
+   * Jahre". Neue Einträge nutzen ausschließlich `intervalKind`/`intervalCount`.
+   */
+  interval?: number;
+}
+
+/**
+ * Schlüssel eines Kalendertags in der Map: der Monat-Tag-Schlüssel.
+ *
+ * Die Art des Eintrags steckt nicht mehr im Schlüssel (früher "MM-DD:kind");
+ * ein Tag kann beliebig viele Geburtstage und wiederkehrende Ereignisse
+ * tragen. Die Einträge liegen daher als Liste unter dem Monat-Tag-Schlüssel.
+ */
+export type AnniversaryKey = string;
+
+/**
+ * Erzeugt den Map-Schlüssel eines Kalendertags.
+ *
+ * Rückwärtskompatibilität: ältere Aufrufer übergaben zusätzlich die Art; der
+ * zweite Parameter wird seit der Umstellung auf Listen ignoriert, damit die
+ * Signatur kompatibel bleibt.
+ */
+export function anniversaryKey(monthDay: string, _kind?: AnniversaryKind): AnniversaryKey {
+  return monthDay;
+}
+
+/**
+ * Alle Jahrestage eines Kalendertags, indiziert nach Monat-Tag ("MM-DD").
+ *
+ * Der Wert ist die (geordnete) Liste aller Einträge dieses Tages: mehrere
+ * Geburtstage und mehrere wiederkehrende Ereignisse sind möglich.
+ */
+export type AnniversaryMap = Record<AnniversaryKey, AnniversaryEntry[]>;
+
 /** Persönliche, vom Benutzer gesetzte Markierung eines Tages. */
 export interface UserDayAnnotation {
   dateKey: string;
@@ -113,6 +243,14 @@ export interface UserDayAnnotation {
    * Einträge bedeuten "keine Farbe" für diese Spalte.
    */
   colors: Partial<Record<ColumnColorName, AnnotationColorId>>;
+  /**
+   * Persönliche Farben der frei angelegten Zusatzspalten
+   * (Schlüssel `extra0`, `extra1`, … -> colorId).
+   *
+   * Der DayEditor setzt sie genau wie die Farbe der Informationsspalte; fehlende
+   * Einträge bedeuten "keine Farbe" für diese Spalte.
+   */
+  extraColors?: Partial<Record<ExtraColumnColorKey, AnnotationColorId>>;
 }
 
 /** Monatskennzahlen. */
@@ -208,7 +346,39 @@ export interface AppSettings {
    * Bildschirm- als auch in der Druckansicht.
    */
   weekdayOverDate: boolean;
+  /**
+   * Anzeige-Checkbox "Schichtkalender" (Standard: an).
+   *
+   * Ist sie aus, werden die Schichtspalte (T/N), die Schichtkennzahlen und die
+   * Soll-/Werktagsangaben in Bildschirm- und Druckansicht ausgeblendet. Die
+   * zugrunde liegenden Fachdaten bleiben unverändert erhalten.
+   */
+  showShiftCalendar: boolean;
+  /** Anzeige-Checkbox "Geburtstag" (Standard: an). */
+  showBirthdays: boolean;
+  /** Anzeige-Checkbox "wdh. Ereignis" (Standard: an). */
+  showRecurringEvents: boolean;
+  /**
+   * Modus der Bildschirmansicht.
+   *
+   * 'shift': regulärer Schichtkalender (Standard).
+   * 'anniversaries': jahreslose Ansicht für Geburtstage und wiederkehrende
+   *                  Ereignisse (ohne Schichten und ohne Datumsangaben).
+   */
+  viewMode: CalendarViewMode;
+  /**
+   * Frei angelegte Zusatzspalten je Monat.
+   *
+   * Schlüssel ist der Monat (1..12), Wert die Anordnung der schmalen Spalten
+   * links und rechts der KW-/T-N-Spalten. Die Anordnung ist rein
+   * darstellungsbezogen und verändert keine Fachdaten; sie wird jedoch - wie die
+   * übrigen Anzeige-Optionen - zusammen mit dem Zustand gespeichert.
+   */
+  extraColumns: Record<number, ExtraColumns>;
 }
+
+/** Betriebsart der Bildschirmansicht. */
+export type CalendarViewMode = 'shift' | 'anniversaries';
 
 /** Persistierte Annotationen, global nach dateKey. */
 export type AnnotationMap = Record<string, UserDayAnnotation>;
@@ -232,4 +402,6 @@ export interface PersistedState {
   annotations: AnnotationMap;
   /** Erklärtexte der Farblegende je Jahr und Farbe. */
   colorLegend: ColorLegendMap;
+  /** Jahreslose Geburtstage und wiederkehrende Ereignisse, nach "MM-DD". */
+  anniversaries: AnniversaryMap;
 }

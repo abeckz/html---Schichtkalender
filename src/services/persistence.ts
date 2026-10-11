@@ -15,6 +15,7 @@
 import type { PersistedState } from '../domain/types.ts';
 import {
   STORAGE_VERSION,
+  normalizeAnniversaries,
   normalizeAnnotations,
   normalizeColorLegend,
   normalizeSettings,
@@ -53,6 +54,7 @@ export function serializeState(state: PersistedState): string {
     settings: normalizeSettings(state.settings),
     annotations: normalizeAnnotations(state.annotations),
     colorLegend: normalizeColorLegend(state.colorLegend),
+    anniversaries: normalizeAnniversaries(state.anniversaries),
   };
   return JSON.stringify(payload, null, 2);
 }
@@ -78,6 +80,7 @@ export function parseState(text: string): PersistedState | null {
     settings: normalizeSettings(candidate.settings),
     annotations: normalizeAnnotations(candidate.annotations),
     colorLegend: normalizeColorLegend(candidate.colorLegend),
+    anniversaries: normalizeAnniversaries(candidate.anniversaries),
   };
 }
 

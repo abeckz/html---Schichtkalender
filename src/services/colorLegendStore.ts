@@ -60,9 +60,14 @@ export function useColorLegendStore(
     setColorLegend(readState(storage).colorLegend);
   }, [storage]);
 
-  // Jede Änderung sofort persistieren.
+  // Jede Änderung sofort persistieren; die Jahrestage werden aus dem Speicher
+  // übernommen, damit sie nicht überschrieben werden.
   useEffect(() => {
-    writeState({ version: 1, settings, annotations, colorLegend }, storage);
+    const persisted = readState(storage);
+    writeState(
+      { version: 1, settings, annotations, colorLegend, anniversaries: persisted.anniversaries },
+      storage,
+    );
   }, [settings, annotations, colorLegend, storage]);
 
   const setColorLegendText = useCallback(

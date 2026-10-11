@@ -10,6 +10,9 @@ import {
   LABEL_CHARS_PER_LINE,
   MAX_LABEL_LINES,
   MIN_LABEL_FONT_SIZE,
+  cellFitFontSize,
+  cellLineClass,
+  countCellLines,
   countLabelLines,
   fitFontSize,
   labelLineClass,
@@ -73,5 +76,50 @@ describe('labelLineClass', () => {
 
   it('liefert für eine leere Beschriftung die Ein-Zeilen-Klasse', () => {
     expect(labelLineClass('')).toBe('label-lines-1');
+  });
+});
+
+describe('countCellLines', () => {
+  it('zählt je Jahrestag eine zusätzliche Zeile', () => {
+    expect(countCellLines('Urlaub', 0)).toBe(1);
+    expect(countCellLines('Urlaub', 1)).toBe(2);
+    expect(countCellLines('Urlaub', 2)).toBe(3);
+  });
+
+  it('behandelt eine leere Beschriftung als null Grundzeilen', () => {
+    expect(countCellLines('', 0)).toBe(0);
+    expect(countCellLines('', 1)).toBe(1);
+  });
+
+  it('berücksichtigt harte und weiche Umbrüche der Beschriftung', () => {
+    expect(countCellLines('Urlaub\nArzt', 0)).toBe(2);
+    expect(countCellLines('x'.repeat(LABEL_CHARS_PER_LINE + 1), 0)).toBe(2);
+  });
+
+  it('begrenzt die Zeilenzahl auf das Maximum', () => {
+    expect(countCellLines('Urlaub', 5)).toBe(MAX_LABEL_LINES);
+  });
+});
+
+describe('cellLineClass', () => {
+  it('verkleinert die Stufe, sobald ein Jahrestag zur Beschriftung hinzukommt', () => {
+    expect(cellLineClass('Urlaub')).toBe('label-lines-1');
+    expect(cellLineClass('Urlaub', 1)).toBe('label-lines-2');
+    expect(cellLineClass('Urlaub', 2)).toBe('label-lines-3');
+  });
+
+  it('liefert für leeren Inhalt die Ein-Zeilen-Klasse', () => {
+    expect(cellLineClass('')).toBe('label-lines-1');
+  });
+});
+
+describe('cellFitFontSize', () => {
+  it('verkleinert die Schrift mit steigender Zeilenzahl', () => {
+    const one = cellFitFontSize('Urlaub');
+    const two = cellFitFontSize('Urlaub', 1);
+    const three = cellFitFontSize('Urlaub', 2);
+    expect(one).toBeGreaterThan(two);
+    expect(two).toBeGreaterThan(three);
+    expect(three).toBe(MIN_LABEL_FONT_SIZE);
   });
 });

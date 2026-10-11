@@ -1,0 +1,18 @@
+node:fs:484
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOENT: no such file or directory, open 'C:\Users\andre\repos\html - Schichtkalender\http:\localhost:5178'
+    at readFileSync (node:fs:484:20)
+    at buildWorkTarget (file:///C:/Users/andre/repos/html%20-%20Schichtkalender/scripts/checkExtraColumns.mjs:100:18)
+    at file:///C:/Users/andre/repos/html%20-%20Schichtkalender/scripts/checkExtraColumns.mjs:109:14
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\andre\\repos\\html - Schichtkalender\\http:\\localhost:5178'
+}
+
+Node.js v24.19.0

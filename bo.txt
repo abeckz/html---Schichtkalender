@@ -1,0 +1,25 @@
+
+> schichtkalender@1.0.0 build:offline
+> node scripts/buildOffline.mjs
+
+
+> TypeScript-Prüfung (tsc -b)
+
+> Vite-Build als Einzeldatei
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 83 modules transformed.
+rendering chunks...
+[plugin vite:singlefile] 
+
+[plugin vite:singlefile] Inlining: index-BhCXwRS2.js
+[plugin vite:singlefile] Inlining: style-DTi7xmf1.css
+computing gzip size...
+[2moffline/[22m[32mindex.html  [39m[1m[2m247.39 kB[22m[1m[22m[2m │ gzip: 73.10 kB[22m
+[32m✓ built in 433ms[39m
+
+Fertig. Offline-Datei erstellt:
+  C:\Users\andre\repos\html - Schichtkalender\offline\Schichtkalender-Offline.html  (242 kB)
+  C:\Users\andre\repos\html - Schichtkalender\BASF-Schichtkalender.html  (identische Kopie, per Doppelklick öffnen)
+
+Die HTML-Vorlage bleibt unverändert unter src/index.html erhalten.

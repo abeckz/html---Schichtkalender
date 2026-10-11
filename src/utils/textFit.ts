@@ -79,3 +79,43 @@ export function labelLineClass(label: string): string {
   const clamped = Math.min(Math.max(lines, 1), MAX_LABEL_LINES);
   return `label-lines-${clamped}`;
 }
+
+/**
+ * Logische Zeilenzahl einer Zelle aus Beschriftung und zusätzlichen Zeilen.
+ *
+ * Die persönliche Beschriftung (bzw. die Terminnamen) folgt den
+ * DayEditor-Regeln: harte Umbrüche und weiche Umbrüche aus der Zeichenlänge
+ * zählen (`countLabelLines`). Zu den so ermittelten Zeilen kommen je anzuzeigendem
+ * Geburtstag/wiederkehrenden Ereignis `extraLines` Zeilen hinzu: Diese Einträge
+ * stehen als eigener Textblock oben in der Zelle und belegen jeweils eine Zeile.
+ * Die Summe wird auf `MAX_LABEL_LINES` begrenzt.
+ *
+ * Damit sinkt die Schriftgröße auch dann, wenn zu einer einzeiligen Beschriftung
+ * noch ein Geburtstag oder wiederkehrendes Ereignis hinzukommt: Aus einer Zeile
+ * werden zwei - die Schrift folgt der Zeilenzahl des Tageseditors.
+ */
+export function countCellLines(label: string, extraLines: number = 0): number {
+  const base = label === '' ? 0 : countLabelLines(label);
+  const lines = base + Math.max(0, extraLines);
+  return Math.min(lines, MAX_LABEL_LINES);
+}
+
+/**
+ * CSS-Klasse für die adaptive Zeilen-/Schriftsteuerung eines Zellinhalts aus
+ * Beschriftung und zusätzlichen Zeilen (Jahrestage). Siehe `countCellLines`.
+ */
+export function cellLineClass(label: string, extraLines: number = 0): string {
+  const lines = countCellLines(label, extraLines);
+  const clamped = Math.min(Math.max(lines, 1), MAX_LABEL_LINES);
+  return `label-lines-${clamped}`;
+}
+
+/**
+ * Schriftgröße (px) für einen Zellinhalt aus Beschriftung und zusätzlichen
+ * Zeilen (siehe `countCellLines`).
+ */
+export function cellFitFontSize(label: string, extraLines: number = 0): number {
+  const lines = countCellLines(label, extraLines);
+  if (lines <= 0) return FONT_SIZES[1];
+  return FONT_SIZES[lines] ?? MIN_LABEL_FONT_SIZE;
+}

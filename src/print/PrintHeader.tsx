@@ -23,6 +23,8 @@ export interface PrintHeaderProps {
   usedColors?: readonly AnnotationColorId[];
   /** Erklärungstexte der Farblegende des Jahres. */
   colorLegend?: Partial<Record<AnnotationColorId, string>>;
+  /** Anzeige-Checkbox "Schichtkalender" (Standard: an). */
+  showShiftCalendar?: boolean;
 }
 
 export function PrintHeader({
@@ -31,19 +33,24 @@ export function PrintHeader({
   workedShiftCount,
   usedColors = [],
   colorLegend = {},
+  showShiftCalendar = true,
 }: PrintHeaderProps) {
   return (
     <header className="print-page-header">
       <div className="print-header-row">
         <span className="print-header-title">BASF Schichtkalender</span>
         <span className="print-header-year">{year}</span>
-        <span className="print-header-shift">Schicht {selectedShift}</span>
+        {showShiftCalendar && (
+          <span className="print-header-shift">Schicht {selectedShift}</span>
+        )}
       </div>
       <div className="print-header-legend">
-        <span className="print-header-total">
-          Arbeitsschichten gesamt im Jahr {year} für Schicht {selectedShift}:{' '}
-          {workedShiftCount}
-        </span>
+        {showShiftCalendar && (
+          <span className="print-header-total">
+            Arbeitsschichten gesamt im Jahr {year} für Schicht {selectedShift}:{' '}
+            {workedShiftCount}
+          </span>
+        )}
         {usedColors.length > 0 && (
           <ColorLegendBox
             colors={usedColors}
@@ -52,11 +59,17 @@ export function PrintHeader({
             className="print-header-colors"
           />
         )}
-        <span>T = Tagschicht von 6 bis 18 Uhr</span>
-        <span>N = Nachtschicht von 18 bis 6 Uhr</span>
-        <span>Werktage = Anzahl Montag bis Freitag</span>
-        <span>Sollschichten = Anzahl T + N</span>
+        {showShiftCalendar && (
+          <>
+            <span>T = Tagschicht von 6 bis 18 Uhr</span>
+            <span>N = Nachtschicht von 18 bis 6 Uhr</span>
+            <span>Werktage = Anzahl Montag bis Freitag</span>
+            <span>Sollschichten = Anzahl T + N</span>
+          </>
+        )}
         <span>{PUBLIC_HOLIDAY_MARK} = {PUBLIC_HOLIDAY_TITLE}</span>
+        <span>🎂 = Geburtstag (Alter in Klammern)</span>
+        <span>🔁 = wiederkehrendes Ereignis</span>
       </div>
     </header>
   );

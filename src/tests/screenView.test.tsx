@@ -24,7 +24,7 @@ import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder.ts'
 function buildMarch2021(): import('../domain/types').MonthCalendar {
   return buildYearCalendar({ year: 2021, selectedShift: 'C' }).months[2];
 }
-import { DEFAULT_SHIFT } from '../config/appDefaults.ts';
+import { DEFAULT_SHIFT, DEFAULT_SETTINGS } from '../config/appDefaults.ts';
 import {
   THEME_ATTRIBUTE,
   THEME_STORAGE_KEY,
@@ -74,6 +74,18 @@ function click(element: Element | null): void {
   act(() => {
     (element as HTMLElement).click();
   });
+}
+
+/** Findet einen Toggle-Umschalter über die sichtbare Beschriftung seines Labels. */
+function toggleByLabel(container: HTMLElement, label: string): Element | null {
+  return (
+    Array.from(container.querySelectorAll('[role="switch"]')).find((element) => {
+      const labelledBy = element.getAttribute('aria-labelledby');
+      if (!labelledBy) return false;
+      const labelElement = document.getElementById(labelledBy);
+      return container.contains(labelElement) && labelElement?.textContent === label;
+    }) ?? null
+  );
 }
 
 describe('Bildschirmdarstellung', () => {
@@ -222,6 +234,7 @@ describe('Bildschirmdarstellung', () => {
       const persisted = JSON.parse(window.localStorage.getItem('schichtkalender.state') ?? '{}');
       expect(persisted.annotations).toEqual(storedAnnotations);
       expect(persisted.settings).toEqual({
+        ...DEFAULT_SETTINGS,
         selectedYear: year,
         selectedShift: 'C',
         weekdayOverDate: false,
@@ -647,11 +660,17 @@ describe('Bildschirmdarstellung', () => {
 
     const state = {
       version: 1,
-      settings: { selectedYear: 2022, selectedShift: 'B' as const, weekdayOverDate: false },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        selectedYear: 2022,
+        selectedShift: 'B' as const,
+        weekdayOverDate: false,
+      },
       annotations: {
         '2022-05-05': { dateKey: '2022-05-05', label: 'Schulung', colors: { info: 'green' as const } },
       },
       colorLegend: {},
+      anniversaries: {},
     };
     const parsed = parseState(serializeState(state));
     expect(parsed?.settings.selectedYear).toBe(2022);
@@ -714,9 +733,13 @@ describe('Bildschirmdarstellung', () => {
       expect(infoRow?.className).not.toContain('has-color-weekday');
       expect(infoRow?.className).not.toContain('has-color-day');
       expect(infoRow?.className).not.toContain('has-color-shift');
-      // Nur die Info-Zelle hat einen Hintergrund gesetzt.
+      // Nur der Tageseditor-Eintrag (Textblock) trägt den Hintergrund; die
+      // Info-Zelle selbst bleibt unfarbig, damit die Farbe nicht auf
+      // Geburtstage/wiederkehrende Ereignisse übergeht.
       const infoCell = infoRow?.querySelector('.cell-information') as HTMLElement | null;
-      expect(infoCell?.style.backgroundColor).not.toBe('');
+      expect(infoCell?.style.backgroundColor).toBe('');
+      const infoText = infoRow?.querySelector('.cell-information .cell-information-text') as HTMLElement | null;
+      expect(infoText?.style.backgroundColor).not.toBe('');
       const weekdayCell = infoRow?.querySelector('.cell-weekday') as HTMLElement | null;
       expect(weekdayCell?.style.backgroundColor).toBe('');
 
@@ -737,10 +760,9 @@ describe('Anzeige-Option "Wochentag über Datum"', () => {
     window.localStorage.removeItem('schichtkalender.state');
     try {
       const container = render(<App />);
-      const toggle = container.querySelector('.weekday-over-date-toggle .switch-button');
+      const toggle = toggleByLabel(container, 'Wochentag über Datum');
       expect(toggle).not.toBeNull();
       expect(toggle?.getAttribute('aria-checked')).toBe('false');
-      expect(toggle?.textContent).toBe('Aus');
 
       // Ohne Schalter: getrennte Spalten, keine gestapelte Zelle.
       expect(container.querySelector('.day-table.is-weekday-over-date')).toBeNull();
@@ -755,12 +777,11 @@ describe('Anzeige-Option "Wochentag über Datum"', () => {
     window.localStorage.removeItem('schichtkalender.state');
     try {
       const container = render(<App />);
-      const toggle = container.querySelector('.weekday-over-date-toggle .switch-button');
+      const toggle = toggleByLabel(container, 'Wochentag über Datum');
       click(toggle);
 
       // Der Schalter meldet den eingeschalteten Zustand ...
       expect(toggle?.getAttribute('aria-checked')).toBe('true');
-      expect(toggle?.textContent).toBe('Ein');
 
       // ... und der Monat nutzt das gestapelte Raster.
       expect(container.querySelector('.day-table.is-weekday-over-date')).not.toBeNull();
@@ -783,16 +804,166 @@ describe('Anzeige-Option "Wochentag über Datum"', () => {
     window.localStorage.removeItem('schichtkalender.state');
     try {
       const first = render(<App />);
-      const toggle = first.querySelector('.weekday-over-date-toggle .switch-button');
+      const toggle = toggleByLabel(first, 'Wochentag über Datum');
       click(toggle);
       unmountAll();
 
       // Neue Sitzung: die Einstellung wird aus dem Speicher übernommen.
       const second = render(<App />);
-      expect(
-        second.querySelector('.weekday-over-date-toggle .switch-button')?.getAttribute('aria-checked'),
-      ).toBe('true');
+      expect(toggleByLabel(second, 'Wochentag über Datum')?.getAttribute('aria-checked')).toBe(
+        'true',
+      );
       expect(second.querySelector('.day-table.is-weekday-over-date')).not.toBeNull();
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+});
+
+describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
+  /** Findet den Bedienpunkt einer Seite im Monatskopf. */
+  function handle(container: HTMLElement, side: 'left' | 'right'): HTMLElement | null {
+    return container.querySelector(
+      `.column-insert-handle[data-extra-column-side="${side}"]`,
+    ) as HTMLElement | null;
+  }
+
+  it('zeigt je Monat zwei Bedienpunkte auf den vertikalen Trennlinien', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      const header = container.querySelector('.month-header');
+      expect(header).not.toBeNull();
+      // Links vor KW/T/N und rechts unmittelbar neben der Schichtspalte.
+      expect(handle(container, 'left')).not.toBeNull();
+      expect(handle(container, 'right')).not.toBeNull();
+      // Der Punkt selbst zeigt das Plus im Kreis.
+      expect(handle(container, 'left')?.querySelector('circle')).not.toBeNull();
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  /** Liefert die Monatskarte (`.month-card`) über ihren Beschriftungstext. */
+  function cardOf(container: HTMLElement, label: string): HTMLElement | null {
+    return (
+      Array.from(container.querySelectorAll('.month-card')).find(
+        (card) => card.getAttribute('aria-label') === label,
+      ) ?? null
+    ) as HTMLElement | null;
+  }
+
+  /** Anzahl der Zusatzzellen einer Tageszeile der Monatskarte. */
+  function extraCellCount(card: HTMLElement | null): number {
+    return card?.querySelectorAll('.day-row')[0]?.querySelectorAll('.cell-extra').length ?? 0;
+  }
+
+  it('legt links eine schmale Spalte an und wiederholt das bei jedem Klick', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      const row = container.querySelector('.day-row');
+      expect(row?.querySelectorAll('.cell-extra').length).toBe(0);
+
+      // Erster Klick: eine Spalte direkt an der linken Trennlinie; jede
+      // Tageszeile des angeklickten Monats (Januar) erhält genau eine
+      // zusätzliche Zelle, die übrigen Monate bleiben unverändert.
+      click(handle(container, 'left'));
+      const firstCard = cardOf(container, 'Januar 2026');
+      expect(firstCard?.querySelectorAll('.day-row').length).toBe(31);
+      expect(extraCellCount(firstCard)).toBe(1);
+      expect(extraCellCount(cardOf(container, 'Februar 2026'))).toBe(0);
+
+      // Wiederholbar: der nächste Klick auf dieselbe Linie erweitert die
+      // vorhandene Spalte, statt eine zweite anzulegen (die Ansicht wird nach
+      // außen geschoben).
+      const widthsBefore = cardOf(container, 'Januar 2026')?.style.getPropertyValue(
+        '--extra-left-width',
+      );
+      click(handle(container, 'left'));
+      const widthsAfter = cardOf(container, 'Januar 2026')?.style.getPropertyValue(
+        '--extra-left-width',
+      );
+      expect(widthsBefore).toBe('1.6em');
+      expect(widthsAfter).toBe('3.2em');
+      // Die erweiterte Spalte besteht aus zwei Zellen ohne zusätzlichen Inhalt.
+      expect(extraCellCount(cardOf(container, 'Januar 2026'))).toBe(2);
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('legt rechts eine Spalte zwischen KW und T/N an', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      click(handle(container, 'right'));
+
+      const card = cardOf(container, 'Januar 2026');
+      expect(card?.style.getPropertyValue('--extra-left-width')).toBe('0em');
+      expect(card?.style.getPropertyValue('--extra-right-width')).toBe('1.6em');
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('färbt eine Zusatzspalte über den Tageseditor ein und schreibt extraColors', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      // Eine Zusatzspalte links anlegen (Januar 2026).
+      click(handle(container, 'left'));
+      const card = cardOf(container, 'Januar 2026');
+      expect(extraCellCount(card)).toBe(1);
+
+      // Der Tag 01.01.2026 wurde noch nicht eingefärbt.
+      const firstRow = card?.querySelectorAll('.day-row')[0] as HTMLElement;
+      expect(
+        (firstRow.querySelector('.cell-extra') as HTMLElement).style.backgroundColor,
+      ).toBe('');
+
+      // Tageseditor öffnen: die Zusatzspalte erscheint als eigenes Farbfeld.
+      click(firstRow);
+      const editor = container.querySelector('.day-editor');
+      expect(editor).not.toBeNull();
+      const extraField = editor!.querySelector('.editor-extra-color');
+      expect(extraField).not.toBeNull();
+      expect(extraField?.textContent).toContain('Zusatzspalte 0');
+
+      // Im Feld der Zusatzspalte eine Farbe (Rot) wählen.
+      const redOption = Array.from(extraField!.querySelectorAll('.color-option')).find(
+        (option) => option.getAttribute('title') === 'Rot',
+      );
+      click(redOption ?? null);
+      const saveButton = Array.from(editor!.querySelectorAll('button')).find(
+        (button) => button.textContent === 'Speichern',
+      );
+      click(saveButton ?? null);
+
+      // Die Farbe landet in extraColors und wird in der Zelle dargestellt.
+      const persisted = JSON.parse(window.localStorage.getItem('schichtkalender.state') ?? '{}');
+      expect(persisted.annotations['2026-01-01']?.extraColors?.extra0).toBe('red');
+      const rowAfter = (cardOf(container, 'Januar 2026')?.querySelectorAll('.day-row')[0] ??
+        null) as HTMLElement | null;
+      expect(rowAfter?.querySelector('.cell-extra')?.getAttribute('style') ?? '').toContain(
+        'background-color',
+      );
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('behält die angelegten Spalten über eine neue Sitzung', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const first = render(<App />);
+      click(handle(first, 'left'));
+      unmountAll();
+
+      const second = render(<App />);
+      expect(cardOf(second, 'Januar 2026')?.style.getPropertyValue('--extra-left-width')).toBe(
+        '1.6em',
+      );
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }

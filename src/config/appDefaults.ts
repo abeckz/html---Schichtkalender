@@ -10,7 +10,7 @@
  * die verbindliche Referenzberechnung der Spezifikation vor.
  */
 
-import type { AppSettings } from '../domain/types.ts';
+import type { AppSettings, CalendarViewMode, ExtraColumns } from '../domain/types.ts';
 
 /** Fachliches Referenzjahr der Spezifikation. */
 export const REFERENCE_YEAR = 2021;
@@ -60,8 +60,27 @@ export const DEFAULT_SHIFT = 'C' as const;
  */
 export const DEFAULT_WEEKDAY_OVER_DATE = false;
 
+/**
+ * Anzeige-Checkboxen der regulären Ansicht. Alle drei sind standardmäßig
+ * eingeschaltet: der Schichtkalender und die beiden Ereignisarten.
+ */
+export const DEFAULT_SHOW_SHIFT_CALENDAR = true;
+export const DEFAULT_SHOW_BIRTHDAYS = true;
+export const DEFAULT_SHOW_RECURRING_EVENTS = true;
+
+/** Standardmodus der Ansicht: regulärer Schichtkalender. */
+export const DEFAULT_VIEW_MODE: CalendarViewMode = 'shift';
+
+/** Standard der frei angelegten Zusatzspalten: keine Spalte vorhanden. */
+export const DEFAULT_EXTRA_COLUMNS: Record<number, ExtraColumns> = {};
+
 export const DEFAULT_SETTINGS: AppSettings = {
   selectedYear: DEFAULT_YEAR,
   selectedShift: DEFAULT_SHIFT,
   weekdayOverDate: DEFAULT_WEEKDAY_OVER_DATE,
+  showShiftCalendar: DEFAULT_SHOW_SHIFT_CALENDAR,
+  showBirthdays: DEFAULT_SHOW_BIRTHDAYS,
+  showRecurringEvents: DEFAULT_SHOW_RECURRING_EVENTS,
+  viewMode: DEFAULT_VIEW_MODE,
+  extraColumns: DEFAULT_EXTRA_COLUMNS,
 };

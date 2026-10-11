@@ -291,44 +291,175 @@ body {
   gap: 4px;
 }
 
-/**
- * Umschalter "Wochentag über Datum" der Menübox.
- *
- * Beschriftung links, Schalter rechts; der Schalter trägt einen sichtbaren
- * Zustandstext ("Ein"/"Aus"), damit der Zustand nicht ausschließlich über
- * Farbe transportiert wird. Standard ist "Aus".
+/*
+ * Umschalter "Wochentag über Datum" wird wie die übrigen Umschalter der
+ * Anzeige-Gruppe als Pille dargestellt (ToggleSwitch); die frühere
+ * Sonderform als kleiner Schaltknopf entfällt.
  */
-.weekday-over-date-toggle {
+
+/**
+ * Anzeige-Kästchen: echtes Kästchen mit Häkchen und Beschriftung rechts.
+ *
+ * Das native `<input type="checkbox">` bleibt für Hilfstechnik und Tastatur
+ * erhalten, wird aber unsichtbar über das gezeichnete Kästchen gelegt. Der
+ * Zustand ist damit nicht ausschließlich über Farbe transportierbar: das
+ * Häkchen selbst zeigt ihn an.
+ */
+.checkbox-field {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
+  cursor: pointer;
 }
 
-.switch-button {
-  min-width: 54px;
-  padding: 5px 10px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text);
-  cursor: pointer;
+.checkbox-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.checkbox-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius);
 }
 
-.switch-button:hover {
-  border-color: var(--color-accent);
+.checkbox-mark {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-on-accent);
+  opacity: 0;
+  transition: opacity 0.1s ease;
 }
 
-.switch-button.is-active {
+.checkbox-input:checked + .checkbox-box {
   background: var(--color-accent);
   border-color: var(--color-accent);
-  color: var(--color-on-accent);
 }
 
-.switch-state {
-  display: inline-block;
-  line-height: 1;
+.checkbox-input:checked + .checkbox-box .checkbox-mark {
+  opacity: 1;
 }
+
+.checkbox-input:focus-visible + .checkbox-box {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.checkbox-field:hover .checkbox-box {
+  border-color: var(--color-accent);
+}
+
+/* ------------------------------------------------ App-Stil-Toggle (Pille) */
+
+/**
+ * Umschalter im Stil moderner Apps (Windows/iOS): ein rundes Knöpfchen gleitet
+ * in einem Langloch. Beschriftung links, Zustandstext, dann die Pille.
+ */
+.toggle-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px 3px 4px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+}
+
+.toggle-switch:hover {
+  border-color: var(--color-accent);
+}
+
+.toggle-switch-state {
+  order: 2;
+  min-width: 26px;
+  text-align: left;
+  letter-spacing: 0.02em;
+}
+
+.toggle-switch-track {
+  order: 1;
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  background: var(--color-border-strong);
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+
+.toggle-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: var(--color-surface);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 40%);
+  transition: transform 0.15s ease;
+}
+
+.toggle-switch.is-checked {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+.toggle-switch.is-checked .toggle-switch-track {
+  background: var(--color-accent);
+}
+
+.toggle-switch.is-checked .toggle-switch-knob {
+  transform: translateX(18px);
+}
+
+/* --------------------------------------------- Anzeige-Gruppe der Menübar */
+
+/**
+ * Alle Bedienelemente der Anzeige stehen untereinander in einer Spalte und
+ * sind an der linken Kante ausgerichtet. Dadurch fluchten die Kästchen und
+ * die Umschalter sauber und die Beschriftungen stehen exakt übereinander.
+ */
+.display-toggles {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.checkbox-group,
+.toggle-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+/* ------------------------------------------------ Anzeige-Kästchen */
 
 .theme-button {
   display: flex;
@@ -573,6 +704,7 @@ body {
 }
 
 .month-header {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: baseline;
@@ -580,6 +712,116 @@ body {
   padding: 7px 10px;
   background: var(--color-accent-soft);
   border-bottom: 1px solid var(--color-border);
+}
+
+/**
+ * Position der Bedienpunkte.
+ *
+ * Die Punkte sitzen im Monatskopf (`.month-header`), dessen Auffangblock (der
+ * Padding-Bereich) mit dem Inhaltsbereich der Monatskarte übereinstimmt. Die
+ * Tageszeile (`.day-row`) ist demgegenüber um ihren eigenen Rahmen und
+ * Innenabstand (1px + 4px = 5px) nach innen versetzt. Deshalb entspricht jede
+ * Randposition im Kopf dem jeweiligen Rasterrand der Tageszeile plus 5px.
+ *
+ * - Linker Punkt: linke Kante der Ereignis-/Info-Zelle
+ *   (zwischen Datum und Info). Von links zählen Datum und Wochentag (2×2.4em)
+ *   sowie die bereits links liegenden Zusatzspalten; alle diese Breiten sind
+ *   fest, der Punkt wird daher über `left` gesetzt.
+ * - Rechter Punkt: linke Kante der Schichtspalte T/N (zwischen KW und T/N).
+ *   Von rechts zählen T/N (2.2em), KW (3.2em) und die rechten Zusatzspalten;
+ *   daher wird der Punkt über `right` gesetzt.
+ *
+ * `transform: translate(±50%, -50%)` zentriert den Punkt auf der Kante, die
+ * `left`/`right` beschreibt. `z-index` hebt ihn über Monatstitel und
+ * Kennzahlen: der Punkt muss auch dort sichtbar und anklickbar sein, wo Text
+ * unter ihm liegt. Die Schriftgröße des Punktes ist auf die der Zeile (13px)
+ * gesetzt, damit die `em`-Werte dieselbe Grundlage wie das Raster haben.
+ */
+.column-insert-handle {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 0;
+  color: var(--color-text);
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  opacity: 0;
+  /* Unsichtbar, aber weiter mit der Maus erreichbar: eine Berührung zeigt ihn. */
+  pointer-events: auto;
+  transform: translate(50%, -50%);
+}
+
+/* Linke Trennlinie: linke Kante der Ereignis-/Info-Zelle (zwischen Datum und Info). */
+.column-insert-handle[data-extra-column-side='left'] {
+  left: calc(5px + 2.4em + 2.4em + var(--extra-left-width, 0em));
+  transform: translate(-50%, -50%);
+}
+
+/* „Wochentag über Datum“: Wochentag und Datum teilen sich eine 3.6em breite Zelle. */
+.month-header.is-weekday-over-date .column-insert-handle[data-extra-column-side='left'] {
+  left: calc(5px + 3.6em + var(--extra-left-width, 0em));
+}
+
+/* Rechte Trennlinie: linke Kante der Schichtspalte T/N (zwischen KW und T/N). */
+.column-insert-handle[data-extra-column-side='right'] {
+  right: calc(5px + 2.2em);
+}
+
+/**
+ * Sichtbarkeit und Andeutungsstrich.
+ *
+ * Beim Überfahren des Monatskopfs wird der Punkt über der Trennlinie
+ * eingeblendet; an derselben Stelle zeichnet `::before` einen gestrichelten
+ * senkrechten Strich, der die einzufügende Spalte andeutet. Der Strich ist so
+ * hoch wie der Monatskopf und liegt hinter dem Punkt, damit das Pluszeichen
+ * frei bleibt.
+ */
+/**
+ * Sichtbarkeit und Andeutungsstrich.
+ *
+ * Beim Überfahren des Monatskopfs ODER der Tageszeilen (also der Spalten)
+ * wird der Punkt über der Trennlinie eingeblendet; an derselben Stelle
+ * zeichnet `::before` einen gestrichelten senkrechten Strich, der die
+ * einzufügende Spalte andeutet. Der Strich ist so hoch wie der Monatskopf und
+ * liegt hinter dem Punkt, damit das Pluszeichen frei bleibt.
+ *
+ * Das Überfahren des gesamten Monats (nicht nur des schmalen Kopfes) stellt
+ * sicher, dass der Punkt auch dann erscheint, wenn die Maus über der linken
+ * Datumsspalte steht - dort, wo die neue Spalte eingefügt werden soll.
+ */
+.month-card:hover .column-insert-handle,
+.column-insert-handle:focus-visible {
+  opacity: 1;
+}
+
+.column-insert-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: -1;
+  width: 0;
+  height: 34px;
+  border-left: 1px dashed var(--color-accent);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.month-card:hover .column-insert-handle::before,
+.column-insert-handle:focus-visible::before {
+  opacity: 0.7;
+}
+
+.column-insert-icon {
+  display: block;
+  width: 15px;
+  height: 15px;
 }
 
 .month-title {
@@ -606,9 +848,20 @@ body {
 }
 
 /**
- * Spaltenraster: Wochentag | Datum | Termin/Beschriftung | KW | T/N.
- * Fünf Spalten für fünf Zellen - die Information bekommt den gesamten Rest
- * der Breite und wird nicht mehr abgeschnitten.
+ * Spaltenraster: Wochentag | Datum | Termin/Beschriftung | [Zusatz links] |
+ * KW | [Zusatz rechts] | T/N.
+ *
+/**
+ * Spaltenraster: Wochentag | Datum | Termin/Beschriftung | [Zusatz links] |
+ * KW | [Zusatz rechts] | T/N.
+ *
+ * Die vollständige Trackliste kommt als `--day-row-columns` von der
+ * Monatskarte (MonatCalendar): Sie wird dort gebaut, weil die Anzahl der
+ * Zusatzspalten zur Laufzeit feststeht und `repeat()` in CSS keinen variablen
+ * Zähler kennt. Jede Zusatzspalte belegt genau einen Track, damit die
+ * Zuordnung von Zellen zu Spuren eindeutig bleibt und die bereits sichtbaren
+ * Spalten ihre Lage behalten. Die Information bekommt den gesamten Rest der
+ * Breite und wird nicht abgeschnitten.
  *
  * Der Abstand zwischen Wochentag und Tagesnummer ist auf das Minimum
  * reduziert; die vertikale Abgrenzung der Zelle erfolgt über schmale
@@ -616,7 +869,7 @@ body {
  */
 .day-row {
   display: grid;
-  grid-template-columns: 2.4em 2.4em minmax(0, 1fr) 3.2em 2.2em;
+  grid-template-columns: var(--day-row-columns);
   align-items: center;
   gap: 0;
   width: 100%;
@@ -642,7 +895,27 @@ body {
  * großen Spalte mit den Bemerkungen zugute (zweite Spalte = 1fr).
  */
 .day-row.is-weekday-over-date {
-  grid-template-columns: 3.6em minmax(0, 1fr) 3.2em 2.2em;
+  grid-template-columns: var(--day-row-columns-weekday-over-date);
+}
+
+/**
+ * Anzeige-Checkbox "Schichtkalender" ist aus: die Schichtspalte (T/N) entfällt
+ * und die Information gewinnt die Breite hinzu. Beide Rastervarianten
+ * (getrennte bzw. gemeinsame Datumsspalte) werden berücksichtigt.
+ */
+/* Anzeige-Checkbox "Schichtkalender" aus: die Spalte T/N entfällt, die rechte
+   Trennlinie gibt es dann nicht mehr. */
+.month-card.is-shift-hidden .day-row {
+  grid-template-columns: var(--day-row-columns-no-shift);
+}
+
+.month-card.is-shift-hidden .day-row.is-weekday-over-date {
+  grid-template-columns: var(--day-row-columns-no-shift-weekday-over-date);
+}
+
+/* In der jahreslosen Ansicht gibt es weder KW- noch Schichtspalte. */
+.anniversary-day-table .day-row {
+  grid-template-columns: 2.4em 2.4em minmax(0, 1fr);
 }
 
 .day-row:hover {
@@ -676,7 +949,7 @@ body {
 .day-row.has-color-weekday .cell-weekday,
 .day-row.has-color-day .cell-day,
 .day-row.is-weekday-over-date.has-color-day .cell-weekday,
-.day-row.has-color-info .cell-information,
+.day-row.has-color-info .cell-information .cell-information-text,
 .day-row.has-color-info .cell-information .holiday-mark,
 .day-row.has-color-shift .cell-shift {
   color: #000000;
@@ -746,11 +1019,74 @@ body {
 
 /* Ein einziger durchgehender Strich links von T/N - rechts ohne Linie. */
 .cell-shift {
+  position: relative;
   align-self: stretch;
   display: flex;
   align-items: center;
   justify-content: center;
   border-left: 1px solid var(--color-border);
+}
+
+/**
+ * KW-/F-Zelle.
+ *
+ * Sie trägt keinen durchgehenden Trennstrich; ihre linke Kante ist aber die
+ * linke Trennlinie des Monats, auf der der Bedienpunkt `+` sitzt. Beim
+ * Überfahren des Monats zeichnet `::before` dort einen gestrichelten Strich
+ * (Andeutung der einzufügenden Spalte).
+ */
+.cell-kw {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/**
+ * Schmale, frei angelegte Zusatzspalte ("Zusatzspalte").
+ *
+ * Der Inhalt ist leer; die Spalte bietet zusätzlichen Platz und trägt - wie die
+ * Info-Spalte - optional eine persönliche Tagesfarbe. Jede Spalte endet mit
+ * einem durchgehenden senkrechten Strich, sodass die Trennlinien des Monats
+ * erhalten bleiben. Die letzte Spalte vor der Schichtspalte ist damit genau die
+ * Linie, an der der Bedienpunkt `+` sitzt.
+ */
+.cell-extra {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  border-right: 1px solid var(--color-border);
+}
+
+/**
+ * Andeutung der beiden einzufügenden Spalten beim Überfahren des Monats.
+ *
+ * Der linke Strich sitzt am linken Rand der Ereignis-/Info-Zelle (zwischen
+ * Datum und Info), der rechte am linken Rand der Schichtspalte (zwischen KW
+ * und T/N). Beide Zellen sind die jeweils rechts der Trennlinie liegende
+ * Zelle; ihr linker Rand ist damit exakt die Linie, auf der der Bedienpunkt
+ * `+` sitzt. Dadurch bleibt die Andeutung deckungsgleich mit dem Raster, ohne
+ * eigene Marker-Elemente.
+ */
+.cell-information::before,
+.cell-shift::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  border-left: 1px dashed var(--color-accent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.day-table:hover .cell-information::before,
+.day-table:hover .cell-shift::before {
+  opacity: 0.6;
 }
 
 /**
@@ -761,8 +1097,12 @@ body {
  * Zellenbereich ab - bis zu den durchgehenden senkrechten Trennstrichen, die
  * von den Spalten Wochentag/Datum/T-N gebildet werden. `display: flex` mit
  * `align-items: center` zentriert den einzeiligen Text vertikal in der Zelle.
+ *
+ * `position: relative` dient ausschließlich dem `::before`-Andeutungsstrich an
+ * der linken Zellkante (siehe oben); am Layout ändert das nichts.
  */
 .cell-information {
+  position: relative;
   align-self: stretch;
   display: flex;
   align-items: center;
@@ -801,7 +1141,7 @@ body {
   justify-content: center; /* vertikal zentriert */
   align-items: flex-start; /* linksbündig */
   text-align: left;
-  white-space: pre-line;
+  white-space: normal;
   overflow: hidden;
   overflow-wrap: anywhere;
 }
@@ -820,6 +1160,57 @@ body {
 .cell-information.label-lines-3 {
   font-size: 12px;
   line-height: 1.1;
+}
+
+/**
+ * Textblock der Info-Zelle (Beschriftung aus dem Tageseditor bzw. Terminnamen).
+ *
+ * Der Block trägt die persönliche Farbe der Info-Spalte (Hintergrund) und ist
+ * nur so breit wie sein Inhalt: So wird beim Zusammenfallen mit Geburtstagen
+ * bzw. wiederkehrenden Ereignissen **nur der Tageseditor-Eintrag** eingefärbt,
+ * nicht die Jahrestage.
+ *
+ * Er ist ein eigenes Flex-Element, damit er zusammen mit den Jahrestagen
+ * sauber untereinander (mehrzeilig) erscheint, sobald die Zelle über
+ * `.cell-information.label-lines-*` als senkrechter Flex-Container arbeitet.
+ */
+.cell-information-text {
+  min-width: 0;
+  max-width: 100%;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/**
+ * Zusätzlicher Tageseditor-Eintrag in der Info-Zelle.
+ *
+ * Liegt eine Beschriftung (bzw. ein Termin) vor, ist die Info-Zelle ein
+ * senkrechter Flex-Container (siehe `.cell-information.label-lines-*`). Die
+ * Jahrestage stehen dabei **immer ganz oben** in der Zelle
+ * (`.cell-anniversaries` vor `.cell-information-text`). Sobald ein zusätzlicher
+ * Tageseditor-Eintrag vorhanden ist, wird der Zellinhalt mehrzeilig
+ * umgebrochen; die Schriftgröße folgt den DayEditor-Regeln
+ * (`label-lines-1/2/3`, siehe `utils/textFit.ts`).
+ */
+.cell-information.has-annotation-entry .cell-anniversaries {
+  display: block;
+  width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-weight: 400;
+}
+
+/**
+ * Ohne Beschriftung (nur Jahrestage/Termine) bleibt die Zeile einzeilig: die
+ * Jahrestage folgen inline auf den Terminnamen (getrennt durch ` · `).
+ */
+.cell-information:not(.has-annotation-entry) .cell-anniversaries {
+  display: inline;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /** ------------------------------------------------------- Feiertagsmarkierung */
@@ -1017,6 +1408,29 @@ body {
   border-top: 1px solid var(--color-border);
 }
 
+/**
+ * Zusatzfarben der frei angelegten Spalten im DayEditor.
+ *
+ * Je Zusatzspalte des Tages zeigt der Editor eine eigene Zeile: links der
+ * Anzeigename, darunter der Farbwähler. Die Felder stehen untereinander, damit
+ * auch mehrere Spalten übersichtlich bleiben.
+ */
+.editor-extra-colors {
+  gap: 10px;
+}
+
+.editor-extra-color {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.editor-extra-color-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
 /* ------------------------------------------------- Streak-Auswahl */
 
 /**
@@ -1090,3 +1504,127 @@ body {
   line-height: 1.5;
   color: var(--color-text-muted);
 }
+
+/* ---------------------------------------------- Jahrestage (Geburtstag / wdh.) */
+
+/* Geburtstag/ereignis-Einträge in der Kalenderzelle. */
+.anniversary-entry.is-birthday {
+  font-weight: 600;
+}
+
+.anniversary-emoji {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.anniversary-age,
+.anniversary-interval {
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+/* Jahreslose Ansicht: gleiche Monatsraster, aber ohne Schichtspalte. */
+.anniversary-month-card .anniversary-day-table .day-row {
+  /* Ohne Schichtspalte bleibt die Info-Zelle breit. */
+  cursor: pointer;
+}
+
+.anniversary-information {
+  text-align: left;
+}
+
+.anniversary-row:hover {
+  background: var(--color-accent-soft);
+}
+
+/* ---------------------------------------------- AnniversaryEditor (zweispaltig) */
+
+.anniversary-editor {
+  width: min(680px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 16px 18px 14px;
+  background: var(--color-surface);
+  border-radius: 6px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+}
+
+.anniversary-editor-header {
+  margin-bottom: 12px;
+}
+
+.anniversary-editor-date {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.anniversary-editor-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.anniversary-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.anniversary-column-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Einzelner Eintrag (Geburtstag bzw. Ereignis) innerhalb einer Spalte. */
+.anniversary-entry-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-sunken);
+}
+
+/* Zeilen-Schaltflächen: leise, damit die Felder im Vordergrund bleiben. */
+.row-remove-button {
+  align-self: flex-start;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-holiday-text);
+  cursor: pointer;
+  background: var(--color-holiday-mark);
+  border: 1px solid var(--color-holiday-border);
+  border-radius: var(--radius);
+}
+
+.row-add-button {
+  align-self: stretch;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-accent);
+  cursor: pointer;
+  background: var(--color-accent-soft);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius);
+}
+
+.row-add-button:hover {
+  background: var(--color-surface-sunken);
+}
+
+.anniversary-editor-hint {
+  margin: 4px 0 0;
+}
+
+@media (max-width: 640px) {
+  .anniversary-editor-columns {
+    grid-template-columns: 1fr;
+  }
+}
+

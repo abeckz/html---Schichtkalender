@@ -230,6 +230,18 @@
   grid-template-columns: 6.5mm 1fr 8mm 5mm;
 }
 
+/**
+ * Anzeige-Checkbox "Schichtkalender" ist aus: die Schichtspalte (T/N) entfällt
+ * vollständig, die Bemerkungsspalte (1fr) nimmt die Breite auf.
+ */
+.print-month.is-shift-hidden .print-row {
+  grid-template-columns: 6.5mm 7mm 1fr 8mm;
+}
+
+.print-month.is-shift-hidden .print-row.print-row-weekday-over-date {
+  grid-template-columns: 6.5mm 1fr 8mm;
+}
+
 .print-row:first-child {
   border-top: none;
 }
@@ -375,7 +387,7 @@
   justify-content: center; /* vertikal zentriert */
   align-items: flex-start; /* linksbündig */
   text-align: left;
-  white-space: pre-line;
+  white-space: normal;
   overflow: hidden;
   overflow-wrap: anywhere;
   text-overflow: clip;
@@ -395,6 +407,31 @@
 .print-row > .print-col-info.label-lines-3 {
   font-size: 6.5pt;
   line-height: 1.02;
+}
+
+/**
+ * Textblock des Tageseditor-Eintrags im Druck.
+ *
+ * Er trägt die persönliche Farbe (Hintergrund) und ist nur so breit wie sein
+ * Inhalt: So wird beim Zusammenfallen mit Geburtstagen bzw. wiederkehrenden
+ * Ereignissen **nur der Tageseditor-Eintrag** eingefärbt, nicht die Jahrestage.
+ * `white-space: pre-line` erhält die harten Umbrüche (`\n`) der Beschriftung.
+ */
+.print-col-info-text {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/**
+ * Jahrestage im Druck: Sie stehen **immer ganz oben** in der Zelle. Liegt ein
+ * zusätzlicher Tageseditor-Eintrag vor, wird der Zellinhalt mehrzeilig
+ * umgebrochen (Jahrestage oben, Eintrag darunter).
+ */
+.print-col-anniversaries {
+  display: block;
+  width: 100%;
+  overflow-wrap: anywhere;
+  font-weight: 400;
 }
 
 .print-col-kw {

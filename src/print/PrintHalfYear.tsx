@@ -6,7 +6,7 @@
  * untereinander.
  */
 
-import type { AnnotationColorId, ColumnColorName, MonthCalendar } from '../domain/types.ts';
+import type { AnnotationColorId, AnniversaryMap, ColumnColorName, MonthCalendar } from '../domain/types.ts';
 import { PrintMonth } from './PrintMonth.tsx';
 
 export interface PrintHalfYearProps {
@@ -16,6 +16,14 @@ export interface PrintHalfYearProps {
   annotationColors: Record<string, Partial<Record<ColumnColorName, AnnotationColorId>>>;
   /** Anzeige-Option "Wochentag über Datum" (Standard: aus). */
   weekdayOverDate?: boolean;
+  /** Anzeige-Checkbox "Schichtkalender" (Standard: an). */
+  showShiftCalendar?: boolean;
+  /** Jahreslose Geburtstage und wiederkehrende Ereignisse. */
+  anniversaries?: AnniversaryMap;
+  /** Anzeige-Checkbox "Geburtstag" (Standard: an). */
+  showBirthdays?: boolean;
+  /** Anzeige-Checkbox "wdh. Ereignis" (Standard: an). */
+  showRecurringEvents?: boolean;
   side: 1 | 2;
 }
 
@@ -24,6 +32,10 @@ export function PrintHalfYear({
   annotationLabels,
   annotationColors,
   weekdayOverDate = false,
+  showShiftCalendar = true,
+  anniversaries = {},
+  showBirthdays = true,
+  showRecurringEvents = true,
   side,
 }: PrintHalfYearProps) {
   return (
@@ -35,6 +47,10 @@ export function PrintHalfYear({
           annotationLabels={annotationLabels}
           annotationColors={annotationColors}
           weekdayOverDate={weekdayOverDate}
+          showShiftCalendar={showShiftCalendar}
+          anniversaries={anniversaries}
+          showBirthdays={showBirthdays}
+          showRecurringEvents={showRecurringEvents}
         />
       ))}
     </section>

@@ -12,6 +12,16 @@
  * KW-Spalte. Trägt der Tag einen Kommentar bzw. eine Info, verdrängt dieser
  * Text die Termin- und Feiertagsangaben vollständig.
  *
+ * Ein Klick in die Zeile öffnet immer den Tageseditor (Beschriftung/Farbe).
+ * Geburtstage und wiederkehrende Ereignisse sind hier reine Anzeige; bearbeitet
+ * werden sie ausschließlich im Jahrestag-Editor der jahreslosen Ansicht. Tragen
+ * Beschriftung (Tageseditor) und Jahrestage denselben Tag, werden beide Inhalte
+ * gemeinsam mehrzeilig in der Info-Zelle umgebrochen: Die Jahrestage stehen
+ * dabei **immer ganz oben**, der Tageseditor-Eintrag darunter. Die persönliche
+ * Farbe der Info-Spalte färbt ausschließlich den Tageseditor-Eintrag ein, nicht
+ * die Jahrestage; die Schriftgröße folgt den Regeln des Tageseditors
+ * (`label-lines-1/2/3`).
+ *
  * Rheinland-Pfalz gilt als Bezugsraum: gesetzliche Feiertage sind Neujahr,
  * Karfreitag, Ostermontag, Maifeiertag, Christi Himmelfahrt, Pfingstmontag,
  * Fronleichnam, Tag der Deutschen Einheit, Allerheiligen sowie
@@ -20,11 +30,18 @@
  */
 
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import type { CalendarDay, ColumnColorName, UserDayAnnotation } from '../domain/types.ts';
+import type {
+  AnniversaryMap,
+  CalendarDay,
+  ColumnColorName,
+  UserDayAnnotation,
+} from '../domain/types.ts';
 import { getColorHex } from '../config/annotationColors.ts';
 import { hasPublicHoliday } from '../engines/eventEngine.ts';
+import { matchesForDateKey, formatIntervalLabel } from '../engines/anniversaryEngine.ts';
 import { PUBLIC_HOLIDAY_MARK, PUBLIC_HOLIDAY_TITLE } from '../print/PrintMonth.tsx';
-import { labelLineClass } from '../utils/textFit.ts';
+import { cellLineClass } from '../utils/textFit.ts';
+import { ExtraColumnCell, type ExtraColumnDisplay } from './ExtraColumnCell.tsx';
 
 export interface CalendarDayRowProps {
   day: CalendarDay;
@@ -38,6 +55,23 @@ export interface CalendarDayRowProps {
    */
   weekdayOverDate?: boolean;
   onOpenEditor: (day: CalendarDay) => void;
+  /** Anzeige-Checkbox "Schichtkalender" (Standard: an). */
+  showShiftCalendar?: boolean;
+  /** Jahreslose Geburtstage und wiederkehrende Ereignisse. */
+  anniversaries?: AnniversaryMap;
+  /** Anzeige-Checkbox "Geburtstag" (Standard: an). */
+  showBirthdays?: boolean;
+  /** Anzeige-Checkbox "wdh. Ereignis" (Standard: an). */
+  showRecurringEvents?: boolean;
+  /**
+   * Frei angelegte Zusatzspalten des Monats, in Anzeigereihenfolge.
+   *
+   * Sie sind leer und dienen dem Benutzer als zusätzlicher Platz. Spalten der
+   * Seite `left` stehen zwischen Datum und Info (links der Ereigniszelle),
+   * Spalten der Seite `right` zwischen KW und T/N. Ohne Eintrag bleibt die
+   * Zeile unverändert.
+   */
+  extraColumns?: ExtraColumnDisplay[];
   /** true, wenn der Tag Teil der aktuellen Streifen-Auswahl ist. */
   isSelected?: boolean;
   /**
@@ -79,6 +113,11 @@ export function CalendarDayRow({
   annotation,
   weekdayOverDate = false,
   onOpenEditor,
+  showShiftCalendar = true,
+  anniversaries = {},
+  showBirthdays = true,
+  showRecurringEvents = true,
+  extraColumns,
   isSelected = false,
   selectedColumn = null,
   onStreakStart,
@@ -87,6 +126,15 @@ export function CalendarDayRow({
 }: CalendarDayRowProps) {
   const publicHoliday = hasPublicHoliday(day);
   const annotationLabel = annotation?.label ?? '';
+
+  // Passende Jahrestage des Kalendertags: Geburtstag und/oder wiederkehrendes
+  // Ereignis. Über die Checkboxen lassen sich beide Arten getrennt ein- und
+  // ausblenden; die angezeigten Einträge werden hier danach gefiltert.
+  const anniversaryMatches = matchesForDateKey(anniversaries, day.dateKey, day.year).filter(
+    ({ entry }) =>
+      (entry.kind === 'birthday' && showBirthdays) ||
+      (entry.kind === 'recurring' && showRecurringEvents),
+  );
 
   // Hintergrundfarben je Spalte. Der Streifen färbt Wochentag, Tagesnummer
   // oder T/N; die Info-Spalte trägt die Farbe aus dem DayEditor.
@@ -105,8 +153,15 @@ export function CalendarDayRow({
     hex ? { backgroundColor: hex } : undefined;
 
   // Eine Zeile gilt als eingefärbt, sobald in irgendeiner Spalte eine Farbe
-  // gesetzt ist. Das steuert die Kontrast-/Textfarbe der Zeile.
-  const hasColor = Boolean(weekdayHex || dayHex || infoHex || shiftHex);
+  // gesetzt ist. Das steuert die Kontrast-/Textfarbe der Zeile. Die frei
+  // angelegten Zusatzspalten zählen dabei mit.
+  const hasColor = Boolean(
+    weekdayHex ||
+      dayHex ||
+      infoHex ||
+      shiftHex ||
+      Object.keys(annotation?.extraColors ?? {}).length > 0,
+  );
 
   // Der Informationstext zeigt die Termine und den Kommentar/die Info des
   // Anwenders. Gesetzliche Feiertage stehen dort ausgeschrieben; die
@@ -119,10 +174,16 @@ export function CalendarDayRow({
       ? annotationLabel
       : day.events.map((event) => event.name).join(' · ');
 
-  // Adaptive Schrift: kurze Beschriftungen erscheinen groß, drei Zeilen
-  // kleiner. Maßgeblich ist ausschließlich die Beschriftung des Anwenders;
-  // Termin- und Feiertagsnamen bleiben in ihrer Standardgröße.
-  const infoLineClass = annotationLabel !== '' ? labelLineClass(annotationLabel) : '';
+  // Adaptive Schrift über den gesamten Zellinhalt: Die Beschriftung folgt den
+  // DayEditor-Regeln, jeder Jahrestag belegt zusätzlich eine Zeile (siehe
+  // `cellLineClass`). Dadurch wird die Schrift kleiner, sobald zu einer
+  // einzeiligen Beschriftung noch ein Geburtstag/ereignis hinzukommt. Ohne
+  // Beschriftung und ohne Jahrestage (nur Terminnamen) bleibt die normale
+  // Zeilengröße erhalten.
+  const infoLineClass =
+    annotationLabel !== '' || anniversaryMatches.length > 0
+      ? cellLineClass(informationText, anniversaryMatches.length)
+      : '';
 
   const classNames = ['day-row'];
   if (weekdayOverDate) classNames.push('is-weekday-over-date');
@@ -135,9 +196,22 @@ export function CalendarDayRow({
   if (infoHex) classNames.push('has-color-info');
   if (shiftHex) classNames.push('has-color-shift');
 
-  const ariaLabel = publicHoliday
-    ? `${describeDay(day, annotation)}, ${PUBLIC_HOLIDAY_TITLE}`
-    : describeDay(day, annotation);
+  const anniversaryLabel = anniversaryMatches
+    .map(({ entry, age }) => {
+      if (entry.kind === 'birthday') {
+        return `Geburtstag ${entry.name}${age !== undefined ? ` (${age})` : ''}`;
+      }
+      return `wiederkehrendes Ereignis ${entry.name} (${formatIntervalLabel(entry)})`;
+    })
+    .join(', ');
+
+  const ariaLabel = [
+    describeDay(day, annotation),
+    anniversaryLabel,
+    publicHoliday ? PUBLIC_HOLIDAY_TITLE : '',
+  ]
+    .filter((part) => part !== '')
+    .join(', ');
 
   /**
    * Streifen-Auswahl: Ein Ziehen zeigt sich nur, wenn die Maustaste in einer
@@ -208,11 +282,58 @@ export function CalendarDayRow({
           </span>
         </>
       )}
+      {/* Zusatzspalten links der Ereignis-/Info-Zelle (zwischen Datum und Info). */}
+      {(extraColumns ?? [])
+        .filter((column) => column.side === 'left')
+        .map((column) => (
+          <ExtraColumnCell
+            key={`extra-left-${column.name}`}
+            column={column}
+            annotation={annotation}
+          />
+        ))}
       <span
-        className={`cell cell-information${selectedClass('info')} ${infoLineClass}`.trim()}
-        style={columnStyle(infoHex)}
+        className={[
+          'cell',
+          'cell-information',
+          selectedClass('info'),
+          infoLineClass,
+          annotationLabel !== '' ? 'has-annotation-entry' : '',
+        ]
+          .filter((name) => name !== '')
+          .join(' ')}
       >
-        {informationText}
+        {anniversaryMatches.length > 0 && (
+          <span className="cell-anniversaries">
+            {anniversaryMatches.map(({ entry, age }, index) => (
+              <span
+                key={entry.id}
+                className={
+                  entry.kind === 'birthday'
+                    ? 'anniversary-entry is-birthday'
+                    : 'anniversary-entry is-recurring'
+                }
+              >
+                {index > 0 && ' · '}
+                <span className="anniversary-emoji" aria-hidden="true">
+                  {entry.kind === 'birthday' ? '🎂' : '🔁'}
+                </span>{' '}
+                {entry.name}
+                {entry.kind === 'birthday' && age !== undefined && (
+                  <span className="anniversary-age"> ({age})</span>
+                )}
+                {entry.kind === 'recurring' && (
+                  <span className="anniversary-interval"> ({formatIntervalLabel(entry)})</span>
+                )}
+              </span>
+            ))}
+          </span>
+        )}
+        {informationText !== '' && (
+          <span className="cell-information-text" style={columnStyle(infoHex)}>
+            {informationText}
+          </span>
+        )}
       </span>
       <span className="cell cell-kw">
         {day.isoWeekday === 1 && <span className="cell-week">{day.isoWeek}</span>}
@@ -222,9 +343,23 @@ export function CalendarDayRow({
           </span>
         )}
       </span>
-      <span className={`cell cell-shift${selectedClass('shift')}`} style={columnStyle(shiftHex)}>
-        {day.shiftLabel}
-      </span>
+      {(extraColumns ?? [])
+        .filter((column) => column.side === 'right')
+        .map((column) => (
+          <ExtraColumnCell
+            key={`extra-right-${column.name}`}
+            column={column}
+            annotation={annotation}
+          />
+        ))}
+      {showShiftCalendar && (
+        <span
+          className={`cell cell-shift${selectedClass('shift')}`}
+          style={columnStyle(shiftHex)}
+        >
+          {day.shiftLabel}
+        </span>
+      )}
     </button>
   );
 }

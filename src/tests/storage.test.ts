@@ -106,6 +106,7 @@ describe('Normalisierung einzelner Annotationen', () => {
 describe('Einstellungen', () => {
   it('übernimmt gültige Einstellungen', () => {
     expect(normalizeSettings({ selectedYear: 2024, selectedShift: 'A' })).toEqual({
+      ...DEFAULT_SETTINGS,
       selectedYear: 2024,
       selectedShift: 'A',
       weekdayOverDate: false,
@@ -137,11 +138,12 @@ describe('Einstellungen', () => {
 describe('Lesen und Schreiben', () => {
   const state: PersistedState = {
     version: 1,
-    settings: { selectedYear: 2023, selectedShift: 'B', weekdayOverDate: false },
+    settings: { ...DEFAULT_SETTINGS, selectedYear: 2023, selectedShift: 'B', weekdayOverDate: false },
     annotations: {
       '2023-04-04': { dateKey: '2023-04-04', label: 'Urlaub', colors: { info: 'orange' } },
     },
     colorLegend: {},
+    anniversaries: {},
   };
 
   it('rundreist verlustfrei', () => {
@@ -159,12 +161,14 @@ describe('Lesen und Schreiben', () => {
       settings: DEFAULT_SETTINGS,
       annotations: {},
       colorLegend: {},
+      anniversaries: {},
     });
     expect(readState(createMemoryStorage())).toEqual({
       version: 1,
       settings: DEFAULT_SETTINGS,
       annotations: {},
       colorLegend: {},
+      anniversaries: {},
     });
   });
 
@@ -211,7 +215,11 @@ describe('Lesen und Schreiben', () => {
       '2021-12-24': { dateKey: '2021-12-24', label: 'frei', colors: { info: 'pink' } },
     };
     expect(
-      saveSettings({ selectedYear: 2021, selectedShift: 'C', weekdayOverDate: false }, annotations, storage),
+      saveSettings(
+        { ...DEFAULT_SETTINGS, selectedYear: 2021, selectedShift: 'C', weekdayOverDate: false },
+        annotations,
+        storage,
+      ),
     ).toBe(true);
     const loaded = readState(storage);
     expect(getAnnotationColorId(loaded.annotations, '2021-12-24')).toBe('pink');
