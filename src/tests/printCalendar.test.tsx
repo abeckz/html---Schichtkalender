@@ -990,4 +990,16 @@ describe('PrintMonth – Zusatzspalten', () => {
     const rule = /\.print-row\s*>\s*\.print-col-extra\[style\]\s*\{[^}]*margin:\s*-0\.25pt\s+0/s;
     expect(rule.test(stylesheet)).toBe(true);
   });
+
+  /**
+   * Regression: Wie am Bildschirm war eine rechts liegende Zusatzspalte im Druck
+   * nur rechts abgetrennt. Die KW-Spalte bleibt bewusst strichfrei, der linke
+   * Trennstrich kommt daher jetzt von der rechten Zusatzspalte selbst.
+   */
+  it('trennt auch rechts liegende Zusatzspalten im Druck beidseitig ab', () => {
+    const stylesheet = readPrintStylesheet();
+    const rule =
+      /\.print-row\s*>\s*\.print-col-extra\[data-extra-column-side='right'\]\s*\{[^}]*border-left:/s;
+    expect(rule.test(stylesheet)).toBe(true);
+  });
 });

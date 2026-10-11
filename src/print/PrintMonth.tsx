@@ -267,10 +267,13 @@ function PrintExtraCell({
   colorKey,
   annotationExtraColors,
   dateKey,
+  side,
 }: {
   colorKey: ExtraColumnColorKey;
   annotationExtraColors: Record<string, Partial<Record<ExtraColumnColorKey, AnnotationColorId>>>;
   dateKey: string | null;
+  /** Seite der Trennlinie - steuert den linken Trennstrich (`left`/`right`). */
+  side: 'left' | 'right';
 }) {
   const colorId = dateKey ? annotationExtraColors[dateKey]?.[colorKey] ?? null : null;
   const hex = getColorHex(colorId);
@@ -278,6 +281,7 @@ function PrintExtraCell({
     <span
       className="print-col-extra"
       data-extra-column-key={colorKey}
+      data-extra-column-side={side}
       style={hex ? { backgroundColor: hex } : undefined}
     />
   );
@@ -433,6 +437,7 @@ export function PrintMonth({
                     colorKey={column.colorKey}
                     annotationExtraColors={annotationExtraColors}
                     dateKey={null}
+                    side="left"
                   />
                 ))}
                 <span className="print-col-info" />
@@ -443,6 +448,7 @@ export function PrintMonth({
                     colorKey={column.colorKey}
                     annotationExtraColors={annotationExtraColors}
                     dateKey={null}
+                    side="right"
                   />
                 ))}
                 {showShiftCalendar && <span className="print-col-schicht" />}
@@ -517,6 +523,7 @@ export function PrintMonth({
                   colorKey={column.colorKey}
                   annotationExtraColors={annotationExtraColors}
                   dateKey={day.dateKey}
+                  side="left"
                 />
               ))}
               <span className={`print-col-info ${infoLineClass}`.trim()}>
@@ -541,6 +548,7 @@ export function PrintMonth({
                   colorKey={column.colorKey}
                   annotationExtraColors={annotationExtraColors}
                   dateKey={day.dateKey}
+                  side="right"
                 />
               ))}
               {showShiftCalendar && (

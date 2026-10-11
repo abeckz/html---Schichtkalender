@@ -323,6 +323,18 @@ den Text mit **demselben Anker** - andere Spannen bleiben erhalten. Der
 `StreakEditor` kennt ausschließlich die festen Farbspalten
 (`ColumnColorName`).
 
+**Klick in einer Zieh-Spalte.** Ein einfacher Klick (ohne Ziehen) auf eine
+Zieh-Zelle (Wochentag, Tagesnummer, T/N oder Zusatzspalte) wird bereits mit
+`mouseup` zentral ausgewertet: Er öffnet den `ExtraColumnEditor` (Zusatzspalte)
+bzw. den `StreakEditor` (feste Spalte). Der Browser feuert danach zusätzlich ein
+`click`-Ereignis, das zum umgebenden Tageszeilen-Button hochsteigt und dort den
+`DayEditor` öffnen würde; der Schutz `if (isSelected) return;` greift dann nicht
+mehr, weil `handleStreakEnd` die Auswahl bereits zurückgesetzt hat. Ein
+`suppressClickRef`-Flag in `CalendarDayRow.tsx` merkt sich das `mousedown` in
+einer Zieh-Spalte und verbraucht den folgenden `click` einmalig, damit der
+`DayEditor` nicht ungewollt (zusätzlich) aufgeht. Ein Klick in die
+Ereignisspalte (Info-Zelle) öffnet den `DayEditor` weiterhin.
+
 **Farbigkeit der Schlüssel.** `buildExtraColumnLayout` vergibt die Farbschlüssel
 seitenübergreifend eindeutig: links ab `extra0`, rechts ab der Anzahl linker
 Spalten. Damit kollidieren die persönlichen Farben der linken und rechten

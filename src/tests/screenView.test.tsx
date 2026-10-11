@@ -1062,6 +1062,58 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
     }
   });
 
+  /**
+   * Regression: Ein einfacher Klick auf eine Zusatzspalte (mousedown + mouseup +
+   * click auf derselben Zelle, ohne Ziehen) öffnete zusätzlich den `DayEditor`
+   * der Ereignisspalte. Ursache war das vom Browser nachgereichte `click`-Ereignis,
+   * das zum umgebenden Tageszeilen-Button hochstieg, nachdem der Streak-End-Handler
+   * die Auswahl (`isSelected`) bereits zurückgesetzt hatte. Der zusätzliche Dialog
+   * erscheint nicht mehr; der Klick in die Ereignisspalte (Info-Zelle) öffnet den
+   * `DayEditor` weiterhin.
+   */
+  it('öffnet bei einem Klick auf eine Zusatzspalte nicht zusätzlich den Tageseditor', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      click(handle(container, 'left'));
+      const row = cardOf(container, 'Januar 2026')!.querySelectorAll('.day-row')[0];
+
+      /** Reiht einen echten Klick (mousedown, mouseup, click) auf einer Zelle auf. */
+      const realClick = (cell: Element) => {
+        for (const type of ['mousedown', 'mouseup', 'click']) {
+          act(() => {
+            cell.dispatchEvent(
+              new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 }),
+            );
+          });
+        }
+      };
+
+      // Klick auf die Zusatzspalte: ausschließlich ihr eigener Editor.
+      realClick(row.querySelector('.cell-extra')!);
+      const extraEditors = container.querySelectorAll('.day-editor');
+      expect(extraEditors.length).toBe(1);
+      expect(extraEditors[0].querySelector('.day-editor-title')?.textContent).toBe(
+        'Zusatzspalte 0',
+      );
+
+      // Klick auf die Ereignisspalte (Info-Zelle) öffnet weiterhin den Tageseditor.
+      act(() => {
+        (
+          Array.from(container.querySelectorAll('.day-editor button')).find(
+            (button) => button.textContent === 'Abbrechen',
+          ) as HTMLElement | undefined
+        )?.click();
+      });
+      realClick(row.querySelector('.cell-information')!);
+      const dayEditors = container.querySelectorAll('.day-editor');
+      expect(dayEditors.length).toBe(1);
+      expect(dayEditors[0].querySelector('.day-editor-title')?.textContent).toBe('1. Januar 2026');
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
   it('hebt beim Ziehen nur die getroffene Spalte hervor', () => {
     // Regression: Jede Zusatzspalte ist eine eigenständige Spalte mit eigenem
     // Farbschlüssel (`extra0`, `extra1`, …). Beim Ziehen darf nur die getroffene
@@ -1216,6 +1268,19 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
   it('zieht gefärbte Zusatzspalten über Padding und Zeilenlinie (ungebrochen)', () => {
     const stylesheet = readStylesheet();
     const rule = /\.cell-extra\[style\]\s*\{[^}]*margin:\s*-4px\s+0/s;
+    expect(rule.test(stylesheet)).toBe(true);
+  });
+
+  /**
+   * Regression: Eine links angelegte Zusatzspalte war beidseitig mit einem
+   * senkrechten Trennstrich abgetrennt (links durch den rechten Rahmen der
+   * Tagesspalte, rechts durch den eigenen Rahmen). Auf der rechten Seite fehlte
+   * der linke Strich, weil die KW-Spalte bewusst strichfrei bleibt. Die rechte
+   * Zusatzspalte zeichnet ihn deshalb selbst.
+   */
+  it('trennt auch rechts liegende Zusatzspalten beidseitig ab', () => {
+    const stylesheet = readStylesheet();
+    const rule = /\.cell-extra\[data-extra-column-side='right'\]\s*\{[^}]*border-left:/s;
     expect(rule.test(stylesheet)).toBe(true);
   });
 

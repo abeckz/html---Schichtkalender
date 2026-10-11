@@ -1128,6 +1128,13 @@ body {
  * einem durchgehenden senkrechten Strich, sodass die Trennlinien des Monats
  * erhalten bleiben. Die letzte Spalte vor der Schichtspalte ist damit genau die
  * Linie, an der der Bedienpunkt `+` sitzt.
+ *
+ * Auf der linken Seite (zwischen Datum und Info) liegt der linke Strich bereits
+ * auf der vorausgehenden Tagesspalte (`.cell-day` trägt `border-right`). Auf der
+ * rechten Seite (zwischen KW und T/N) ist das nicht der Fall: die KW-Spalte
+ * bleibt bewusst strichfrei. Damit auch eine rechte Zusatzspalte beidseitig
+ * abgetrennt ist (wie die linke), zeichnet die rechte Spalte ihren linken
+ * Trennstrich selbst.
  */
 .cell-extra {
   align-self: stretch;
@@ -1136,6 +1143,11 @@ body {
   justify-content: center;
   min-width: 0;
   border-right: 1px solid var(--color-border);
+}
+
+/* Rechte Zusatzspalte: eigener linker Trennstrich zur KW-Spalte hin. */
+.cell-extra[data-extra-column-side='right'] {
+  border-left: 1px solid var(--color-border);
 }
 
 /**

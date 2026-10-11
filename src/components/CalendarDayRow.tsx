@@ -29,6 +29,7 @@
  * Reformationstag sind dort keine gesetzlichen Feiertage.
  */
 
+import { useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import type {
   AnniversaryMap,
@@ -233,6 +234,23 @@ export function CalendarDayRow({
     .join(', ');
 
   /**
+   * Unterdrückt den Editor öffnenden `click`, der auf ein `mousedown` in einer
+   * Zieh-Spalte folgt.
+   *
+   * Ein Klick auf eine Zieh-Zelle (Wochentag, Tagesnummer, T/N oder eine
+   * Zusatzspalte) startet mit `mousedown` eine Streifen-Auswahl und wird mit
+   * `mouseup` bereits zentral ausgewertet (Farbe/Text bzw. Einfärbe-Dialog). Der
+   * Browser feuert danach zusätzlich ein `click`-Ereignis, das zum umgebenden
+   * Tageszeilen-Button hochsteigt und dort den `DayEditor` öffnen würde. Da der
+   * Streak-End-Handler die Auswahl (`isSelected`) zu diesem Zeitpunkt bereits
+   * zurückgesetzt hat, greift dessen Schutz nicht mehr. Dieses Flag merkt sich,
+   * dass der kommende `click` aus einer Zieh-Spalte stammt, und wird dort
+   * einmalig verbraucht, damit der `DayEditor` nicht ungewollt (zusätzlich)
+   * aufgeht.
+   */
+  const suppressClickRef = useRef(false);
+
+  /**
    * Streifen-Auswahl: Ein Ziehen zeigt sich nur, wenn die Maustaste in einer
    * der Zieh-Zellen (Wochentag, Tagesnummer, T/N) gedrückt wurde. Ein reiner
    * Klick ohne Zieh-Spalte öffnet weiterhin den Editor. Die gestartete Spalte
@@ -243,6 +261,9 @@ export function CalendarDayRow({
     if (!onStreakStart) return;
     const column = columnOfCell(event.target);
     if (!column) return;
+    // Ab hier stammt der nachfolgende `click` aus einer Zieh-Spalte und darf
+    // den Tageseditor nicht zusätzlich öffnen (siehe `suppressClickRef`).
+    suppressClickRef.current = true;
     event.preventDefault();
     onStreakStart(day, column);
   };
@@ -267,6 +288,14 @@ export function CalendarDayRow({
         // Während einer Streifen-Auswahl löst das Loslassen kein Öffnen des
         // Editors aus; das übernimmt der Streak-End-Handler zentral.
         if (isSelected) return;
+        // Ein `click`, der auf ein `mousedown` in einer Zieh-Spalte folgt, ist
+        // nur das Nachspiel der Streifen-Auswahl (Farbe/Text bzw. Einfärben)
+        // und darf den Tageseditor nicht zusätzlich öffnen. Das Flag wird beim
+        // nächsten Klick einmalig verbraucht.
+        if (suppressClickRef.current) {
+          suppressClickRef.current = false;
+          return;
+        }
         onOpenEditor(day);
       }}
       onMouseDown={handleMouseDown}

@@ -261,21 +261,20 @@ describe('PrintCalendar', () => {
         const container = render(_jsx(PrintCalendar, { calendar: calendar, annotations: {}, onPrint: () => undefined, onBack: () => undefined }));
         expect(container.querySelectorAll('.print-header-colors').length).toBe(0);
     });
-    it('stellt im Seitenkopf die Farblegende direkt unter die Gesamtzeile', () => {
-        // Anforderung: In der Legendenzeile des Kopfes stehen nur die Gesamtzeile
-        // und darunter die Farblegende.
+    it('führt in der Kopflegende nur noch die Gesamtzeile der Arbeitsschichten', () => {
+        // Anforderung: Die Legendenzeile des Kopfes nennt ausschließlich die
+        // Gesamtzahl der gearbeiteten Schichten des Jahres.
         const container = render(_jsx(PrintCalendar, { calendar: calendar, annotations: annotations, colorLegend: { yellow: 'Urlaub' }, onPrint: () => undefined, onBack: () => undefined }));
         const legend = container.querySelector('.print-header-legend');
         const children = Array.from(legend.children);
+        expect(children.length).toBe(1);
         expect(children[0].classList.contains('print-header-total')).toBe(true);
-        expect(children[1].classList.contains('print-header-colors')).toBe(true);
-        expect(children.length).toBe(2);
     });
-    it('setzt die Erklärungen links als zwei Spalten übereinander', () => {
+    it('setzt die Legenden links als Spalten übereinander', () => {
         // Anforderung: Am linken Rand stehen T, N, Werktage und Sollschichten
         // übereinander; daneben bilden F, Geburtstag und wiederkehrendes Ereignis
-        // eine eigene Spalte.
-        const container = render(_jsx(PrintCalendar, { calendar: calendar, annotations: annotations, onPrint: () => undefined, onBack: () => undefined }));
+        // sowie die beschriebenen Farben eigene Spalten.
+        const container = render(_jsx(PrintCalendar, { calendar: calendar, annotations: annotations, colorLegend: { yellow: 'Urlaub' }, onPrint: () => undefined, onBack: () => undefined }));
         const explain = container.querySelector('.print-header-explain');
         expect(explain).not.toBeNull();
         const shifts = Array.from(explain.querySelector('.print-header-shifts').children).map((element) => element.textContent ?? '');
@@ -291,8 +290,13 @@ describe('PrintCalendar', () => {
             '🎂 = Geburtstag (Alter in Klammern)',
             '🔁 = wiederkehrendes Ereignis',
         ]);
-        // Die Zeichen stehen als eigene Spalte neben den Schichtkennzahlen.
+        // Die beschriebenen Farben bilden eine weitere Spalte daneben.
+        const colors = explain.querySelector('.print-header-colors');
+        expect(colors).not.toBeNull();
+        expect(colors.textContent).toContain('Urlaub');
+        // Die drei Spalten stehen in dieser Reihenfolge nebeneinander.
         expect(explain.querySelector('.print-header-shifts').nextElementSibling).toBe(explain.querySelector('.print-header-marks'));
+        expect(explain.querySelector('.print-header-marks').nextElementSibling).toBe(colors);
     });
     it('setzt Titel, Jahr und Schicht rechts untereinander', () => {
         // Anforderung: Titel, Jahr und Schicht stehen übereinander am rechten Rand.

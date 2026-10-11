@@ -87,6 +87,27 @@ function toggleByLabel(container, label) {
         return container.contains(labelElement) && labelElement?.textContent === label;
     }) ?? null);
 }
+/**
+ * Findet ein Anzeige-Kästchen über die sichtbare Beschriftung.
+ *
+ * Die Kästchen sind echte `<input type="checkbox">`-Elemente; das Label trägt
+ * die Beschriftung als `aria-labelledby`-Ziel.
+ */
+function checkboxByLabel(container, label) {
+    return (Array.from(container.querySelectorAll('.checkbox-input')).find((element) => {
+        const labelledBy = element.getAttribute('aria-labelledby');
+        if (!labelledBy)
+            return false;
+        const labelElement = document.getElementById(labelledBy);
+        return container.contains(labelElement) && labelElement?.textContent === label;
+    }) ?? null);
+}
+/** Klickt ein Kästchen fachgerecht (löst change aus). */
+function toggleCheckbox(element) {
+    if (!element)
+        throw new Error('Kästchen nicht gefunden.');
+    click(element);
+}
 describe('Bildschirmdarstellung', () => {
     it('nennt die Anwendung "BASF Schichtkalender"', () => {
         const container = render(_jsx(App, {}));
@@ -656,10 +677,10 @@ describe('Anzeige-Option "Wochentag über Datum"', () => {
         window.localStorage.removeItem('schichtkalender.state');
         try {
             const container = render(_jsx(App, {}));
-            const toggle = toggleByLabel(container, 'Wochentag über Datum');
-            expect(toggle).not.toBeNull();
-            expect(toggle?.getAttribute('aria-checked')).toBe('false');
-            // Ohne Schalter: getrennte Spalten, keine gestapelte Zelle.
+            const box = checkboxByLabel(container, 'Wochentag über Datum');
+            expect(box).not.toBeNull();
+            expect(box?.checked).toBe(false);
+            // Ohne Kästchen: getrennte Spalten, keine gestapelte Zelle.
             expect(container.querySelector('.day-table.is-weekday-over-date')).toBeNull();
             const row = container.querySelector('.day-row');
             expect(row?.querySelector('.cell-day')).not.toBeNull();
@@ -672,10 +693,10 @@ describe('Anzeige-Option "Wochentag über Datum"', () => {
         window.localStorage.removeItem('schichtkalender.state');
         try {
             const container = render(_jsx(App, {}));
-            const toggle = toggleByLabel(container, 'Wochentag über Datum');
-            click(toggle);
-            // Der Schalter meldet den eingeschalteten Zustand ...
-            expect(toggle?.getAttribute('aria-checked')).toBe('true');
+            const box = checkboxByLabel(container, 'Wochentag über Datum');
+            toggleCheckbox(box);
+            // Das Kästchen meldet den eingeschalteten Zustand ...
+            expect(box?.checked).toBe(true);
             // ... und der Monat nutzt das gestapelte Raster.
             expect(container.querySelector('.day-table.is-weekday-over-date')).not.toBeNull();
             const row = container.querySelector('.day-row');
@@ -694,13 +715,28 @@ describe('Anzeige-Option "Wochentag über Datum"', () => {
         window.localStorage.removeItem('schichtkalender.state');
         try {
             const first = render(_jsx(App, {}));
-            const toggle = toggleByLabel(first, 'Wochentag über Datum');
-            click(toggle);
+            const box = checkboxByLabel(first, 'Wochentag über Datum');
+            toggleCheckbox(box);
             unmountAll();
             // Neue Sitzung: die Einstellung wird aus dem Speicher übernommen.
             const second = render(_jsx(App, {}));
-            expect(toggleByLabel(second, 'Wochentag über Datum')?.getAttribute('aria-checked')).toBe('true');
+            expect(checkboxByLabel(second, 'Wochentag über Datum')?.checked).toBe(true);
             expect(second.querySelector('.day-table.is-weekday-over-date')).not.toBeNull();
+        }
+        finally {
+            window.localStorage.removeItem('schichtkalender.state');
+        }
+    });
+    it('führt die Anzeige-Option als Kästchen in der Anzeigen-Gruppe', () => {
+        window.localStorage.removeItem('schichtkalender.state');
+        try {
+            const container = render(_jsx(App, {}));
+            const group = container.querySelector('.checkbox-group');
+            expect(group).not.toBeNull();
+            // Das Kästchen steht in derselben Gruppe wie die übrigen Anzeigen.
+            expect(group?.querySelectorAll('.checkbox-input').length).toBe(4);
+            // Und nicht mehr unter den Umschaltern (Pillen).
+            expect(toggleByLabel(container, 'Wochentag über Datum')).toBeNull();
         }
         finally {
             window.localStorage.removeItem('schichtkalender.state');
@@ -834,6 +870,47 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
             const rowAfter = (cardOf(container, 'Januar 2026')?.querySelectorAll('.day-row')[0] ??
                 null);
             expect(rowAfter?.querySelector('.cell-extra')?.getAttribute('style') ?? '').toContain('background-color');
+        }
+        finally {
+            window.localStorage.removeItem('schichtkalender.state');
+        }
+    });
+    /**
+     * Regression: Ein einfacher Klick auf eine Zusatzspalte (mousedown + mouseup +
+     * click auf derselben Zelle, ohne Ziehen) öffnete zusätzlich den `DayEditor`
+     * der Ereignisspalte. Ursache war das vom Browser nachgereichte `click`-Ereignis,
+     * das zum umgebenden Tageszeilen-Button hochstieg, nachdem der Streak-End-Handler
+     * die Auswahl (`isSelected`) bereits zurückgesetzt hatte. Der zusätzliche Dialog
+     * erscheint nicht mehr; der Klick in die Ereignisspalte (Info-Zelle) öffnet den
+     * `DayEditor` weiterhin.
+     */
+    it('öffnet bei einem Klick auf eine Zusatzspalte nicht zusätzlich den Tageseditor', () => {
+        window.localStorage.removeItem('schichtkalender.state');
+        try {
+            const container = render(_jsx(App, {}));
+            click(handle(container, 'left'));
+            const row = cardOf(container, 'Januar 2026').querySelectorAll('.day-row')[0];
+            /** Reiht einen echten Klick (mousedown, mouseup, click) auf einer Zelle auf. */
+            const realClick = (cell) => {
+                for (const type of ['mousedown', 'mouseup', 'click']) {
+                    act(() => {
+                        cell.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 }));
+                    });
+                }
+            };
+            // Klick auf die Zusatzspalte: ausschließlich ihr eigener Editor.
+            realClick(row.querySelector('.cell-extra'));
+            const extraEditors = container.querySelectorAll('.day-editor');
+            expect(extraEditors.length).toBe(1);
+            expect(extraEditors[0].querySelector('.day-editor-title')?.textContent).toBe('Zusatzspalte 0');
+            // Klick auf die Ereignisspalte (Info-Zelle) öffnet weiterhin den Tageseditor.
+            act(() => {
+                Array.from(container.querySelectorAll('.day-editor button')).find((button) => button.textContent === 'Abbrechen')?.click();
+            });
+            realClick(row.querySelector('.cell-information'));
+            const dayEditors = container.querySelectorAll('.day-editor');
+            expect(dayEditors.length).toBe(1);
+            expect(dayEditors[0].querySelector('.day-editor-title')?.textContent).toBe('1. Januar 2026');
         }
         finally {
             window.localStorage.removeItem('schichtkalender.state');

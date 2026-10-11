@@ -526,11 +526,22 @@
  * Rein darstellungsbezogen und ohne Inhalt: sie trägt nur eine optionale
  * persönliche Farbe. Wie die übrigen Spaltenzellen endet sie mit einem
  * senkrechten Trennstrich, damit das Raster durchgehend bleibt.
+ *
+ * Auf der linken Seite (zwischen Datum und Info) stammt der linke Strich von
+ * der vorausgehenden Tagesspalte (`.print-col-datum` mit `border-right`). Auf
+ * der rechten Seite (zwischen KW und T/N) bleibt die KW-Spalte bewusst
+ * strichfrei; damit die rechte Zusatzspalte - wie die linke - beidseitig
+ * abgetrennt ist, zeichnet sie ihren linken Trennstrich selbst.
  */
 .print-row > .print-col-extra {
   align-self: stretch;
   min-width: 0;
   border-right: 0.25pt solid #c8ccd1;
+}
+
+/* Rechte Zusatzspalte: eigener linker Trennstrich zur KW-Spalte hin. */
+.print-row > .print-col-extra[data-extra-column-side='right'] {
+  border-left: 0.25pt solid #c8ccd1;
 }
 
 /**

@@ -1,4 +1,35 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+/**
+ * Einzelne Tageszeile der Bildschirmdarstellung.
+ *
+ * Es werden immer alle Informationen als Text angeboten: Wochentag,
+ * Tagesnummer, Termine, persönliche Beschriftung, ISO-KW und T/N. Eine
+ * persönliche Farbe wird als Hintergrund verwendet, ersetzt aber niemals
+ * den Text.
+ *
+ * Gesetzliche Feiertage werden in der KW-Spalte (rechts) als rosa Kästchen
+ * mit "F" markiert. In der Textspalte steht der ausgeschriebene
+ * Feiertagsname; die Markierung "F" erscheint ausschließlich in der
+ * KW-Spalte. Trägt der Tag einen Kommentar bzw. eine Info, verdrängt dieser
+ * Text die Termin- und Feiertagsangaben vollständig.
+ *
+ * Ein Klick in die Zeile öffnet immer den Tageseditor (Beschriftung/Farbe).
+ * Geburtstage und wiederkehrende Ereignisse sind hier reine Anzeige; bearbeitet
+ * werden sie ausschließlich im Jahrestag-Editor der jahreslosen Ansicht. Tragen
+ * Beschriftung (Tageseditor) und Jahrestage denselben Tag, werden beide Inhalte
+ * gemeinsam mehrzeilig in der Info-Zelle umgebrochen: Die Jahrestage stehen
+ * dabei **immer ganz oben**, der Tageseditor-Eintrag darunter. Die persönliche
+ * Farbe der Info-Spalte färbt ausschließlich den Tageseditor-Eintrag ein, nicht
+ * die Jahrestage; die Schriftgröße folgt den Regeln des Tageseditors
+ * (`label-lines-1/2/3`).
+ *
+ * Rheinland-Pfalz gilt als Bezugsraum: gesetzliche Feiertage sind Neujahr,
+ * Karfreitag, Ostermontag, Maifeiertag, Christi Himmelfahrt, Pfingstmontag,
+ * Fronleichnam, Tag der Deutschen Einheit, Allerheiligen sowie
+ * 1. und 2. Weihnachtstag. Heilige Drei Könige, Mariä Himmelfahrt und der
+ * Reformationstag sind dort keine gesetzlichen Feiertage.
+ */
+import { useRef } from 'react';
 import { getColorHex } from '../config/annotationColors.ts';
 import { hasPublicHoliday } from '../engines/eventEngine.ts';
 import { matchesForDateKey } from '../engines/anniversaryEngine.ts';
@@ -122,6 +153,22 @@ export function CalendarDayRow({ day, annotation, weekdayOverDate = false, onOpe
         .filter((part) => part !== '')
         .join(', ');
     /**
+     * Unterdrückt den Editor öffnenden `click`, der auf ein `mousedown` in einer
+     * Zieh-Spalte folgt.
+     *
+     * Ein Klick auf eine Zieh-Zelle (Wochentag, Tagesnummer, T/N oder eine
+     * Zusatzspalte) startet mit `mousedown` eine Streifen-Auswahl und wird mit
+     * `mouseup` bereits zentral ausgewertet (Farbe/Text bzw. Einfärbe-Dialog). Der
+     * Browser feuert danach zusätzlich ein `click`-Ereignis, das zum umgebenden
+     * Tageszeilen-Button hochsteigt und dort den `DayEditor` öffnen würde. Da der
+     * Streak-End-Handler die Auswahl (`isSelected`) zu diesem Zeitpunkt bereits
+     * zurückgesetzt hat, greift dessen Schutz nicht mehr. Dieses Flag merkt sich,
+     * dass der kommende `click` aus einer Zieh-Spalte stammt, und wird dort
+     * einmalig verbraucht, damit der `DayEditor` nicht ungewollt (zusätzlich)
+     * aufgeht.
+     */
+    const suppressClickRef = useRef(false);
+    /**
      * Streifen-Auswahl: Ein Ziehen zeigt sich nur, wenn die Maustaste in einer
      * der Zieh-Zellen (Wochentag, Tagesnummer, T/N) gedrückt wurde. Ein reiner
      * Klick ohne Zieh-Spalte öffnet weiterhin den Editor. Die gestartete Spalte
@@ -135,6 +182,9 @@ export function CalendarDayRow({ day, annotation, weekdayOverDate = false, onOpe
         const column = columnOfCell(event.target);
         if (!column)
             return;
+        // Ab hier stammt der nachfolgende `click` aus einer Zieh-Spalte und darf
+        // den Tageseditor nicht zusätzlich öffnen (siehe `suppressClickRef`).
+        suppressClickRef.current = true;
         event.preventDefault();
         onStreakStart(day, column);
     };
@@ -151,6 +201,14 @@ export function CalendarDayRow({ day, annotation, weekdayOverDate = false, onOpe
             // Editors aus; das übernimmt der Streak-End-Handler zentral.
             if (isSelected)
                 return;
+            // Ein `click`, der auf ein `mousedown` in einer Zieh-Spalte folgt, ist
+            // nur das Nachspiel der Streifen-Auswahl (Farbe/Text bzw. Einfärben)
+            // und darf den Tageseditor nicht zusätzlich öffnen. Das Flag wird beim
+            // nächsten Klick einmalig verbraucht.
+            if (suppressClickRef.current) {
+                suppressClickRef.current = false;
+                return;
+            }
             onOpenEditor(day);
         }, onMouseDown: handleMouseDown, onMouseEnter: handleMouseEnter, onMouseUp: onStreakEnd, "aria-label": ariaLabel, title: ariaLabel, "data-color-weekday": annotation?.colors.weekday ?? undefined, "data-color-day": annotation?.colors.day ?? undefined, "data-color-info": annotation?.colors.info ?? undefined, "data-color-shift": annotation?.colors.shift ?? undefined, "data-public-holiday": publicHoliday ? 'true' : undefined, children: [weekdayOverDate ? (
             // Datum unter dem Wochentag: eine gemeinsame Zelle, keine eigene
