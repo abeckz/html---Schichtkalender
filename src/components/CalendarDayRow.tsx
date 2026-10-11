@@ -33,7 +33,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import type {
   AnniversaryMap,
   CalendarDay,
-  ColumnColorName,
+  StreakTarget,
   UserDayAnnotation,
 } from '../domain/types.ts';
 import { getColorHex } from '../config/annotationColors.ts';
@@ -76,25 +76,40 @@ export interface CalendarDayRowProps {
   isSelected?: boolean;
   /**
    * Spalte, die während der aktuellen Streifen-Auswahl hervorgehoben wird.
-   * null bedeutet: keine laufende Streifen-Auswahl.
+   * null bedeutet: keine laufende Streifen-Auswahl. Neben den festen
+   * Farbspalten ('weekday', 'day', 'shift') kann auch eine einzelne
+   * Breiteneinheit einer Zusatzspalte ('extra0', 'extra0#1', …) Ziel sein.
    */
-  selectedColumn?: ColumnColorName | null;
+  selectedColumn?: StreakTarget | null;
   /** Beginnt eine Streifen-Auswahl in einer der Zieh-Spalten. */
-  onStreakStart?: (day: CalendarDay, column: ColumnColorName) => void;
+  onStreakStart?: (day: CalendarDay, column: StreakTarget) => void;
   /** Erweitert die Streifen-Auswahl um einen berührten Tag. */
   onStreakEnter?: (day: CalendarDay) => void;
   /** Schließt die Streifen-Auswahl ab. */
   onStreakEnd?: () => void;
 }
 
-/** Ordnet eine Zieh-Zelle dem Spaltennamen zu. */
-function columnOfCell(target: EventTarget | null): ColumnColorName | null {
+/**
+ * Ordnet eine Zieh-Zelle dem Spaltennamen zu.
+ *
+ * Die festen Farbspalten liefern ihren Spaltennamen ('weekday', 'day', 'shift').
+ * Eine Zusatzspalte (`.cell-extra`) liefert ihr **einheitenstabiles** Zieh-Ziel
+ * aus `data-extra-unit-key`: die erste Breiteneinheit den Farbschlüssel
+ * ('extra0'), jede weitere Einheit einen Suffix ('extra0#1'). Dadurch wird beim
+ * Ziehen nur die getroffene Einheit hervorgehoben und nicht die ganze
+ * erweiterte Spalte.
+ */
+function columnOfCell(target: EventTarget | null): StreakTarget | null {
   const element = target as HTMLElement | null;
-  const cell = element?.closest?.('.cell-weekday, .cell-day, .cell-shift');
+  const cell = element?.closest?.('.cell-weekday, .cell-day, .cell-shift, .cell-extra');
   if (!cell) return null;
   if (cell.classList.contains('cell-weekday')) return 'weekday';
   if (cell.classList.contains('cell-day')) return 'day';
   if (cell.classList.contains('cell-shift')) return 'shift';
+  if (cell.classList.contains('cell-extra')) {
+    const key = cell.getAttribute('data-extra-unit-key') ?? cell.getAttribute('data-extra-column-key');
+    return key ? (key as StreakTarget) : null;
+  }
   return null;
 }
 
@@ -234,10 +249,10 @@ export function CalendarDayRow({
   };
 
   /** Nur die vom Streifen gestartete Spalte wird während der Auswahl markiert. */
-  const isColumnSelected = (column: ColumnColorName) =>
+  const isColumnSelected = (column: StreakTarget) =>
     isSelected && selectedColumn === column;
 
-  const selectedClass = (column: ColumnColorName) =>
+  const selectedClass = (column: StreakTarget) =>
     isColumnSelected(column) ? ' is-column-selected' : '';
 
   return (
@@ -290,6 +305,7 @@ export function CalendarDayRow({
             key={`extra-left-${column.name}`}
             column={column}
             annotation={annotation}
+            selected={isColumnSelected(column.unitKey)}
           />
         ))}
       <span
@@ -350,6 +366,7 @@ export function CalendarDayRow({
             key={`extra-right-${column.name}`}
             column={column}
             annotation={annotation}
+            selected={isColumnSelected(column.unitKey)}
           />
         ))}
       {showShiftCalendar && (

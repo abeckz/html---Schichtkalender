@@ -56,6 +56,18 @@ export interface SettingsStore {
    * Spalte soll die Ansicht nach außen schieben).
    */
   widenExtraColumn: (month: number, side: ExtraColumnSide, index: number) => void;
+  /**
+   * Entfernt eine Zusatzspalte vollständig bzw. verkleinert sie (Bedienpunkt
+   * `−`).
+   *
+   * Die Spalte unmittelbar an der Trennlinie (`index`) ist die einzige, die
+   * entfernt werden kann; ist sie breiter als eine Einheit, verliert sie nur
+   * eine Einheit, andernfalls entfällt sie ganz und die Anordnung der übrigen
+   * Spalten der Seite rückt nach. Die zugehörigen Farben und querliegenden
+   * Texte (`extraN`) werden beim Entfernen aus allen Annotationen des Monats
+   * geräumt.
+   */
+  removeExtraColumn: (month: number, side: ExtraColumnSide, index: number) => void;
   /** Übernimmt Jahr und Schicht gemeinsam (z. B. beim Laden einer Datei). */
   setSettings: (next: Partial<AppSettings>) => void;
   goToPreviousYear: () => void;
@@ -165,6 +177,35 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
     [],
   );
 
+  const removeExtraColumn = useCallback(
+    (month: number, side: ExtraColumnSide, index: number) => {
+      setSettings((current) => {
+        const existing = current.extraColumns[month];
+        if (!existing) return current;
+        const list = [...(side === 'left' ? existing.left : existing.right)];
+        if (index !== 0 || list.length === 0) return current;
+        // Nur die Spalte an der Trennlinie lässt sich entfernen: ist sie
+        // breiter als eine Einheit, verliert sie eine Einheit; andernfalls
+        // entfällt sie ganz und die übrigen Spalten rücken nach.
+        if (list[0] > 1) {
+          list[0] -= 1;
+        } else {
+          list.shift();
+        }
+        // Ist die Liste danach leer, wird der Monatseintrag entfernt.
+        const nextMonth = side === 'left' ? { left: list, right: existing.right } : { left: existing.left, right: list };
+        const extraColumns = { ...current.extraColumns };
+        if (nextMonth.left.length === 0 && nextMonth.right.length === 0) {
+          delete extraColumns[month];
+        } else {
+          extraColumns[month] = nextMonth;
+        }
+        return { ...current, extraColumns };
+      });
+    },
+    [],
+  );
+
   const replaceSettings = useCallback((next: Partial<AppSettings>) => {
     setSettings((current) => ({
       selectedYear:
@@ -204,6 +245,7 @@ export function useSettingsStore(initial?: Partial<AppSettings>): SettingsStore 
     setViewMode,
     addExtraColumn,
     widenExtraColumn,
+    removeExtraColumn,
     setSettings: replaceSettings,
     goToPreviousYear,
     goToNextYear,

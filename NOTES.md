@@ -192,6 +192,104 @@ linken Datumsspalte steht. Zusätzlich sind sie per Tastaturfokus
 Info- bzw. Schichtzelle über alle Tageszeilen (`.cell-information::before`,
 `.cell-shift::before`).
 
-**Druck.** Zusatzspalten sind reine Bildschirm-Funktion und werden nicht
-gedruckt; `PrintMonth` kennt sie nicht.
+**Druck.** Zusatzspalten werden inzwischen auch gedruckt (siehe unten,
+„Druck" im Abschnitt Zusatzspalten).
+
+## Zusatzspalten: Entfernen, Streifen-Markierung und eigener Editor
+
+**Entfernen (`−`).** Im Monatskopf sitzt neben jedem `+`-Punkt ein `−`-Punkt
+(`ColumnRemoveHandle` in `ColumnInsertHandle.tsx`), tiefer versetzt, damit sich
+beide nicht überlagern. Er ist nur sichtbar, wenn an der Trennlinie eine Spalte
+liegt. Ein Klick ruft `removeExtraColumn(month, side, index)` im
+`settingsStore` auf: die Spalte an der Linie (Index 0) verliert eine
+Einheit bzw. entfällt ganz, wenn sie nur eine Einheit breit war; ist die Liste
+danach leer, entfällt der Monatseintrag. Da die Farbschlüssel (`extraN`)
+positionsbasiert sind, verschiebt App die Annotationen des Monats über
+`shiftMonthExtraAnnotations` / `shiftExtraMap` / `shiftExtraTextMap` um eine
+Position nach innen - so bleiben Farben und querliegende Texte bei ihrer Spalte.
+
+**Streifen-Markierung.** Die schmalen Zusatzspalten sind wie die festen
+Farbspalten über einen gezogenen Streifen markier- und einfärbbar. Dafür trägt
+jede Zelle ihren stabilen Farbschlüssel als `data-extra-column-key` und - für die
+Unterscheidung einzelner Breiteneinheiten einer erweiterten Spalte -
+`data-extra-unit-key` (`extra0` für die erste Einheit, `extra0#1` für die
+zweite). `columnOfCell` in `CalendarDayRow.tsx` erkennt `.cell-extra` und liefert
+das Zieh-Ziel. Das Streifen-Ziel ist daher
+`StreakTarget = StreakColumnTarget | ExtraColumnUnitKey`. So hebt ein Zug nur die
+**Einheit unter dem Zeiger** hervor (vorher wurde die komplette erweiterte
+Spalte markiert). Die Farbe wird über `setColumnColorForDateKeys` in
+`extraColors` geschrieben (Zusatzspalten getrennt von den festen Spalten); App
+führt das Zieh-Ziel dabei über `extraColorKeyOfUnit` auf den Farbschlüssel
+zurück, damit die ganze Spalte gefärbt und beschriftet wird.
+
+**Eigener Editor (`ExtraColumnEditor.tsx`).** Nach einer Streifen-Auswahl in
+einer Zusatzspalte öffnet App **direkt** diesen Editor (kein `StreakEditor`).
+Er gleicht dem `DayEditor` (mehrzeilige Beschriftung, Farbe, Escape, Fokus),
+ergänzt aber die Checkbox **„Querliegender Text"**: ist sie aktiv, wird der Text
+um 90° nach links gedreht und mittig über die Gesamtzahl der markierten Zellen
+gesetzt. Die Spanne wird als **ein** Eintrag auf der obersten (Anker-)Zelle in
+`UserDayAnnotation.extraTexts[colorKey]` gespeichert (`ExtraColumnText` mit
+`vertical`, `text`, `dateKeys`, `length`); `setExtraColumnText` im
+`annotationStore` sorgt dafür, dass höchstens ein Text je Spalten-Schlüssel
+existiert. Der `StreakEditor` kennt ausschließlich die festen Farbspalten
+(`ColumnColorName`).
+
+**Farbigkeit der Schlüssel.** `buildExtraColumnLayout` vergibt die Farbschlüssel
+seitenübergreifend eindeutig: links ab `extra0`, rechts ab der Anzahl linker
+Spalten. Damit kollidieren die persönlichen Farben der linken und rechten
+Zusatzspalten nicht mehr im selben Tagesdatensatz.
+
+**Darstellung des querliegenden Textes (Bildschirm).** Die querliegenden Texte
+werden nicht in der Zelle selbst, sondern in einer Überlagerungsebene
+(`.day-table-overlay`) gerendert. **Wichtig:** `.day-table` ist eine
+Spalten-Flexbox; die Spaltenbreiten stehen ausschließlich auf den Tageszeilen
+(`.day-row`). Ein Subgrid über `.day-table` könnte die Zeilenraster daher nie
+treffen - die frühere Subgrid-Lösung war deshalb wirkungslos und der Text blieb
+unsichtbar. Die Ebene liegt jetzt absolut über dem Raster
+(`.day-table { position: relative }`, `.day-table-overlay { position: absolute;
+inset: 0 }`) und jeder Text wird aus den **gemessenen** Rechtecken der Zielzelle
+(alle Einheiten der Spalte) und der markierten Zeilen platziert
+(`measureExtraColumnOverlay` in `MonthCalendar.tsx`, `useLayoutEffect`, auch bei
+`resize`). `.cell-extra-text.is-vertical` dreht um 90°.
+
+**Crosshair.** Die Zusatzspalten zählen zu den Zieh-Spalten und zeigen deshalb
+denselben Greif-Cursor (`cursor: crosshair`) wie Wochentag, Datumsnummer und
+T/N (siehe `styles.css`).
+
+**Druck.** Zusatzspalten und querliegende Texte erscheinen auch im Druck.
+`PrintMonth` kennt `extraColumns`, `annotationExtraColors` und
+`extraTextsByDateKey`; `PrintCalendar` leitet die beiden Maps aus der
+`AnnotationMap` ab und reicht sie über `PrintHalfYear` durch. Die Spaltenbreiten
+kommen als CSS-Variablen `--print-extra-left` / `--print-extra-right` in die
+`grid-template-columns` der `.print-row` (je 3 mm pro Einheit,
+`PRINT_EXTRA_COLUMN_UNIT_MM`). Der querliegende Text liegt in
+`.print-month-overlay` (letztes Kind des 31-Zeilen-Rasters); da alle Zeilen über
+`minmax(0, 1fr)` gleich hoch sind, genügen Prozentangaben für die Zeilenspanne
+und Millimeter für die Spalte (`collectPrintExtraTexts`). Das 31-Zeilen-Raster
+bleibt dabei unverändert.
+
+**Druck: Überlagerung darf KEINEN Rasterplatz belegen.** `.print-month-overlay`
+war früher mit `grid-row: 1 / -1` über das gesamte Raster gespannt. Dadurch
+belegte die Ebene die erste Spalte vollständig; die 31 `.print-row`-Zeilen wichen
+per Auto-Placement in 31 zusätzliche, implizite Zeilen aus. Das Raster besaß dann
+62 Zeilen und jede Zelle war auf weniger als die halbe Höhe gestaucht (Fehlerbild:
+„Zusatzspalte + querliegender Text zerstört die Druckansicht"). Der Fix:
+`.print-month-body` ist `position: relative`, `.print-month-overlay` ist
+`position: absolute; inset: 0` **ohne** `grid-row`/`grid-column`. Die Ebene ist
+damit aus dem Rasterfluss und erzeugt keine impliziten Zeilen mehr (siehe
+`print.css` und die Regressionstests in `printCalendar.test.tsx`).
+
+**Querliegender Text auf eingefärbter Zusatzspalte.** Der Text lag in der
+Standard-Textfarbe (`--color-text`, im Dunkelmodus fast weiß) und war auf dem
+satten Palette-Farbfeld unlesbar. Trägt die Zusatzspalte am Anker-Tag eine
+persönliche Farbe, erhält der Text die Klasse `has-color` und wird in Schwarz
+gezeichnet (`.cell-extra-text.has-color`), analog zu `.day-row.has-color-*`.
+Die Information kommt als `colored`-Feld aus `collectExtraColumnTexts`
+(`MonthCalendar.tsx`).
+
+
+**DayEditor.** Das frühere Feld „Zusatzspalten" (Farbwahl je Spalte im
+`DayEditor`) wurde entfernt: Zusatzspalten-Farben setzt jetzt ausschließlich die
+Streifen-Auswahl, Texte und Ausrichtung der eigene `ExtraColumnEditor`.
+
 

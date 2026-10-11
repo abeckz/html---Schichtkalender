@@ -6,7 +6,7 @@
  * Druckdarstellung ist davon vollständig unabhängig.
  */
 
-import type { AnnotationMap, AnniversaryMap, CalendarDay, ColumnColorName, ExtraColumns, YearCalendar as YearCalendarModel } from '../domain/types.ts';
+import type { AnnotationMap, AnniversaryMap, CalendarDay, ExtraColumns, StreakTarget, YearCalendar as YearCalendarModel } from '../domain/types.ts';
 import { MonthCalendar } from './MonthCalendar.tsx';
 import type { ExtraColumnSide } from '../services/settingsStore.ts';
 
@@ -29,14 +29,16 @@ export interface YearCalendarProps {
   showRecurringEvents?: boolean;
   selectedKeys?: ReadonlySet<string>;
   /** Spalte, die während der aktuellen Streifen-Auswahl hervorgehoben wird. */
-  selectedColumn?: ColumnColorName | null;
+  selectedColumn?: StreakTarget | null;
   /** Frei angelegte Zusatzspalten, geschlüsselt nach Monat (1..12). */
   extraColumns?: Record<number, ExtraColumns>;
   /** Legt eine schmale Zusatzspalte an einer der beiden Trennlinien an. */
   onAddExtraColumn?: (month: number, side: ExtraColumnSide) => void;
   /** Erweitert die Spalte unmittelbar an der Trennlinie um eine Einheit. */
   onWidenExtraColumn?: (month: number, side: ExtraColumnSide, index: number) => void;
-  onStreakStart?: (day: CalendarDay, column: ColumnColorName) => void;
+  /** Entfernt bzw. verkleinert die Spalte unmittelbar an der Trennlinie. */
+  onRemoveExtraColumn?: (month: number, side: ExtraColumnSide, index: number) => void;
+  onStreakStart?: (day: CalendarDay, column: StreakTarget) => void;
   onStreakEnter?: (day: CalendarDay) => void;
   onStreakEnd?: () => void;
 }
@@ -55,6 +57,7 @@ export function YearCalendar({
   extraColumns,
   onAddExtraColumn,
   onWidenExtraColumn,
+  onRemoveExtraColumn,
   onStreakStart,
   onStreakEnter,
   onStreakEnd,
@@ -77,6 +80,7 @@ export function YearCalendar({
           extraColumns={extraColumns?.[month.month]}
           onAddExtraColumn={onAddExtraColumn}
           onWidenExtraColumn={onWidenExtraColumn}
+          onRemoveExtraColumn={onRemoveExtraColumn}
           onStreakStart={onStreakStart}
           onStreakEnter={onStreakEnter}
           onStreakEnd={onStreakEnd}

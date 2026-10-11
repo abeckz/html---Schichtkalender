@@ -17,14 +17,18 @@
  * der jeweiligen Markierungsfarbe mit der Anzahl der markierten Tage.
  */
 
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type {
   AnnotationColorId,
   AnnotationMap,
   AnniversaryMap,
   CalendarDay,
   ColumnColorName,
+  ExtraColumnColorKey,
   ExtraColumns,
+  ExtraColumnText,
   MonthCalendar as MonthCalendarModel,
+  StreakTarget,
 } from '../domain/types.ts';
 import { annotationColors, getColorHex } from '../config/annotationColors.ts';
 import { CalendarDayRow } from './CalendarDayRow.tsx';
@@ -33,7 +37,7 @@ import {
   extraColumnUnitCount,
   type ExtraColumnDisplay,
 } from './ExtraColumnCell.tsx';
-import { ColumnInsertHandle } from './ColumnInsertHandle.tsx';
+import { ColumnInsertHandle, ColumnRemoveHandle } from './ColumnInsertHandle.tsx';
 import type { ExtraColumnSide } from '../services/settingsStore.ts';
 
 /** Breite einer Spalteneinheit in em; muss zum Raster in styles.css passen. */
@@ -50,6 +54,169 @@ export const EXTRA_COLUMN_UNIT_EM = 1.6;
 function extraTracks(units: number, unitEm: number): string {
   if (units <= 0) return '';
   return ` ${`${unitEm}em `.repeat(units).trim()}`;
+}
+
+/**
+ * Ein querliegender Text einer Zusatzspalte als Anzeigeelement im Monatsraster.
+ *
+ * `gridColumn` ist die Rasterspalte der Zusatzspalte (1-basiert), `gridRowStart`
+ * die Tageszeile des Ankers und `gridRowSpan` die Anzahl markierter Zellen. Diese
+ * Angaben dienen nur noch der Zuordnung (Anker, Spanne, Farbschlüssel); die
+ * tatsächliche Platzierung erfolgt gemessen über `left`/`top`/`width`/`height`
+ * (siehe `measureExtraColumnOverlay`), weil `.day-table` keine Grid-Spalten
+ * kennt.
+ */
+export interface ExtraColumnOverlay {
+  id: string;
+  colorKey: ExtraColumnColorKey;
+  columnLabel: string;
+  text: string;
+  vertical: boolean;
+  /**
+   * true, wenn die Zusatzspalte am Anker-Tag eine persönliche Farbe trägt.
+   *
+   * Die Palette ist satt und kräftig; auf einem gefärbten Feld ist die
+   * (im Dunkelmodus helle) Standard-Textfarbe nicht lesbar. Deshalb wird der
+   * querliegende Text dann - wie die übrigen Zellen einer Farbmarkierung -
+   * in Schwarz gezeichnet (siehe `.cell-extra-text.has-color`).
+   */
+  colored: boolean;
+  gridColumn: number;
+  gridRowStart: number;
+  gridRowSpan: number;
+}
+
+/**
+ * Gemessene Platzierung eines querliegenden Textes (px, relativ zu `.day-table`).
+ * Ist die Spanne bzw. Spalte im Monat nicht messbar (z. B. noch nicht
+ * gerendert), liefert die Messung `null` und es wird kein Element ausgegeben.
+ */
+export interface ExtraColumnOverlayPlacement {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Ermittelt die Rasterspalte (1-basiert) eines Zusatzspalten-Schlüssels.
+ *
+ * Reihenfolge des Rasters: Wochentag | Datum | [links] | Info | KW | [rechts] | T/N.
+ * Bei „Wochentag über Datum" fallen Wochentag und Datum in eine Spalte.
+ */
+function extraColumnGridColumn(
+  colorKey: ExtraColumnColorKey,
+  extraColumns: readonly ExtraColumnDisplay[],
+  weekdayOverDate: boolean,
+): number {
+  const leading = weekdayOverDate ? 1 : 2;
+  // Position der Spalte innerhalb der Anzeigeliste (links vor rechts).
+  const index = extraColumns.findIndex((column) => column.colorKey === colorKey);
+  if (index < 0) return 0;
+  const leftCount = extraColumns.filter((column) => column.side === 'left').length;
+  if (index < leftCount) return leading + index + 1;
+  // Rechts der Info- und KW-Spalte: leading + links + Info + KW + rechts.
+  return leading + leftCount + 2 + (index - leftCount) + 1;
+}
+
+/**
+ * Sammelt die querliegenden Texte eines Monats aus den Annotationen.
+ *
+ * Berücksichtigt werden nur Texte, deren Spanne im Monat liegt und deren
+ * Zusatzspalte aktuell (links bzw. rechts) vorhanden ist. Die Spanne wird auf
+ * die tatsächlich im Monat vorhandenen Tage begrenzt, damit die Überlagerung
+ * nie über den Monat hinausreicht.
+ */
+export function collectExtraColumnTexts(
+  month: MonthCalendarModel,
+  annotations: AnnotationMap,
+  extraColumns: readonly ExtraColumnDisplay[],
+  showShiftCalendar: boolean,
+  weekdayOverDate = false,
+): ExtraColumnOverlay[] {
+  const dayIndexByKey = new Map<string, number>();
+  month.days.forEach((day, index) => dayIndexByKey.set(day.dateKey, index));
+
+  const overlays: ExtraColumnOverlay[] = [];
+  for (const [dateKey, annotation] of Object.entries(annotations)) {
+    // Nur Anker-Tage des Monats betrachten (frühestes Datum der Spanne).
+    if (!dayIndexByKey.has(dateKey)) continue;
+    const texts = annotation.extraTexts;
+    if (!texts) continue;
+    for (const text of Object.values(texts) as ExtraColumnText[]) {
+      if (!text || text.text === '') continue;
+      if (text.dateKeys[0] !== dateKey) continue;
+      const column = extraColumns.find((entry) => entry.colorKey === text.colorKey);
+      // Rechts liegende Spalten sind ohne Schichtkalender ausgeblendet.
+      if (!column || (column.side === 'right' && !showShiftCalendar)) continue;
+      const presentRows = text.dateKeys
+        .map((key) => dayIndexByKey.get(key))
+        .filter((index): index is number => index !== undefined)
+        .sort((a, b) => a - b);
+      if (presentRows.length === 0) continue;
+      const start = presentRows[0];
+      const end = presentRows[presentRows.length - 1];
+      overlays.push({
+        id: `${dateKey}-${text.colorKey}`,
+        colorKey: text.colorKey,
+        columnLabel: text.columnLabel,
+        text: text.text,
+        vertical: text.vertical,
+        // Am Anker-Tag entscheidet die persönliche Farbe der Zusatzspalte über
+        // die Textfarbe der Überlagerung (schwarz auf gefärbtem Feld).
+        colored: (annotation.extraColors?.[text.colorKey] ?? null) !== null,
+        gridColumn: extraColumnGridColumn(text.colorKey, extraColumns, weekdayOverDate),
+        gridRowStart: start + 1,
+        gridRowSpan: end - start + 1,
+      });
+    }
+  }
+  return overlays;
+}
+
+/**
+ * Misst die Platzierung eines querliegenden Textes im Tagesraster.
+ *
+ * `.day-table` ist eine Spalten-Flexbox: die Spaltenbreiten stehen ausschließlich
+ * auf den Tageszeilen (`.day-row`). Deshalb wird die Zielzelle (bzw. - bei
+ * "Wochentag über Datum" - die passende Zelle der ersten Tageszeile) gesucht und
+ * ihr Rechteck sowie die Rechtecke der markierten Zeilen relativ zum Raster
+ * ausgewertet.
+ *
+ * Rückgabe: `left`/`width` aus der Zielzelle, `top`/`height` aus dem
+ * zusammengefassten Bereich der markierten Zeilen. Fehlt die Zelle (z. B. weil
+ * die Spanne außerhalb des Monats liegt), wird null geliefert.
+ */
+export function measureExtraColumnOverlay(
+  table: HTMLElement,
+  overlay: ExtraColumnOverlay,
+): ExtraColumnOverlayPlacement | null {
+  const rows = table.querySelectorAll<HTMLElement>('.day-row');
+  const firstRowIndex = overlay.gridRowStart - 1;
+  const lastRowIndex = overlay.gridRowStart - 1 + overlay.gridRowSpan - 1;
+  const firstRow = rows[firstRowIndex];
+  const lastRow = rows[lastRowIndex];
+  if (!firstRow || !lastRow) return null;
+
+  // Eine erweiterte Spalte besteht aus mehreren Zellen mit demselben
+  // Farbschlüssel; der Text gehört über die gesamte Spalte.
+  const cells = firstRow.querySelectorAll<HTMLElement>(
+    `.cell-extra[data-extra-column-key="${overlay.colorKey}"]`,
+  );
+  if (cells.length === 0) return null;
+
+  const tableRect = table.getBoundingClientRect();
+  const firstCellRect = cells[0].getBoundingClientRect();
+  const lastCellRect = cells[cells.length - 1].getBoundingClientRect();
+  const topRect = firstRow.getBoundingClientRect();
+  const bottomRect = lastRow.getBoundingClientRect();
+
+  return {
+    left: firstCellRect.left - tableRect.left,
+    width: lastCellRect.right - firstCellRect.left,
+    top: topRect.top - tableRect.top,
+    height: bottomRect.bottom - topRect.top,
+  };
 }
 
 export interface MonthCalendarProps {
@@ -69,7 +236,7 @@ export interface MonthCalendarProps {
   /** dateKeys der aktuell markierten Streifen-Auswahl. */
   selectedKeys?: ReadonlySet<string>;
   /** Spalte, die während der aktuellen Streifen-Auswahl hervorgehoben wird. */
-  selectedColumn?: ColumnColorName | null;
+  selectedColumn?: StreakTarget | null;
   /**
    * Frei angelegte Zusatzspalten des Monats.
    *
@@ -84,7 +251,9 @@ export interface MonthCalendarProps {
   onAddExtraColumn?: (month: number, side: ExtraColumnSide) => void;
   /** Erweitert die Spalte unmittelbar an der Trennlinie um eine Einheit. */
   onWidenExtraColumn?: (month: number, side: ExtraColumnSide, index: number) => void;
-  onStreakStart?: (day: CalendarDay, column: ColumnColorName) => void;
+  /** Entfernt bzw. verkleinert die Spalte unmittelbar an der Trennlinie. */
+  onRemoveExtraColumn?: (month: number, side: ExtraColumnSide, index: number) => void;
+  onStreakStart?: (day: CalendarDay, column: StreakTarget) => void;
   onStreakEnter?: (day: CalendarDay) => void;
   onStreakEnd?: () => void;
 }
@@ -162,12 +331,15 @@ export function MonthCalendar({
   extraColumns,
   onAddExtraColumn,
   onWidenExtraColumn,
+  onRemoveExtraColumn,
   onStreakStart,
   onStreakEnter,
   onStreakEnd,
 }: MonthCalendarProps) {
   const { statistics } = month;
   const markedShiftCounts = countMarkedShiftsByColor(month.days, annotations);
+  // Referenz auf das Tagesraster: Grundlage der Messung querliegender Texte.
+  const tableRef = useRef<HTMLDivElement>(null);
   // Die Anzeige-Option ändert ausschließlich das Spaltenraster des Monats:
   // mit gesetztem Schalter steht das Datum unter dem Wochentag und die
   // Tagesnummer-Spalte entfällt (der Platz kommt der Info-Spalte zugute).
@@ -227,6 +399,17 @@ export function MonthCalendar({
     : leftColumns;
 
   /**
+   * Stabile Signatur der Anzeigespalten (Farbschlüssel + Seite).
+   *
+   * `extraColumnsForRow` entsteht bei jedem Render neu; die Signatur hält die
+   * davon abhängigen Ableitungen (querliegende Texte) stabil, damit das
+   * Messen der Überlagerung nicht bei jedem Render neu anläuft.
+   */
+  const extraColumnsSignature = extraColumnsForRow
+    .map((column) => `${column.colorKey}:${column.side}`)
+    .join(',');
+
+  /**
    * Klick auf einen Bedienpunkt: liegt an der Trennlinie noch keine
    * Zusatzspalte, wird eine angelegt; andernfalls wächst die bereits dort
    * liegende Spalte um eine Einheit. Dadurch bleibt die Lage der vorhandenen
@@ -239,6 +422,62 @@ export function MonthCalendar({
     }
     onAddExtraColumn?.(month.month, side);
   };
+
+  /** Klick auf den Minus-Bedienpunkt: verkleinert/entfernt die Spalte. */
+  const handleRemoveActivate = (side: ExtraColumnSide, nearEdgeIndex: number) => {
+    onRemoveExtraColumn?.(month.month, side, nearEdgeIndex);
+  };
+
+  /**
+   * Querliegende Texte der Zusatzspalten, die in diesem Monat sichtbar sind.
+   *
+   * Ein Text gehört zu einer markierten Spanne und liegt auf der obersten
+   * Zelle (Anker). Seine Darstellung zieht ihn über alle Zellen der Spanne,
+   * mittig und - bei vertikaler Ausrichtung - um 90° nach links gedreht.
+   */
+  const extraColumnTexts = useMemo(
+    () =>
+      collectExtraColumnTexts(
+        month,
+        annotations,
+        extraColumnsForRow,
+        showShiftCalendar,
+        weekdayOverDate,
+      ),
+    // `extraColumnsForRow` wird bei jedem Render neu gebaut; die für die
+    // Sammlung maßgeblichen Angaben (Farbschlüssel und Seite je Spalte) werden
+    // deshalb über eine stabile Signatur verglichen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [month, annotations, extraColumnsSignature, showShiftCalendar, weekdayOverDate],
+  );
+
+  // Gemessene Platzierung der querliegenden Texte (px, relativ zum Tagesraster).
+  // Das Raster kennt keine Grid-Spalten, daher werden die Rechtecke der
+  // Zielzelle und der markierten Zeilen ausgelesen und als Inline-Stile gesetzt.
+  const [extraTextPlacements, setExtraTextPlacements] = useState<
+    Record<string, ExtraColumnOverlayPlacement>
+  >({});
+
+  useLayoutEffect(() => {
+    const table = tableRef.current;
+    if (!table || extraColumnTexts.length === 0) {
+      setExtraTextPlacements((current) =>
+        Object.keys(current).length === 0 ? current : {},
+      );
+      return;
+    }
+    const measure = () => {
+      const next: Record<string, ExtraColumnOverlayPlacement> = {};
+      for (const overlay of extraColumnTexts) {
+        const placement = measureExtraColumnOverlay(table, overlay);
+        if (placement) next[overlay.id] = placement;
+      }
+      setExtraTextPlacements(next);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [extraColumnTexts]);
 
   return (
     <section
@@ -290,9 +529,16 @@ export function MonthCalendar({
             onActivate={handleInsertActivate}
           />
         )}
+        {/* Minus-Punkte: entfernen/verkleinern die Spalte an der Trennlinie. */}
+        {onRemoveExtraColumn && leftColumns.length > 0 && (
+          <ColumnRemoveHandle side="left" nearEdgeIndex={0} onActivate={handleRemoveActivate} />
+        )}
+        {onRemoveExtraColumn && showShiftCalendar && rightColumns.length > 0 && (
+          <ColumnRemoveHandle side="right" nearEdgeIndex={0} onActivate={handleRemoveActivate} />
+        )}
       </header>
 
-      <div className={tableClassName} role="table" aria-label={`Tage im ${month.name}`}>
+      <div className={tableClassName} role="table" aria-label={`Tage im ${month.name}`} ref={tableRef}>
         {month.days.map((day) => (
           <CalendarDayRow
             key={day.dateKey}
@@ -312,6 +558,36 @@ export function MonthCalendar({
             onStreakEnd={onStreakEnd}
           />
         ))}
+        {extraColumnTexts.length > 0 && (
+          <div className="day-table-overlay" aria-hidden="true">
+            {extraColumnTexts.map((overlay) => {
+              const placement = extraTextPlacements[overlay.id];
+              if (!placement) return null;
+              return (
+                <span
+                  key={overlay.id}
+                  className={[
+                    'cell-extra-text',
+                    overlay.vertical ? 'is-vertical' : '',
+                    overlay.colored ? 'has-color' : '',
+                  ]
+                    .filter((name) => name !== '')
+                    .join(' ')}
+                  title={overlay.text}
+                  data-grid-column={overlay.gridColumn}
+                  style={{
+                    left: placement.left,
+                    top: placement.top,
+                    width: placement.width,
+                    height: placement.height,
+                  }}
+                >
+                  <span>{overlay.text}</span>
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {showShiftCalendar && (

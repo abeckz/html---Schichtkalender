@@ -9,10 +9,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   AnnotationColorId,
+  AnnotationMap,
   AnniversaryEntry,
   CalendarDay,
   ColumnColorName,
+  ExtraColumnColorKey,
+  ExtraColumnText,
   PersistedState,
+  StreakTarget,
+  UserDayAnnotation,
 } from '../domain/types.ts';
 import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder.ts';
 import { usedAnnotationColors } from '../config/annotationColors.ts';
@@ -24,14 +29,14 @@ import { useThemeStore } from '../services/themeStore.ts';
 import { STORAGE_VERSION } from '../services/storage.ts';
 import { saveState } from '../services/persistence.ts';
 import { useUnsavedChangesGuard } from '../services/unsavedChanges.ts';
-import { monthDayOfDateKey, parseDateKey } from '../utils/dateUtils.ts';
+import { monthDayOfDateKey } from '../utils/dateUtils.ts';
 import { anniversariesAt } from '../engines/anniversaryEngine.ts';
-import { buildExtraColumnLayout } from './ExtraColumnCell.tsx';
 import { Toolbar } from './Toolbar.tsx';
 import { YearCalendar } from './YearCalendar.tsx';
 import { CalendarLegend } from './CalendarLegend.tsx';
 import { ColorLegendEditor } from './ColorLegendEditor.tsx';
-import { DayEditor, type ExtraColumnColorField } from './DayEditor.tsx';
+import { DayEditor } from './DayEditor.tsx';
+import { ExtraColumnEditor } from './ExtraColumnEditor.tsx';
 import { AnniversaryEditor } from './AnniversaryEditor.tsx';
 import { AnniversaryYearCalendar } from './AnniversaryYearCalendar.tsx';
 import { StreakEditor } from './StreakEditor.tsx';
@@ -52,14 +57,21 @@ export function App() {
     setViewMode,
     addExtraColumn,
     widenExtraColumn,
+    removeExtraColumn,
     setSettings,
     goToPreviousYear,
     goToNextYear,
     canGoToPreviousYear,
     canGoToNextYear,
   } = useSettingsStore();
-  const { annotations, setAnnotation, resetAnnotation, setColumnColorForDateKeys, replaceAnnotations } =
-    useAnnotationStore(settings);
+  const {
+    annotations,
+    setAnnotation,
+    resetAnnotation,
+    setColumnColorForDateKeys,
+    setExtraColumnText,
+    replaceAnnotations,
+  } = useAnnotationStore(settings);
   // Erklärtexte der Farblegende (jahresbezogen); rein darstellungsbezogen.
   const { colorLegend, setColorLegendText, replaceColorLegend } = useColorLegendStore(
     settings,
@@ -73,6 +85,12 @@ export function App() {
 
   const [view, setView] = useState<AppView>('screen');
   const [editingDay, setEditingDay] = useState<CalendarDay | null>(null);
+  // Zusatzspalte, deren eigener Editor gerade geöffnet ist (Fast-Spanne).
+  const [editingExtraColumn, setEditingExtraColumn] = useState<{
+    colorKey: ExtraColumnColorKey;
+    columnLabel: string;
+    dateKeys: string[];
+  } | null>(null);
   // Jahrestag-Tag, dessen Editor gerade geöffnet ist ("MM-DD" oder null).
   const [editingAnniversary, setEditingAnniversary] = useState<string | null>(null);
   // Farbe, deren Erklärung gerade bearbeitet wird (öffnet den Eingabedialog).
@@ -97,12 +115,12 @@ export function App() {
 
   // Streifen-Auswahl (vertikales Ziehen mit gedrückter Maustaste). Die
   // markierten Tage werden beim Loslassen in einem eigenen Fenster eingefärbt.
-  // `streakColumn` merkt sich, in welcher Spalte (Wochentag, Tagesnummer, T/N)
-  // der Streifen gestartet wurde; nur diese Spalte wird hervorgehoben und
-  // eingefärbt.
+  // `streakColumn` merkt sich das genaue Zieh-Ziel (Wochentag, Tagesnummer, T/N
+  // oder eine einzelne Breiteneinheit einer Zusatzspalte wie 'extra0#1'); nur
+  // dieses Ziel wird hervorgehoben und danach eingefärbt.
   const [streakKeys, setStreakKeys] = useState<string[]>([]);
   const [streakActive, setStreakActive] = useState(false);
-  const [streakColumn, setStreakColumn] = useState<ColumnColorName | null>(null);
+  const [streakColumn, setStreakColumn] = useState<StreakTarget | null>(null);
   const [streakDays, setStreakDays] = useState<CalendarDay[]>([]);
 
   // Jahreskalender: hängt ausschließlich von Jahr und Schicht ab.
@@ -139,37 +157,6 @@ export function App() {
 
   const streakKeySet = useMemo(() => new Set(streakKeys), [streakKeys]);
 
-  /**
-   * Farbfelder der frei angelegten Zusatzspalten für den geöffneten Tag.
-   *
-   * Die Zusatzspalten sind je Monat angelegt; für den bearbeiteten Tag werden
-   * alle Spalten seines Monats mit ihrem stabilen Farbschlüssel und der aktuell
-   * gesetzten Farbe aufgelistet. Ohne Zusatzspalten bleibt die Liste leer.
-   */
-  const editingDayExtraFields = useMemo<ExtraColumnColorField[]>(() => {
-    if (!editingDay) return [];
-    const parts = parseDateKey(editingDay.dateKey);
-    if (!parts) return [];
-    const monthColumns = settings.extraColumns[parts.month];
-    if (!monthColumns) return [];
-    const layout = buildExtraColumnLayout(monthColumns);
-    const currentExtra = annotations[editingDay.dateKey]?.extraColors ?? {};
-    // Die Anzeige führt links vor rechts; doppelte Farbschlüssel entstehen nur
-    // bei erweiterten Spalten und werden dabei zu einem Feld zusammengefasst.
-    const seen = new Set<string>();
-    const fields: ExtraColumnColorField[] = [];
-    for (const column of [...layout.left, ...layout.right]) {
-      if (seen.has(column.colorKey)) continue;
-      seen.add(column.colorKey);
-      fields.push({
-        key: column.colorKey,
-        label: `Zusatzspalte ${column.name.split('·')[0]}`,
-        colorId: currentExtra[column.colorKey] ?? null,
-      });
-    }
-    return fields;
-  }, [editingDay, settings.extraColumns, annotations]);
-
   const handleOpenEditor = useCallback((day: CalendarDay) => {
     setEditingDay(day);
   }, []);
@@ -197,7 +184,19 @@ export function App() {
     [resetAnniversary],
   );
 
-  const handleStreakStart = useCallback((day: CalendarDay, column: ColumnColorName) => {
+  /**
+   * Anzeigename einer Zusatzspalte aus ihrem Farbschlüssel (`extraN`).
+   *
+   * Der Name folgt dem Spaltenindex ("Zusatzspalte 0", "1", …). Da die Spalten
+   * erst beim Anlegen der Zelle bekannt sind, wird die Nummer direkt aus dem
+   * Farbschlüssel abgeleitet - Farben und Texte hängen nicht von der Lage ab.
+   */
+  const extraColumnLabel = useCallback(
+    (colorKey: ExtraColumnColorKey) => `Zusatzspalte ${extraColumnIndex(colorKey)}`,
+    [],
+  );
+
+  const handleStreakStart = useCallback((day: CalendarDay, column: StreakTarget) => {
     setStreakActive(true);
     setStreakColumn(column);
     setStreakKeys([day.dateKey]);
@@ -211,18 +210,42 @@ export function App() {
     [streakActive],
   );
 
+  /**
+   * Schließt den Zieh-Vorgang ab.
+   *
+   * Bei den festen Farbspalten öffnet sich der bekannte `StreakEditor`
+   * (Einfärben). Bei einer Zusatzspalte wird stattdessen direkt der eigene
+   * `ExtraColumnEditor` geöffnet: er bündelt Farbe und querliegenden Text der
+   * markierten Spanne, ohne dass ein zusätzliches Einfärbe-Fenster erscheint.
+   *
+   * Die Nebenwirkungen (Editor öffnen) laufen bewusst außerhalb des
+   * State-Updaters, damit sie im StrictMode nicht doppelt ausgelöst werden.
+   */
   const handleStreakEnd = useCallback(() => {
     setStreakActive(false);
-    setStreakKeys((current) => {
-      if (current.length === 0) return current;
-      const days = current
-        .map((key) => dayByKey.get(key))
-        .filter((day): day is CalendarDay => Boolean(day))
-        .sort((a, b) => (a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0));
-      setStreakDays(days);
-      return current;
-    });
-  }, [dayByKey]);
+    const keys = streakKeys;
+    const column = streakColumn;
+    if (keys.length === 0) return;
+    const days = keys
+      .map((key) => dayByKey.get(key))
+      .filter((day): day is CalendarDay => Boolean(day))
+      .sort((a, b) => (a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0));
+    const colorKey = column ? extraColorKeyOfUnit(column) : null;
+    if (colorKey) {
+      // Zusatzspalte: eigenen Editor öffnen, keinen Einfärbe-Dialog. Die Spanne
+      // gilt für die gesamte (ggf. erweiterte) Spalte, also für ihren
+      // Farbschlüssel - nicht nur für die gezogene Breiteneinheit.
+      setEditingExtraColumn({
+        colorKey,
+        columnLabel: extraColumnLabel(colorKey),
+        dateKeys: days.map((day) => day.dateKey),
+      });
+      setStreakKeys([]);
+      setStreakColumn(null);
+      return;
+    }
+    setStreakDays(days);
+  }, [dayByKey, streakKeys, streakColumn, extraColumnLabel]);
 
   const handleStreakApply = useCallback(
     (dateKeys: readonly string[], column: ColumnColorName, colorId: AnnotationColorId | null) => {
@@ -239,6 +262,39 @@ export function App() {
     setStreakColumn(null);
     setStreakDays([]);
   }, []);
+
+  /** Farbe der Zusatzspalten-Spanne über den eigenen Editor speichern. */
+  const handleSaveExtraColumn = useCallback(
+    (dateKeys: readonly string[], colorKey: ExtraColumnColorKey, colorId: AnnotationColorId | null) => {
+      setColumnColorForDateKeys(dateKeys, colorKey, colorId);
+    },
+    [setColumnColorForDateKeys],
+  );
+
+  /**
+   * Verkleinert/entfernt eine Zusatzspalte an der Trennlinie und verschiebt die
+   * Annotationen (`extraN`) der verbleibenden Spalten um eine Position nach
+   * innen, damit Farben und querliegende Texte bei ihrer Spalte bleiben.
+   */
+  const handleRemoveExtraColumn = useCallback(
+    (month: number, side: 'left' | 'right', index: number) => {
+      if (index !== 0) return;
+      const before = settings.extraColumns[month];
+      if (!before) return;
+      // Anzahl linker Spalten VOR dem Entfernen bestimmt den Schlüsselbereich
+      // der rechten Seite.
+      const leftCountBefore = before.left.reduce(
+        (total, width) => total + Math.max(1, Math.trunc(width)),
+        0,
+      );
+      const startKey = side === 'left' ? 0 : leftCountBefore;
+      removeExtraColumn(month, side, index);
+      replaceAnnotations(
+        shiftMonthExtraAnnotations(annotations, month, startKey),
+      );
+    },
+    [removeExtraColumn, settings.extraColumns, annotations, replaceAnnotations],
+  );
 
   // Läuft ein Ziehen aus dem Kalender heraus, muss die Auswahl dennoch
   // sauber abgeschlossen werden.
@@ -382,6 +438,7 @@ export function App() {
               extraColumns={settings.extraColumns}
               onAddExtraColumn={addExtraColumn}
               onWidenExtraColumn={widenExtraColumn}
+              onRemoveExtraColumn={handleRemoveExtraColumn}
               onStreakStart={handleStreakStart}
               onStreakEnter={handleStreakEnter}
               onStreakEnd={handleStreakEnd}
@@ -399,6 +456,7 @@ export function App() {
             anniversaries={anniversaries}
             showBirthdays={settings.showBirthdays}
             showRecurringEvents={settings.showRecurringEvents}
+            extraColumns={settings.extraColumns}
             onPrint={handlePrint}
             onBack={() => setView('screen')}
           />
@@ -411,10 +469,35 @@ export function App() {
           selectedShift={settings.selectedShift}
           initialLabel={annotations[editingDay.dateKey]?.label ?? ''}
           initialColorId={annotations[editingDay.dateKey]?.colors.info ?? null}
-          extraColumnFields={editingDayExtraFields}
           onSave={setAnnotation}
           onReset={resetAnnotation}
           onClose={() => setEditingDay(null)}
+        />
+      )}
+
+      {editingExtraColumn && (
+        <ExtraColumnEditor
+          colorKey={editingExtraColumn.colorKey}
+          columnLabel={editingExtraColumn.columnLabel}
+          dateKeys={editingExtraColumn.dateKeys}
+          initialColorId={
+            annotations[editingExtraColumn.dateKeys[0]]?.extraColors?.[
+              editingExtraColumn.colorKey
+            ] ?? null
+          }
+          initialText={
+            annotations[editingExtraColumn.dateKeys[0]]?.extraTexts?.[
+              editingExtraColumn.colorKey
+            ]?.text ?? ''
+          }
+          initialVertical={
+            annotations[editingExtraColumn.dateKeys[0]]?.extraTexts?.[
+              editingExtraColumn.colorKey
+            ]?.vertical ?? true
+          }
+          onSave={handleSaveExtraColumn}
+          onSaveText={setExtraColumnText}
+          onClose={() => setEditingExtraColumn(null)}
         />
       )}
 
@@ -438,7 +521,7 @@ export function App() {
         />
       )}
 
-      {streakDays.length > 0 && streakColumn && (
+      {streakDays.length > 0 && streakColumn && isFixedColumn(streakColumn) && (
         <StreakEditor
           days={streakDays}
           column={streakColumn}
@@ -456,4 +539,119 @@ export function App() {
       )}
     </div>
   );
+}
+
+/**
+ * Prüft, ob ein Streifen-Ziel eine feste Farbspalte benennt ('weekday', 'day'
+ * oder 'shift') - im Unterschied zu einer Breiteneinheit einer Zusatzspalte
+ * ('extra0', 'extra0#1', …).
+ */
+function isFixedColumn(column: StreakTarget): column is ColumnColorName {
+  return column === 'weekday' || column === 'day' || column === 'shift';
+}
+
+/**
+ * Liefert den Farbschlüssel einer Zusatzspalte zu einem Zieh-Ziel - oder null,
+ * wenn das Ziel eine feste Farbspalte ist.
+ *
+ * Eine Zusatzspalte wird über ihren Farbschlüssel gefärbt (`extra0`); für die
+ * Streifen-Auswahl ist zusätzlich die einzelne Breiteneinheit als Zieh-Ziel
+ * unterscheidbar (`extra0#1`). Beide Formen werden hier auf den Farbschlüssel
+ * zurückgeführt, damit auch eine erweiterte Spalte vollständig eingefärbt und
+ * beschriftet wird.
+ */
+function extraColorKeyOfUnit(column: StreakTarget): ExtraColumnColorKey | null {
+  const match = /^(extra[0-9]+)(?:#[0-9]+)?$/.exec(column);
+  return match ? (match[1] as ExtraColumnColorKey) : null;
+}
+
+/** Nummer einer Zusatzspalte aus ihrem Farbschlüssel (`extra0` -> 0). */
+function extraColumnIndex(colorKey: ExtraColumnColorKey): number {
+  const match = /^extra([0-9]+)$/.exec(colorKey);
+  return match ? Number(match[1]) : 0;
+}
+
+/**
+ * Verschiebt die Annotationen (`extraN`) eines Monats um eine Position nach
+ * innen.
+ *
+ * Wird beim Entfernen einer Zusatzspalte an der Trennlinie aufgerufen: alle
+ * Farben und querliegenden Texte, deren Schlüssel im Schlüsselbereich der
+ * betroffenen Seite (ab `startKey`) liegt, rücken auf `extraN-1`. Der Eintrag
+ * mit dem kleinsten Schlüssel (`startKey`) entfällt, weil seine Spalte entfernt
+ * wurde. Dadurch bleiben die Markierungen bei ihrer jeweiligen Spalte.
+ */
+function shiftMonthExtraAnnotations(
+  annotations: AnnotationMap,
+  month: number,
+  startKey: number,
+): AnnotationMap {
+  const monthKey = String(month).padStart(2, '0');
+  const next: AnnotationMap = {};
+  for (const [dateKey, annotation] of Object.entries(annotations)) {
+    // Monat aus dem dateKey (YYYY-MM-DD) ableiten.
+    if (dateKey.slice(5, 7) !== monthKey) {
+      next[dateKey] = annotation;
+      continue;
+    }
+    const shiftedColors = shiftExtraMap(annotation.extraColors, startKey);
+    const shiftedTexts = shiftExtraTextMap(annotation.extraTexts, startKey);
+    const updated: UserDayAnnotation = { ...annotation };
+    if (shiftedColors) {
+      updated.extraColors = shiftedColors;
+    } else {
+      delete updated.extraColors;
+    }
+    if (shiftedTexts) {
+      updated.extraTexts = shiftedTexts;
+    } else {
+      delete updated.extraTexts;
+    }
+    const isEmpty =
+      updated.label === '' &&
+      Object.keys(updated.colors).length === 0 &&
+      !updated.extraColors &&
+      !updated.extraTexts;
+    if (!isEmpty) next[dateKey] = updated;
+  }
+  return next;
+}
+
+/** Verschiebt eine `extraN`-Farbmap um eine Position nach innen. */
+function shiftExtraMap<T>(
+  map: Partial<Record<ExtraColumnColorKey, T>> | undefined,
+  startKey: number,
+): Partial<Record<ExtraColumnColorKey, T>> | undefined {
+  if (!map) return undefined;
+  const result: Partial<Record<ExtraColumnColorKey, T>> = {};
+  for (const [key, value] of Object.entries(map) as Array<[ExtraColumnColorKey, T]>) {
+    const index = extraColumnIndex(key);
+    if (index < startKey) {
+      result[key] = value;
+    } else if (index > startKey) {
+      result[`extra${index - 1}`] = value;
+    }
+    // index === startKey: entfällt (Spalte wurde entfernt).
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/** Verschiebt die querliegenden Texte eines Monats um eine Position nach innen. */
+function shiftExtraTextMap(
+  map: Partial<Record<ExtraColumnColorKey, ExtraColumnText>> | undefined,
+  startKey: number,
+): Partial<Record<ExtraColumnColorKey, ExtraColumnText>> | undefined {
+  if (!map) return undefined;
+  const result: Partial<Record<ExtraColumnColorKey, ExtraColumnText>> = {};
+  for (const [key, value] of Object.entries(map) as Array<[ExtraColumnColorKey, ExtraColumnText]>) {
+    const index = extraColumnIndex(key);
+    if (index < startKey) {
+      result[key] = value;
+    } else if (index > startKey) {
+      const newKey = `extra${index - 1}` as ExtraColumnColorKey;
+      result[newKey] = { ...value, colorKey: newKey };
+    }
+    // index === startKey: Text der entfernten Spalte entfällt.
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
 }

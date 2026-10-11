@@ -16,9 +16,23 @@ import { describe, expect, it } from 'vitest';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { App } from '../components/App.tsx';
 import { countMarkedShiftsByColor, MonthCalendar } from '../components/MonthCalendar.tsx';
 import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder.ts';
+
+/**
+ * Liest das Bildschirm-Stylesheet als Text.
+ *
+ * Reine Regeln wie der Greif-Cursor der Zieh-Spalten lassen sich in jsdom nicht
+ * über `getComputedStyle` prüfen (jsdom wertet Stylesheets nicht aus). Der
+ * Regressionstest prüft deshalb direkt die Stylesheet-Quelle. Der Pfad wird
+ * gegen das Arbeitsverzeichnis (Projektwurzel, in der Vitest startet) gebildet.
+ */
+function readStylesheet(): string {
+  return readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8');
+}
 
 /** Baut einen realen Monat für die Markierungs-Tests (März 2021, Schicht C). */
 function buildMarch2021(): import('../domain/types').MonthCalendar {
@@ -907,7 +921,7 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
     }
   });
 
-  it('färbt eine Zusatzspalte über den Tageseditor ein und schreibt extraColors', () => {
+  it('markiert eine Zusatzspalte per Ziehen und öffnet den eigenen Editor', () => {
     window.localStorage.removeItem('schichtkalender.state');
     try {
       const container = render(<App />);
@@ -916,22 +930,46 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
       const card = cardOf(container, 'Januar 2026');
       expect(extraCellCount(card)).toBe(1);
 
-      // Der Tag 01.01.2026 wurde noch nicht eingefärbt.
-      const firstRow = card?.querySelectorAll('.day-row')[0] as HTMLElement;
-      expect(
-        (firstRow.querySelector('.cell-extra') as HTMLElement).style.backgroundColor,
-      ).toBe('');
+      /** Hilfsfunktion: ein Maus-Ereignis auf einem Zielelement auslösen. */
+      const mouse = (element: Element, type: string, target?: Element) => {
+        const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 });
+        act(() => {
+          (target ?? element).dispatchEvent(event);
+        });
+      };
 
-      // Tageseditor öffnen: die Zusatzspalte erscheint als eigenes Farbfeld.
-      click(firstRow);
+      const rows = Array.from(card!.querySelectorAll('.day-row'));
+      // Ziehen in der Zusatzspalte über die ersten drei Tage.
+      mouse(rows[0], 'mousedown', rows[0].querySelector('.cell-extra') ?? rows[0]);
+      for (const row of rows.slice(1, 3)) {
+        act(() => {
+          row.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        });
+      }
+      mouse(rows[2], 'mouseup', rows[2].querySelector('.cell-extra') ?? rows[2]);
+      act(() => {
+        window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      });
+
+      // Der eigene Zusatzspalten-Editor erscheint (kein Streifen-Dialog).
       const editor = container.querySelector('.day-editor');
       expect(editor).not.toBeNull();
-      const extraField = editor!.querySelector('.editor-extra-color');
-      expect(extraField).not.toBeNull();
-      expect(extraField?.textContent).toContain('Zusatzspalte 0');
+      expect(editor?.textContent).toContain('Zusatzspalte 0');
+      expect(editor?.textContent).toContain('Querliegender Text');
+      expect(editor?.textContent).toContain('3 Zellen');
 
-      // Im Feld der Zusatzspalte eine Farbe (Rot) wählen.
-      const redOption = Array.from(extraField!.querySelectorAll('.color-option')).find(
+      // Text eingeben und eine Farbe (Rot) wählen.
+      expect(editor?.querySelector('.cell-extra-text')).toBeNull();
+      const textarea = editor!.querySelector('textarea') as HTMLTextAreaElement;
+      act(() => {
+        const setter = Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          'value',
+        )?.set;
+        setter?.call(textarea, 'Urlaub');
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      const redOption = Array.from(editor!.querySelectorAll('.color-option')).find(
         (option) => option.getAttribute('title') === 'Rot',
       );
       click(redOption ?? null);
@@ -940,9 +978,15 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
       );
       click(saveButton ?? null);
 
-      // Die Farbe landet in extraColors und wird in der Zelle dargestellt.
+      // Farbe und querliegender Text landen in der Persistenz (Anker = erster Tag).
       const persisted = JSON.parse(window.localStorage.getItem('schichtkalender.state') ?? '{}');
       expect(persisted.annotations['2026-01-01']?.extraColors?.extra0).toBe('red');
+      const text = persisted.annotations['2026-01-01']?.extraTexts?.extra0;
+      expect(text?.text).toBe('Urlaub');
+      expect(text?.vertical).toBe(true);
+      expect(text?.dateKeys).toEqual(['2026-01-01', '2026-01-02', '2026-01-03']);
+
+      // Die Farbe wird in der Zelle dargestellt.
       const rowAfter = (cardOf(container, 'Januar 2026')?.querySelectorAll('.day-row')[0] ??
         null) as HTMLElement | null;
       expect(rowAfter?.querySelector('.cell-extra')?.getAttribute('style') ?? '').toContain(
@@ -951,6 +995,71 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }
+  });
+
+  it('hebt beim Ziehen nur die getroffene Breiteneinheit hervor', () => {
+    // Regression: Eine erweiterte Zusatzspalte besteht aus mehreren Zellen mit
+    // demselben Farbschlüssel. Früher wurde beim Ziehen die gesamte Spalte
+    // hervorgehoben; jetzt trägt jede Einheit ein eigenes Zieh-Ziel
+    // (`data-extra-unit-key`), sodass nur die Spalte unter dem Zeiger markiert
+    // wird - wie bei den festen Farbspalten.
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      // Zusatzspalte links anlegen und auf zwei Einheiten erweitern.
+      click(handle(container, 'left'));
+      click(handle(container, 'left'));
+      const card = cardOf(container, 'Januar 2026');
+      const rows = Array.from(card!.querySelectorAll('.day-row'));
+      const startCells = rows[0].querySelectorAll('.cell-extra');
+      expect(startCells.length).toBe(2);
+
+      // Beide Einheiten tragen denselben Farbschlüssel, aber eigene Zieh-Ziele.
+      expect(startCells[0].getAttribute('data-extra-column-key')).toBe('extra0');
+      expect(startCells[1].getAttribute('data-extra-column-key')).toBe('extra0');
+      expect(startCells[0].getAttribute('data-extra-unit-key')).toBe('extra0');
+      expect(startCells[1].getAttribute('data-extra-unit-key')).toBe('extra0#1');
+
+      const mouse = (element: Element, type: string, target?: Element) => {
+        act(() => {
+          (target ?? element).dispatchEvent(
+            new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 }),
+          );
+        });
+      };
+      // Ziehen beginnt in der ZWEITEN Einheit.
+      mouse(rows[0], 'mousedown', startCells[1]);
+      mouse(rows[1], 'mouseover');
+
+      const selected = (row: Element) =>
+        Array.from(row.querySelectorAll('.cell-extra'))
+          .map((cell) => cell.classList.contains('is-column-selected'))
+          .join(',');
+
+      // Nur die getroffene Einheit ist hervorgehoben - nicht die ganze Spalte.
+      expect(selected(rows[0])).toBe('false,true');
+      expect(selected(rows[1])).toBe('false,true');
+      // Außerhalb der Auswahl bleibt alles unmarkiert.
+      expect(selected(rows[3])).toBe('false,false');
+
+      mouse(rows[1], 'mouseup');
+      act(() => window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })));
+      // Der eigene Zusatzspalten-Editor erscheint; die Farbe gilt anschließend
+      // für die gesamte (erweiterte) Spalte, weil beide Einheiten denselben
+      // Farbschlüssel tragen.
+      const editor = container.querySelector('.day-editor');
+      expect(editor?.textContent).toContain('Zusatzspalte 0');
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('zeigt den Greif-Cursor (crosshair) auch über Zusatzspalten', () => {
+    // Regression: Die Zusatzspalten waren als Zieh-Spalten nutzbar, zeigten
+    // aber nicht denselben Cursor wie die festen Farbspalten.
+    const stylesheet = readStylesheet();
+    const rule = /\.cell-weekday\s*,[\s\S]*?\.cell-extra\s*\{[^}]*cursor:\s*crosshair/s;
+    expect(rule.test(stylesheet)).toBe(true);
   });
 
   it('behält die angelegten Spalten über eine neue Sitzung', () => {
@@ -964,6 +1073,151 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
       expect(cardOf(second, 'Januar 2026')?.style.getPropertyValue('--extra-left-width')).toBe(
         '1.6em',
       );
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('entfernt eine Zusatzspalte über den Minus-Bedienpunkt', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      // Ohne Spalte gibt es noch keinen Minus-Punkt.
+      expect(
+        container.querySelector('.column-remove-handle[data-extra-column-side="left"]'),
+      ).toBeNull();
+
+      // Zwei Spalten links anlegen (erste Linie anlegen/dann erweitern).
+      click(handle(container, 'left'));
+      click(handle(container, 'left'));
+      expect(extraCellCount(cardOf(container, 'Januar 2026'))).toBe(2);
+
+      // Minus-Punkt erscheint, sobald eine Spalte vorhanden ist.
+      const minus = container.querySelector(
+        '.column-remove-handle[data-extra-column-side="left"]',
+      ) as HTMLElement | null;
+      expect(minus).not.toBeNull();
+
+      // Erster Klick verkleinert die Spalte an der Linie um eine Einheit.
+      click(minus);
+      expect(extraCellCount(cardOf(container, 'Januar 2026'))).toBe(1);
+      expect(
+        cardOf(container, 'Januar 2026')?.style.getPropertyValue('--extra-left-width'),
+      ).toBe('1.6em');
+
+      // Zweiter Klick entfernt die Spalte vollständig.
+      click(
+        container.querySelector('.column-remove-handle[data-extra-column-side="left"]'),
+      );
+      expect(extraCellCount(cardOf(container, 'Januar 2026'))).toBe(0);
+      expect(
+        container.querySelector('.column-remove-handle[data-extra-column-side="left"]'),
+      ).toBeNull();
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('zeigt den querliegenden Text über die markierten Zellen', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    // Querliegenden Text für die Spanne 01.–03.01.2026 direkt vorbelegen.
+    window.localStorage.setItem(
+      'schichtkalender.state',
+      JSON.stringify({
+        version: 1,
+        settings: { ...DEFAULT_SETTINGS, extraColumns: { 1: { left: [1], right: [] } } },
+        annotations: {
+          '2026-01-01': {
+            dateKey: '2026-01-01',
+            label: '',
+            colors: {},
+            extraTexts: {
+              extra0: {
+                colorKey: 'extra0',
+                columnLabel: 'Zusatzspalte 0',
+                vertical: true,
+                text: 'Urlaub',
+                dateKeys: ['2026-01-01', '2026-01-02', '2026-01-03'],
+                length: 3,
+              },
+            },
+          },
+        },
+        colorLegend: {},
+        anniversaries: {},
+      }),
+    );
+    try {
+      const container = render(<App />);
+      const card = cardOf(container, 'Januar 2026');
+      const overlay = card?.querySelector('.cell-extra-text');
+      expect(overlay).not.toBeNull();
+      expect(overlay?.textContent).toBe('Urlaub');
+      // Querliegend: um 90° gedreht (Klasse is-vertical).
+      expect(overlay?.classList.contains('is-vertical')).toBe(true);
+      // Die Überlagerung liegt in der Ebene über dem Tagesraster und wird
+      // gemessen platziert (die Rasterspalte dient nur der Zuordnung).
+      expect(card?.querySelector('.day-table-overlay .cell-extra-text')).not.toBeNull();
+      const element = overlay as HTMLElement;
+      const style = element.style;
+      // Position als Inline-Stil (auch wenn jsdom keine echten Maße liefert).
+      expect(style.left).not.toBe('');
+      expect(style.top).not.toBe('');
+      expect(style.width).not.toBe('');
+      expect(style.height).not.toBe('');
+      // Die Rasterspalte der Zusatzspalte (Wochentag | Datum | [links] | Info …).
+      expect(element.getAttribute('data-grid-column')).toBe('3');
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  /**
+   * Regression: Der querliegende Text blieb auf einer eingefärbten
+   * Zusatzspalte in der (im Dunkelmodus weißen) Standard-Textfarbe und war
+   * damit auf dem satten Farbfeld unlesbar. Trägt die Spalte am Anker-Tag eine
+   * persönliche Farbe, wird der Text - wie die übrigen Zellen einer
+   * Farbmarkierung - in Schwarz gezeichnet (`has-color`).
+   */
+  it('färbt den querliegenden Text einer eingefärbten Zusatzspalte schwarz', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    window.localStorage.setItem(
+      'schichtkalender.state',
+      JSON.stringify({
+        version: 1,
+        settings: { ...DEFAULT_SETTINGS, extraColumns: { 1: { left: [1], right: [] } } },
+        annotations: {
+          '2026-01-01': {
+            dateKey: '2026-01-01',
+            label: '',
+            colors: {},
+            extraColors: { extra0: 'red' },
+            extraTexts: {
+              extra0: {
+                colorKey: 'extra0',
+                columnLabel: 'Zusatzspalte 0',
+                vertical: true,
+                text: 'Urlaub',
+                dateKeys: ['2026-01-01', '2026-01-02', '2026-01-03'],
+                length: 3,
+              },
+            },
+          },
+        },
+        colorLegend: {},
+        anniversaries: {},
+      }),
+    );
+    try {
+      const container = render(<App />);
+      const card = cardOf(container, 'Januar 2026');
+      const overlay = card?.querySelector('.cell-extra-text');
+      expect(overlay).not.toBeNull();
+      // Die eingefärbte Spalte ist markiert (Kontrastfarbe greift).
+      expect(overlay?.classList.contains('has-color')).toBe(true);
+      // Die zugehörige Regel setzt schwarze Schrift.
+      const rule = /\.cell-extra-text\.has-color\s*\{[^}]*color:\s*#000000/s;
+      expect(rule.test(readStylesheet())).toBe(true);
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }

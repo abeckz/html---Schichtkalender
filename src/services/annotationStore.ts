@@ -16,10 +16,13 @@ import type {
   AppSettings,
   ColumnColorName,
   ExtraColumnColorKey,
+  ExtraColumnText,
+  UserDayAnnotation,
 } from '../domain/types';
 import {
   getDefaultStorage,
   normalizeAnnotation,
+  MAX_EXTRA_TEXT_LENGTH,
   readState,
   writeState,
   type StorageLike,
@@ -28,20 +31,14 @@ import {
 export interface AnnotationStore {
   annotations: AnnotationMap;
   /**
-   * Setzt oder entfernt eine Annotation. Leere Werte löschen den Eintrag.
-   *
-   * `extraColors` (optional) setzt die persönlichen Farben der frei angelegten
-   * Zusatzspalten des Tages. Fehlt der Parameter vollständig, bleiben die
-   * vorhandenen Zusatzspalten-Farben unverändert erhalten (z. B. beim
-   * Streifen-Einfärben). Wird die Map übergeben, ersetzt sie die Farben der
-   * Zusatzspalten vollständig; ein Eintrag mit `null` entfernt die Farbe
-   * dieser Spalte.
+   * Setzt oder entfernt Beschriftung und Info-Farbe eines Tages. Leere Werte
+   * löschen den Eintrag. Farben der Zusatzspalten und deren querliegende Texte
+   * bleiben dabei unverändert erhalten.
    */
   setAnnotation: (
     dateKey: string,
     label: string,
     colorId: AnnotationColorId | null,
-    extraColors?: Partial<Record<ExtraColumnColorKey, AnnotationColorId | null>>,
   ) => void;
   /** Entfernt nur Beschriftung und Farbe eines Tages. */
   resetAnnotation: (dateKey: string) => void;
@@ -49,13 +46,31 @@ export interface AnnotationStore {
    * Setzt die Farbe einer Spalte für mehrere Tage auf einmal
    * (Streifen-Markierung).
    *
-   * Bestehende Beschriftungen und übrige Spaltenfarben bleiben unverändert
-   * erhalten. Eine Farbe von null entfernt nur die Farbe dieser Spalte.
+   * Deckt sowohl die festen Farbspalten der Tageszeile ('weekday', 'day',
+   * 'shift', 'info') als auch die frei angelegten Zusatzspalten (`extra0`,
+   * `extra1`, …) ab. Bestehende Beschriftungen und übrige Spaltenfarben bleiben
+   * unverändert erhalten. Eine Farbe von null entfernt nur die Farbe dieser
+   * Spalte.
    */
   setColumnColorForDateKeys: (
     dateKeys: readonly string[],
-    column: ColumnColorName,
+    column: ColumnColorName | ExtraColumnColorKey,
     colorId: AnnotationColorId | null,
+  ) => void;
+  /**
+   * Setzt oder entfernt den querliegenden Text einer Zusatzspalte.
+   *
+   * Der Text gehört zu einer markierten Spanne und wird auf deren **oberster**
+   * Zelle (erstes Element von `dateKeys`) gespeichert; die übrigen Tage der
+   * Spanne werden von einem früheren Text desselben Schlüssels befreit, damit
+   * nur ein Eintrag je Spalte und Spanne existiert.
+   */
+  setExtraColumnText: (
+    dateKeys: readonly string[],
+    colorKey: ExtraColumnColorKey,
+    columnLabel: string,
+    vertical: boolean,
+    text: string,
   ) => void;
   /** Ersetzt die gesamte Map (Reset/Import). */
   replaceAnnotations: (next: AnnotationMap) => void;
@@ -93,12 +108,7 @@ export function useAnnotationStore(
   }, [settings, annotations, storage]);
 
   const setAnnotation = useCallback(
-    (
-      dateKey: string,
-      label: string,
-      colorId: AnnotationColorId | null,
-      extraColors?: Partial<Record<ExtraColumnColorKey, AnnotationColorId | null>>,
-    ) => {
+    (dateKey: string, label: string, colorId: AnnotationColorId | null) => {
       setAnnotations((current) => {
         const existing = current[dateKey];
         const colors = { ...(existing?.colors ?? {}) };
@@ -107,32 +117,16 @@ export function useAnnotationStore(
         } else {
           delete colors.info;
         }
-        // Zusatzspalten-Farben: fehlt der Parameter, bleiben die bestehenden
-        // erhalten; wird er übergeben, ersetzt er sie vollständig. Ein Wert von
-        // null entfernt nur die Farbe dieser einen Spalte.
-        let extra: Partial<Record<ExtraColumnColorKey, AnnotationColorId>> | undefined =
-          existing?.extraColors;
-        if (extraColors !== undefined) {
-          const merged: Partial<Record<ExtraColumnColorKey, AnnotationColorId>> = {
-            ...(existing?.extraColors ?? {}),
-          };
-          for (const [key, value] of Object.entries(extraColors) as Array<
-            [ExtraColumnColorKey, AnnotationColorId | null | undefined]
-          >) {
-            if (value) {
-              merged[key] = value;
-            } else {
-              delete merged[key];
-            }
-          }
-          extra = Object.keys(merged).length > 0 ? merged : undefined;
-        }
+        // Farben und querliegende Texte der Zusatzspalten bleiben unverändert
+        // erhalten: sie werden ausschließlich über die Streifen-Auswahl bzw.
+        // den Zusatzspalten-Editor gepflegt.
         const normalized = normalizeAnnotation({
           dateKey,
           label,
           colors,
-          extraColors: extra,
-        });
+          extraColors: existing?.extraColors,
+          extraTexts: existing?.extraTexts,
+        } as UserDayAnnotation);
         const next = { ...current };
         if (normalized) {
           next[dateKey] = normalized;
@@ -157,31 +151,115 @@ export function useAnnotationStore(
   const setColumnColorForDateKeys = useCallback(
     (
       dateKeys: readonly string[],
-      column: ColumnColorName,
+      column: ColumnColorName | ExtraColumnColorKey,
       colorId: AnnotationColorId | null,
     ) => {
+      // Feste Farbspalten der Tageszeile landen in `colors`, Zusatzspalten
+      // (`extra0`, …) in `extraColors`; beide werden getrennt gepflegt.
+      const isExtra = isExtraColorKey(column);
       setAnnotations((current) => {
         const next = { ...current };
         for (const dateKey of dateKeys) {
           const existing = current[dateKey];
           const label = existing?.label ?? '';
           const colors = { ...(existing?.colors ?? {}) };
-          if (colorId) {
-            colors[column] = colorId;
+          const extraColors: Partial<Record<ExtraColumnColorKey, AnnotationColorId>> = {
+            ...(existing?.extraColors ?? {}),
+          };
+          if (isExtra) {
+            const key = column as ExtraColumnColorKey;
+            if (colorId) {
+              extraColors[key] = colorId;
+            } else {
+              delete extraColors[key];
+            }
           } else {
-            delete colors[column];
+            const key = column as ColumnColorName;
+            if (colorId) {
+              colors[key] = colorId;
+            } else {
+              delete colors[key];
+            }
           }
           const normalized = normalizeAnnotation({
             dateKey,
             label,
             colors,
-            extraColors: existing?.extraColors,
-          });
+            extraColors: Object.keys(extraColors).length > 0 ? extraColors : undefined,
+            extraTexts: existing?.extraTexts,
+          } as UserDayAnnotation);
           if (normalized) {
             next[dateKey] = normalized;
           } else {
             delete next[dateKey];
           }
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const setExtraColumnText = useCallback(
+    (
+      dateKeys: readonly string[],
+      colorKey: ExtraColumnColorKey,
+      columnLabel: string,
+      vertical: boolean,
+      text: string,
+    ) => {
+      const span = [...dateKeys].sort();
+      if (span.length === 0) return;
+      const anchor = span[0];
+      const trimmed = text.slice(0, MAX_EXTRA_TEXT_LENGTH);
+      setAnnotations((current) => {
+        const next = { ...current };
+        // Zuerst einen früheren Text desselben Schlüssels im gesamten Zustand
+        // entfernen (Spanne kann sich verschoben haben), dann neu auf dem Anker
+        // setzen. So existiert höchstens ein Text je Spalten-Schlüssel und Tag.
+        const removeFrom = (target: Record<string, UserDayAnnotation>, dateKey: string) => {
+          const existing = target[dateKey];
+          if (!existing?.extraTexts?.[colorKey]) return;
+          const extraTexts = { ...existing.extraTexts };
+          delete extraTexts[colorKey];
+          const normalized = normalizeAnnotation({
+            ...existing,
+            extraTexts: Object.keys(extraTexts).length > 0 ? extraTexts : undefined,
+          } as UserDayAnnotation);
+          if (normalized) {
+            target[dateKey] = normalized;
+          } else {
+            delete target[dateKey];
+          }
+        };
+        for (const dateKey of Object.keys(next)) {
+          removeFrom(next, dateKey);
+        }
+
+        if (trimmed === '') return next;
+
+        const existing = next[anchor] ?? current[anchor];
+        const normalized = normalizeAnnotation({
+          dateKey: anchor,
+          label: existing?.label ?? '',
+          colors: existing?.colors ?? {},
+          extraColors: existing?.extraColors,
+          extraTexts: {
+            ...(existing?.extraTexts ?? {}),
+            [colorKey]: {
+              colorKey,
+              columnLabel,
+              vertical,
+              text: trimmed,
+              dateKeys: span,
+              length: span.length,
+            } satisfies ExtraColumnText,
+          },
+        } as UserDayAnnotation);
+        if (normalized) {
+          next[anchor] = normalized;
+        } else {
+          delete next[anchor];
         }
         return next;
       });
@@ -198,6 +276,12 @@ export function useAnnotationStore(
     setAnnotation,
     resetAnnotation,
     setColumnColorForDateKeys,
+    setExtraColumnText,
     replaceAnnotations,
   };
+}
+
+/** Prüft, ob ein Streifen-Ziel eine Zusatzspalte (`extra0`, …) benennt. */
+function isExtraColorKey(column: ColumnColorName | ExtraColumnColorKey): boolean {
+  return /^extra[0-9]+$/.test(column);
 }

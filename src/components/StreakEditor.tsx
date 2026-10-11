@@ -21,8 +21,15 @@ import { ColorPicker } from './ColorPicker';
 export interface StreakEditorProps {
   /** Markierte Tage in chronologischer Reihenfolge. */
   days: readonly CalendarDay[];
-  /** Spalte, in der der Streifen gezogen wurde (Wochentag, Tagesnummer oder T/N). */
+  /**
+   * Feste Farbspalte, in der der Streifen gezogen wurde.
+   *
+   * Zusatzspalten erreichen diesen Dialog nie: für sie öffnet App direkt den
+   * eigenen `ExtraColumnEditor` (Farbe + querliegender Text).
+   */
   column: ColumnColorName;
+  /** Anzeigename der Spalte (überschreibt die Standardbeschriftung). */
+  columnLabel?: string;
   onApply: (
     dateKeys: readonly string[],
     column: ColumnColorName,
@@ -31,7 +38,7 @@ export interface StreakEditorProps {
   onClose: () => void;
 }
 
-/** Beschriftung der gefärbten Spalte für die Zusammenfassung. */
+/** Beschriftung der festen Farbspalten für die Zusammenfassung. */
 const COLUMN_LABELS: Record<ColumnColorName, string> = {
   weekday: 'Wochentag',
   day: 'Tagesnummer',
@@ -39,7 +46,7 @@ const COLUMN_LABELS: Record<ColumnColorName, string> = {
   info: 'Info',
 };
 
-export function StreakEditor({ days, column, onApply, onClose }: StreakEditorProps) {
+export function StreakEditor({ days, column, columnLabel, onApply, onClose }: StreakEditorProps) {
   const [colorId, setColorId] = useState<AnnotationColorId | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -86,6 +93,8 @@ export function StreakEditor({ days, column, onApply, onClose }: StreakEditorPro
 
   if (dayCount === 0) return null;
 
+  const displayColumn = columnLabel ?? COLUMN_LABELS[column];
+
   return (
     <div className="editor-backdrop no-print" role="presentation" onClick={onClose}>
       <div
@@ -101,7 +110,7 @@ export function StreakEditor({ days, column, onApply, onClose }: StreakEditorPro
         </h2>
 
         <p className="streak-summary">
-          Spalte „{COLUMN_LABELS[column]}“ – {dayCount} {dayCount === 1 ? 'Tag' : 'Tage'} markiert ({rangeLabel})
+          Spalte „{displayColumn}“ – {dayCount} {dayCount === 1 ? 'Tag' : 'Tage'} markiert ({rangeLabel})
         </p>
 
         <div className="editor-field" id={colorGroupId}>

@@ -53,6 +53,62 @@ export type ColumnColorName = 'weekday' | 'day' | 'shift' | 'info';
 export type ExtraColumnColorKey = `extra${number}`;
 
 /**
+ * Zielspalte einer Streifen-Auswahl (Ziehen mit gedrückter Maustaste).
+ *
+ * Neben den festen Farbspalten der Tageszeile ('weekday', 'day', 'shift')
+ * lassen sich auch die frei angelegten Zusatzspalten markieren und einfärben.
+ * Deren Ziel wird über den stabilen Farbschlüssel (`extra0`, `extra1`, …)
+ * benannt, damit die Auswahl unabhängig von der Lage der Spalte bleibt.
+ */
+export type StreakColumnTarget = ColumnColorName | ExtraColumnColorKey;
+
+/**
+ * Zieh-Ziel einer einzelnen Breiteneinheit einer Zusatzspalte.
+ *
+ * Eine erweiterte Zusatzspalte (`ExtraColumns.left: [2]`) besteht aus mehreren
+ * Breiteneinheiten mit **demselben** Farbschlüssel: gefärbt und beschriftet wird
+ * immer die ganze Spalte. Für die Streifen-Auswahl muss jedoch die einzelne
+ * Einheit unterscheidbar sein, damit beim Ziehen ausschließlich die Spalte unter
+ * dem Zeiger hervorgehoben wird. Die erste Einheit trägt deshalb den reinen
+ * Farbschlüssel ('extra0'), jede weitere einen Suffix ('extra0#1').
+ */
+export type ExtraColumnUnitKey = ExtraColumnColorKey | `${ExtraColumnColorKey}#${number}`;
+
+/**
+ * Zieh-Ziel der Streifen-Auswahl: feste Farbspalte oder einzelne
+ * Breiteneinheit einer Zusatzspalte.
+ */
+export type StreakTarget = StreakColumnTarget | ExtraColumnUnitKey;
+
+/**
+ * Querliegender Text einer Zusatzspalte.
+ *
+ * Der Text gehört zu einer markierten Spanne (Streifen-Auswahl) innerhalb einer
+ * Zusatzspalte und wird als **ein** Eintrag gespeichert. Anker ist die oberste
+ * markierte Zelle; `dateKeys` hält die vollständige, chronologisch sortierte
+ * Spanne, damit die Darstellung den Text mittig über alle markierten Zellen
+ * setzen kann. `length` ist die Anzahl der markierten Zellen (Zeilenhöhen) und
+ * dient als Gradmaß für die zentrierte Platzierung.
+ *
+ * Ist `vertical` gesetzt (Checkbox "Querliegender Text"), wird der Text um 90°
+ * nach links gedreht mittig über die Gesamtzahl der markierten Zellen gesetzt.
+ */
+export interface ExtraColumnText {
+  /** Zusatzspalten-Farbschlüssel ('extra0', 'extra1', …). */
+  colorKey: ExtraColumnColorKey;
+  /** Anzeigename der Spalte (z. B. "Zusatzspalte 0"). */
+  columnLabel: string;
+  /** Querliegender (= um 90° nach links gedrehter) Text. */
+  vertical: boolean;
+  /** Freitext; bei `vertical === false` normale horizontale Darstellung. */
+  text: string;
+  /** Chronologisch sortierte Spanne der markierten Tage (inkl. Anker). */
+  dateKeys: string[];
+  /** Anzahl der markierten Zellen; entspricht `dateKeys.length`. */
+  length: number;
+}
+
+/**
  * Anordnung der Zusatzspalten eines Monats.
  *
  * - `left`: schmale Spalten zwischen der großen Kommentarspalte und der
@@ -230,7 +286,14 @@ export function anniversaryKey(monthDay: string, _kind?: AnniversaryKind): Anniv
  */
 export type AnniversaryMap = Record<AnniversaryKey, AnniversaryEntry[]>;
 
-/** Persönliche, vom Benutzer gesetzte Markierung eines Tages. */
+/**
+ * Persönliche, vom Benutzer gesetzte Markierung eines Tages.
+ *
+ * Neben Beschriftung und Farben kann ein Tag Träger eines **querliegenden
+ * Textes** einer Zusatzspalte sein (siehe `extraTexts`). Der Text gehört zu
+ * einer markierten Spanne und wird ausschließlich auf der obersten (Anker-)
+ * Zelle der Spanne gespeichert.
+ */
 export interface UserDayAnnotation {
   dateKey: string;
   /** Freitext, maximal 50 Zeichen. */
@@ -239,18 +302,26 @@ export interface UserDayAnnotation {
    * Persönliche Farben je Spalte (Spaltenname -> colorId).
    *
    * Der gezogene Streifen setzt die drei linken Spalten ('weekday', 'day',
-   * 'shift'); der DayEditor setzt die Informationsspalte ('info'). Fehlende
-   * Einträge bedeuten "keine Farbe" für diese Spalte.
+   * 'shift'); die Informationsspalte ('info') wird über den DayEditor gepflegt.
+   * Fehlende Einträge bedeuten "keine Farbe" für diese Spalte.
    */
   colors: Partial<Record<ColumnColorName, AnnotationColorId>>;
   /**
    * Persönliche Farben der frei angelegten Zusatzspalten
    * (Schlüssel `extra0`, `extra1`, … -> colorId).
    *
-   * Der DayEditor setzt sie genau wie die Farbe der Informationsspalte; fehlende
-   * Einträge bedeuten "keine Farbe" für diese Spalte.
+   * Sie werden über die Streifen-Auswahl eingefärbt (wie die festen
+   * Farbspalten); fehlende Einträge bedeuten "keine Farbe" für diese Spalte.
    */
   extraColors?: Partial<Record<ExtraColumnColorKey, AnnotationColorId>>;
+  /**
+   * Querliegende Texte der Zusatzspalten, deren Spanne auf diesem Tag beginnt.
+   *
+   * Schlüssel ist der Farbschlüssel der Zusatzspalte (`extra0`, `extra1`, …).
+   * Der Eintrag liegt immer auf der obersten Zelle der markierten Spanne; die
+   * Darstellung zieht ihn über alle Zellen der Spanne (`dateKeys`).
+   */
+  extraTexts?: Partial<Record<ExtraColumnColorKey, ExtraColumnText>>;
 }
 
 /** Monatskennzahlen. */

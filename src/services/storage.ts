@@ -18,6 +18,7 @@ import type {
   ColorLegendMap,
   ColumnColorName,
   ExtraColumnColorKey,
+  ExtraColumnText,
   ExtraColumns,
   PersistedState,
   ShiftId,
@@ -31,6 +32,9 @@ import { isValidDateKey, isMonthDayKey, isPlausibleBirthYear } from '../utils/da
 export const STORAGE_KEY = 'schichtkalender.state';
 export const STORAGE_VERSION = 1;
 export const MAX_LABEL_LENGTH = 50;
+
+/** Maximale Länge eines querliegenden Textes einer Zusatzspalte. */
+export const MAX_EXTRA_TEXT_LENGTH = 50;
 
 /** Kleinste Breite einer Zusatzspalte, in Einheiten à 1,6 em (~2 Zeichen). */
 export const MIN_EXTRA_COLUMN_WIDTH = 1;
@@ -104,16 +108,29 @@ export function normalizeAnnotation(value: unknown): UserDayAnnotation | null {
     }
   }
 
+  // Querliegende Texte der Zusatzspalten (`extra0`, `extra1`, …).
+  const extraTexts: Partial<Record<ExtraColumnColorKey, ExtraColumnText>> = {};
+  const rawExtraTexts = (candidate as { extraTexts?: unknown }).extraTexts;
+  if (rawExtraTexts && typeof rawExtraTexts === 'object') {
+    for (const [key, value] of Object.entries(rawExtraTexts as Record<string, unknown>)) {
+      if (!isExtraColumnColorKey(key)) continue;
+      const text = normalizeExtraColumnText(value, key);
+      if (text) extraTexts[key] = text;
+    }
+  }
+
   // Vollständig leere Annotationen werden nicht gespeichert.
   if (
     label === '' &&
     Object.keys(colors).length === 0 &&
-    Object.keys(extraColors).length === 0
+    Object.keys(extraColors).length === 0 &&
+    Object.keys(extraTexts).length === 0
   ) {
     return null;
   }
   const annotation: UserDayAnnotation = { dateKey: candidate.dateKey, label, colors };
   if (Object.keys(extraColors).length > 0) annotation.extraColors = extraColors;
+  if (Object.keys(extraTexts).length > 0) annotation.extraTexts = extraTexts;
   return annotation;
 }
 
@@ -126,6 +143,53 @@ export function extraColumnColorKey(name: string | number): ExtraColumnColorKey 
 /** Prüft den Farbschlüssel einer Zusatzspalte ("extra0", "extra1", …). */
 export function isExtraColumnColorKey(value: unknown): value is ExtraColumnColorKey {
   return typeof value === 'string' && /^extra[0-9]+$/.test(value);
+}
+
+/** Länge einer Beschriftung/eines Textes auf 50 Zeichen begrenzen. */
+function normalizeExtraText(value: unknown): string {
+  return typeof value === 'string' ? value.slice(0, MAX_EXTRA_TEXT_LENGTH) : '';
+}
+
+/**
+ * Bereinigt einen querliegenden Text einer Zusatzspalte.
+ *
+ * Erwartet als `fallbackKey` den Farbschlüssel der Spalte (aus dem Map-Schlüssel).
+ * Liefert null, wenn weder Text noch Spanne gültig sind bzw. kein Text vorliegt.
+ * Die Spanne (`dateKeys`) wird auf gültige, eindeutige Datumsschlüssel beschränkt
+ * und chronologisch sortiert; `length` folgt aus ihrer Länge.
+ */
+export function normalizeExtraColumnText(
+  value: unknown,
+  fallbackKey?: ExtraColumnColorKey,
+): ExtraColumnText | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<ExtraColumnText>;
+  const colorKey = isExtraColumnColorKey(candidate.colorKey)
+    ? candidate.colorKey
+    : fallbackKey;
+  if (!colorKey) return null;
+  const text = normalizeExtraText(candidate.text);
+  const rawKeys = Array.isArray(candidate.dateKeys) ? candidate.dateKeys : [];
+  const dateKeys: string[] = [];
+  const seen = new Set<string>();
+  for (const key of rawKeys) {
+    if (typeof key !== 'string' || !isValidDateKey(key) || seen.has(key)) continue;
+    seen.add(key);
+    dateKeys.push(key);
+  }
+  dateKeys.sort();
+  if (dateKeys.length === 0 && text === '') return null;
+  return {
+    colorKey,
+    columnLabel:
+      typeof candidate.columnLabel === 'string'
+        ? candidate.columnLabel.slice(0, MAX_LABEL_LENGTH)
+        : '',
+    vertical: candidate.vertical !== false,
+    text,
+    dateKeys,
+    length: dateKeys.length,
+  };
 }
 
 /** Begrenzt eine Spaltenbreite auf den zulässigen Bereich. */

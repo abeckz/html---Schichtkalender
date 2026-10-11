@@ -824,6 +824,51 @@ body {
   height: 15px;
 }
 
+/**
+ * Minus-Bedienpunkt "Zusatzspalte entfernen".
+ *
+ * Er nutzt dieselben Positionslinien wie der Plus-Punkt (gleiche
+ * `left`/`right`-Basen), sitzt aber um `--column-handle-offset` tiefer, damit
+ * sich beide Punkte nicht überlagern. Sichtbarkeit und Ein-/Ausblenden folgen
+ * dem Plus-Punkt (Überfahren der Monatskarte bzw. Tastaturfokus).
+ */
+.column-remove-handle {
+  position: absolute;
+  top: calc(50% + 15px);
+  z-index: 2;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 0;
+  color: var(--color-text);
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: auto;
+  transform: translate(50%, -50%);
+}
+
+.column-remove-handle[data-extra-column-side='left'] {
+  left: calc(5px + 2.4em + 2.4em + var(--extra-left-width, 0em));
+  transform: translate(-50%, -50%);
+}
+
+.month-header.is-weekday-over-date .column-remove-handle[data-extra-column-side='left'] {
+  left: calc(5px + 3.6em + var(--extra-left-width, 0em));
+}
+
+.column-remove-handle[data-extra-column-side='right'] {
+  right: calc(5px + 2.2em);
+}
+
+.month-card:hover .column-remove-handle,
+.column-remove-handle:focus-visible {
+  opacity: 1;
+}
+
 .month-title {
   margin: 0;
   font-size: 14px;
@@ -843,6 +888,7 @@ body {
 }
 
 .day-table {
+  position: relative;
   display: flex;
   flex-direction: column;
 }
@@ -1059,6 +1105,76 @@ body {
   justify-content: center;
   min-width: 0;
   border-right: 1px solid var(--color-border);
+}
+
+/**
+ * Überlagerungsebene für querliegende Texte der Zusatzspalten.
+ *
+ * Wichtig: `.day-table` ist eine Spalten-Flexbox; die Spaltenbreiten stehen
+ * ausschließlich auf den Tageszeilen (`.day-row`). Ein Subgrid über
+ * `.day-table` könnte die Zeilenraster daher nie treffen. Die Ebene liegt
+ * deshalb absolut über dem Tagesraster (`.day-table { position: relative }`)
+ * und jeder Text wird aus den gemessenen Rechtecken der Zielzelle und der
+ * markierten Zeilen exakt platziert (siehe `MonthCalendar`).
+ * `pointer-events: none` lässt Klicks auf die Zellen darunter durchlaufen.
+ */
+.day-table-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/**
+ * Querliegender Text einer Zusatzspalte, zentriert über die markierte Spanne.
+ *
+ * Die Position kommt als Inline-Stil aus `MonthCalendar` (`left`, `top`,
+ * `width`, `height`), gemessen gegen das Tagesraster. Bei `is-vertical` wird
+ * der Text um 90° nach links gedreht (Gegenzeigersinn); die zur Verfügung
+ * stehende Länge ist dann die Höhe der Spanne (Summe der markierten Zellen).
+ */
+.cell-extra-text {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.05;
+  text-align: center;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+}
+
+.cell-extra-text.is-vertical {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  line-height: 1;
+}
+
+/**
+ * Querliegender Text auf einer gefärbten Zusatzspalte.
+ *
+ * Trägt die Spalte eine persönliche Farbe (satt kräftige Palette), wird der
+ * Text - wie in den festen Farbspalten - in Schwarz gezeichnet. Die im
+ * Dunkelmodus helle Standard-Textfarbe wäre auf den gefärbten Feldern nicht
+ * lesbar (siehe `.day-row.has-color-*`).
+ */
+.cell-extra-text.has-color {
+  color: #000000;
+}
+
+/**
+ * Innerer Textkörper: sorgt dafür, dass der gedrehte Text in der Breite der
+ * Spanne bleibt und der Rest abgeschnitten wird, statt die Nachbarspalten zu
+ * überlagern.
+ */
+.cell-extra-text > span {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 /**
@@ -1444,10 +1560,12 @@ body {
   background: var(--color-accent-soft);
 }
 
-/* Die Zieh-Spalten zeigen den Greif-Cursor: hier beginnt der Streifen. */
+/* Die Zieh-Spalten zeigen den Greif-Cursor: hier beginnt der Streifen.
+   Die Zusatzspalten zählen mit - auch sie lassen sich als Streifen ziehen. */
 .cell-weekday,
 .cell-day,
-.cell-shift {
+.cell-shift,
+.cell-extra {
   cursor: crosshair;
 }
 

@@ -16,6 +16,9 @@ import type {
   AnnotationMap,
   AnniversaryMap,
   ColumnColorName,
+  ExtraColumnColorKey,
+  ExtraColumnText,
+  ExtraColumns,
   YearCalendar,
 } from '../domain/types.ts';
 import { usedAnnotationColors } from '../config/annotationColors.ts';
@@ -38,6 +41,8 @@ export interface PrintCalendarProps {
   showBirthdays?: boolean;
   /** Anzeige-Checkbox "wdh. Ereignis" (Standard: an). */
   showRecurringEvents?: boolean;
+  /** Frei angelegte Zusatzspalten, geschlüsselt nach Monat (1..12). */
+  extraColumns?: Record<number, ExtraColumns>;
   onPrint: () => void;
   onBack: () => void;
 }
@@ -51,6 +56,7 @@ export function PrintCalendar({
   anniversaries = {},
   showBirthdays = true,
   showRecurringEvents = true,
+  extraColumns,
   onPrint,
   onBack,
 }: PrintCalendarProps) {
@@ -81,6 +87,34 @@ export function PrintCalendar({
     > = {};
     for (const [dateKey, annotation] of Object.entries(annotations)) {
       if (Object.keys(annotation.colors).length > 0) map[dateKey] = annotation.colors;
+    }
+    return map;
+  }, [annotations]);
+
+  // Farben der frei angelegten Zusatzspalten je Tag. Sie liegen getrennt von
+  // den festen Farbspalten in `extraColors` und werden - rein
+  // darstellungsbezogen - in den Druck übernommen.
+  const annotationExtraColors = useMemo(() => {
+    const map: Record<string, Partial<Record<ExtraColumnColorKey, AnnotationColorId>>> = {};
+    for (const [dateKey, annotation] of Object.entries(annotations)) {
+      if (annotation.extraColors && Object.keys(annotation.extraColors).length > 0) {
+        map[dateKey] = annotation.extraColors;
+      }
+    }
+    return map;
+  }, [annotations]);
+
+  // Querliegende Texte der Zusatzspalten je Ankertag. Sie werden als
+  // Überlagerung über die markierte Zeilenspanne gezogen.
+  const extraTextsByDateKey = useMemo(() => {
+    const map: Record<string, ExtraColumnText[]> = {};
+    for (const [dateKey, annotation] of Object.entries(annotations)) {
+      const texts = annotation.extraTexts;
+      if (!texts) continue;
+      const list = Object.values(texts).filter(
+        (text): text is ExtraColumnText => Boolean(text) && text?.text !== '',
+      );
+      if (list.length > 0) map[dateKey] = list;
     }
     return map;
   }, [annotations]);
@@ -124,6 +158,9 @@ export function PrintCalendar({
             anniversaries={anniversaries}
             showBirthdays={showBirthdays}
             showRecurringEvents={showRecurringEvents}
+            extraColumns={extraColumns}
+            annotationExtraColors={annotationExtraColors}
+            extraTextsByDateKey={extraTextsByDateKey}
             side={1}
           />
         </article>
@@ -146,6 +183,9 @@ export function PrintCalendar({
             anniversaries={anniversaries}
             showBirthdays={showBirthdays}
             showRecurringEvents={showRecurringEvents}
+            extraColumns={extraColumns}
+            annotationExtraColors={annotationExtraColors}
+            extraTextsByDateKey={extraTextsByDateKey}
             side={2}
           />
         </article>

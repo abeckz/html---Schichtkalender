@@ -12,12 +12,23 @@
 
 import { describe, expect, it } from 'vitest';
 import { act } from 'react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { createRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
 import type { AnnotationMap } from '../domain/types.ts';
 import { buildYearCalendar, summarizeYear } from '../engines/calendarBuilder.ts';
 import { PrintCalendar } from '../print/PrintCalendar.tsx';
 import { PrintMonth, PRINT_ROWS } from '../print/PrintMonth.tsx';
+
+/**
+ * Liest die Druckstildatei, um CSS-Regeln prüfen zu können (jsdom berechnet
+ * kein Rasterlayout). Der Pfad wird gegen das Arbeitsverzeichnis gebildet.
+ */
+function readPrintStylesheet(): string {
+  return readFileSync(resolve(process.cwd(), 'src/print/print.css'), 'utf8');
+}
+
 
 function render(element: React.ReactElement): HTMLElement {
   const container = document.createElement('div');
@@ -602,5 +613,238 @@ describe('Anzeige-Option "Wochentag über Datum" (Druck)', () => {
     expect(emptyRow?.querySelector('.print-col-datum')).toBeNull();
     // Das 31-Zeilen-Raster bleibt unverändert.
     expect(container.querySelectorAll('.print-month-body > .print-row').length).toBe(PRINT_ROWS);
+  });
+});
+
+/**
+ * Frei angelegte Zusatzspalten und querliegende Texte im Druck.
+ *
+ * Sie sind rein darstellungsbezogen, sollen aber - wie am Bildschirm - auch im
+ * Ausdruck erscheinen: als schmale Spalten links der Information und rechts der
+ * KW-Spalte sowie als querliegender Text über die markierte Zeilenspanne.
+ */
+describe('PrintMonth – Zusatzspalten', () => {
+  const january2026 = buildYearCalendar({ year: 2026, selectedShift: 'B' }).months[0];
+
+  it('fügt links und rechts je eine schmale Spalte ein und setzt die Breiten', () => {
+    const container = render(
+      <PrintMonth
+        month={january2026}
+        annotationLabels={{}}
+        annotationColors={{}}
+        extraColumns={{ left: [1], right: [1] }}
+      />,
+    );
+    const month = container.querySelector('.print-month') as HTMLElement | null;
+    expect(month).not.toBeNull();
+    // Breiten der Zusatzspalten als CSS-Variablen (je 3 mm pro Einheit).
+    expect(month?.style.getPropertyValue('--print-extra-left')).toBe('3mm');
+    expect(month?.style.getPropertyValue('--print-extra-right')).toBe('3mm');
+
+    const firstRow = container.querySelector('.print-row') as HTMLElement | null;
+    expect(firstRow?.querySelectorAll('.print-col-extra').length).toBe(2);
+    // Reihenfolge: Wochentag, Datum, [links], Info, KW, [rechts], T/N.
+    const cellClasses = Array.from(firstRow?.children ?? []).map((cell) =>
+      Array.from(cell.classList).find((name) => name.startsWith('print-col-')),
+    );
+    expect(cellClasses).toEqual([
+      'print-col-wo',
+      'print-col-datum',
+      'print-col-extra',
+      'print-col-info',
+      'print-col-kw',
+      'print-col-extra',
+      'print-col-schicht',
+    ]);
+    // Die vollständige Trackliste muss exakt zu den gerenderten Zellen passen
+    // (je Zusatzspalte genau ein Track). Weicht sie ab, verrutscht das
+    // Spaltenraster und die Zeilen wachsen über die Blatthöhe hinaus.
+    expect(month?.style.getPropertyValue('--print-row-columns')).toBe(
+      '6.5mm 7mm 3mm 1fr 8mm 3mm 5mm',
+    );
+  });
+
+  it('gibt ohne Zusatzspalten die unveränderte Trackliste aus', () => {
+    const container = render(
+      <PrintMonth
+        month={january2026}
+        annotationLabels={{}}
+        annotationColors={{}}
+      />,
+    );
+    const month = container.querySelector('.print-month') as HTMLElement | null;
+    // Keine zusätzlichen Spuren: das Raster entspricht exakt dem Ursprungszustand.
+    expect(month?.style.getPropertyValue('--print-row-columns')).toBe('6.5mm 7mm 1fr 8mm 5mm');
+    expect(month?.style.getPropertyValue('--print-row-columns-weekday-over-date')).toBe(
+      '6.5mm 1fr 8mm 5mm',
+    );
+    expect(month?.style.getPropertyValue('--print-row-columns-no-shift')).toBe(
+      '6.5mm 7mm 1fr 8mm',
+    );
+    expect(
+      month?.style.getPropertyValue('--print-row-columns-no-shift-weekday-over-date'),
+    ).toBe('6.5mm 1fr 8mm');
+  });
+
+  it('lässt das 31-Zeilen-Raster bei Zusatzspalten unverändert', () => {
+    const container = render(
+      <PrintMonth
+        month={january2026}
+        annotationLabels={{}}
+        annotationColors={{}}
+        extraColumns={{ left: [2], right: [] }}
+      />,
+    );
+    expect(container.querySelectorAll('.print-month-body > .print-row').length).toBe(PRINT_ROWS);
+  });
+
+  it('färbt die Zusatzspalte eines Tages ein', () => {
+    const container = render(
+      <PrintMonth
+        month={january2026}
+        annotationLabels={{}}
+        annotationColors={{}}
+        extraColumns={{ left: [1], right: [] }}
+        annotationExtraColors={{ '2026-01-05': { extra0: 'red' } }}
+      />,
+    );
+    const row = container.querySelector('.print-row[data-date-key="2026-01-05"]');
+    const cell = row?.querySelector('.print-col-extra') as HTMLElement | null;
+    expect(cell).not.toBeNull();
+    expect(cell?.getAttribute('data-extra-column-key')).toBe('extra0');
+    expect(cell?.style.backgroundColor).not.toBe('');
+  });
+
+  it('zieht den querliegenden Text über die markierte Zeilenspanne', () => {
+    const container = render(
+      <PrintMonth
+        month={january2026}
+        annotationLabels={{}}
+        annotationColors={{}}
+        extraColumns={{ left: [1], right: [] }}
+        extraTextsByDateKey={{
+          '2026-01-01': [
+            {
+              colorKey: 'extra0',
+              columnLabel: 'Zusatzspalte 0',
+              vertical: true,
+              text: 'Urlaub',
+              dateKeys: ['2026-01-01', '2026-01-02', '2026-01-03'],
+              length: 3,
+            },
+          ],
+        }}
+      />,
+    );
+    const overlay = container.querySelector('.print-month-overlay');
+    expect(overlay).not.toBeNull();
+    const text = overlay?.querySelector('.print-extra-text') as HTMLElement | null;
+    expect(text).not.toBeNull();
+    expect(text?.textContent).toBe('Urlaub');
+    // Querliegend (um 90° gedreht) und über die drei ersten Zeilen gespannt.
+    expect(text?.classList.contains('is-vertical')).toBe(true);
+    expect(text?.style.top).toBe('0%');
+    expect(text?.style.height).toBe(`${(3 / PRINT_ROWS) * 100}%`);
+    // Die Spalte liegt links der Information: Wochentag (6,5) + Datum (7) = 13,5 mm.
+    expect(text?.style.left).toBe('13.5mm');
+    expect(text?.style.width).toBe('3mm');
+    // Das Zeilenraster bleibt unverändert (die Überlagerung zählt nicht mit).
+    expect(container.querySelectorAll('.print-month-body > .print-row').length).toBe(PRINT_ROWS);
+  });
+
+  it('verschiebt den Text der zweiten linken Spalte um eine Einheit', () => {
+    const container = render(
+      <PrintMonth
+        month={january2026}
+        annotationLabels={{}}
+        annotationColors={{}}
+        extraColumns={{ left: [1, 1], right: [] }}
+        extraTextsByDateKey={{
+          '2026-01-10': [
+            {
+              colorKey: 'extra1',
+              columnLabel: 'Zusatzspalte 1',
+              vertical: true,
+              text: 'Schulung',
+              dateKeys: ['2026-01-10'],
+              length: 1,
+            },
+          ],
+        }}
+      />,
+    );
+    const text = container.querySelector('.print-extra-text') as HTMLElement | null;
+    expect(text).not.toBeNull();
+    // Zweite Spalte: 13,5 mm + 1 × 3 mm.
+    expect(text?.style.left).toBe('16.5mm');
+    expect(text?.style.top).toBe(`${(9 / PRINT_ROWS) * 100}%`);
+  });
+
+  it('zeigt ohne Zusatzspalten weder Zellen noch Überlagerung', () => {
+    const container = render(
+      <PrintMonth
+        month={january2026}
+        annotationLabels={{}}
+        annotationColors={{}}
+        extraTextsByDateKey={{
+          '2026-01-01': [
+            {
+              colorKey: 'extra0',
+              columnLabel: 'Zusatzspalte 0',
+              vertical: true,
+              text: 'Urlaub',
+              dateKeys: ['2026-01-01'],
+              length: 1,
+            },
+          ],
+        }}
+      />,
+    );
+    expect(container.querySelector('.print-col-extra')).toBeNull();
+    expect(container.querySelector('.print-month-overlay')).toBeNull();
+  });
+
+  /**
+   * Regression: Der querliegende Text wurde früher als letztes Rasterkind über
+   * `grid-row: 1 / -1` über das gesamte Raster gespannt. Dadurch belegte die
+   * Überlagerung die erste Spalte vollständig; die 31 Tageszeilen wichen per
+   * Auto-Placement in 31 zusätzliche, implizite Zeilen aus. Das Raster besaß
+   * anschließend 62 Zeilen und jede Zelle war auf weniger als die halbe Höhe
+   * gestaucht. Die Ebene muss deshalb aus dem Rasterfluss genommen werden
+   * (`position: absolute` gegen den relativen `.print-month-body`).
+   */
+  it('nimmt die Überlagerung aus dem Zeilenraster (keine gestauchten Zellen)', () => {
+    render(
+      <PrintMonth
+        month={january2026}
+        annotationLabels={{}}
+        annotationColors={{}}
+        extraColumns={{ left: [1], right: [] }}
+        extraTextsByDateKey={{
+          '2026-01-01': [
+            {
+              colorKey: 'extra0',
+              columnLabel: 'Zusatzspalte 0',
+              vertical: true,
+              text: 'Urlaub',
+              dateKeys: ['2026-01-01', '2026-01-02', '2026-01-03'],
+              length: 3,
+            },
+          ],
+        }}
+      />,
+    );
+
+    // Der Rasterrahmen muss Bezugsrahmen der absolut positionierten Ebene sein.
+    const bodyRule = /\.print-month-body\s*\{[^}]*position:\s*relative/s;
+    expect(bodyRule.test(readPrintStylesheet())).toBe(true);
+
+    // Die Ebene selbst darf keinen Rasterplatz belegen: absolut positioniert
+    // und ohne `grid-row`/`grid-column`-Spanne.
+    const overlayRule = /\.print-month-overlay\s*\{([^}]*)\}/s.exec(readPrintStylesheet())?.[1] ?? '';
+    expect(overlayRule).toMatch(/position:\s*absolute/);
+    expect(overlayRule).toMatch(/inset:\s*0/);
+    expect(overlayRule).not.toMatch(/grid-row/);
+    expect(overlayRule).not.toMatch(/grid-column/);
   });
 });
