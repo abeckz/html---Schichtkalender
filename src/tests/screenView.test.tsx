@@ -1322,6 +1322,22 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
   });
 
   /**
+   * Regression: Auch die farblich markierten festen Tagesspalten (Wochentag,
+   * Datum und Schicht T/N) wurden an jeder Zeilengrenze von der horizontalen
+   * Zeilenlinie durchschnitten und hatten durch das senkrechte Zellen-Padding
+   * der Zeile einen weißen Rand. Sie werden nun - wie die markierten
+   * Zusatzspalten - um Padding plus Linienstärke über die Zeilengrenzen
+   * hinausgezogen (negatives `margin`), damit ihr Farbfeld randlos und
+   * ungebrochen erscheint.
+   */
+  it('zieht gefärbte Wochentag-, Datum- und Schichtspalten über Padding und Zeilenlinie', () => {
+    const stylesheet = readStylesheet();
+    const rule =
+      /\.cell-weekday\[style\][^{}]*,\s*\.cell-day\[style\][^{}]*,\s*\.cell-shift\[style\]\s*\{[^}]*margin:\s*-4px\s+0/s;
+    expect(rule.test(stylesheet)).toBe(true);
+  });
+
+  /**
    * Regression: Eine links angelegte Zusatzspalte war beidseitig mit einem
    * senkrechten Trennstrich abgetrennt (links durch den rechten Rahmen der
    * Tagesspalte, rechts durch den eigenen Rahmen). Auf der rechten Seite fehlte

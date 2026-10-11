@@ -1265,6 +1265,29 @@ body {
 }
 
 /**
+ * Durchgehende farbliche Markierung der festen Tagesspalten.
+ *
+ * Trägt eine der Tagesspalten (Wochentag, Datum oder Schicht T/N) eine
+ * persönliche Farbe, soll ihr Farbfeld über mehrere Tageszeilen hinweg - genau
+ * wie bei den markierten Zusatzspalten - **ungebrochen und randlos** erscheinen.
+ * Störend sind sonst dieselben zwei Größen: der senkrechte Innenabstand der
+ * Zeile (`.day-row` `padding: 3px 4px`) und die horizontale Zeilenlinie
+ * (`.day-row` `border-bottom: 1px`). Die gefärbte Zelle wird daher um das
+ * senkrechte Padding plus die halbe Linienstärke (negatives `margin` je 4 px)
+ * über die Zeilengrenzen hinausgezogen und mit `z-index` über die Linien der
+ * Nachbarzeilen gelegt. Rasterzeilen und Nachbarspalten bleiben unverändert;
+ * der senkrechte Trennstrich (Wochentag/Datum: rechts, Schicht: links) bleibt
+ * erhalten, weil das negative `margin` nur senkrecht wirkt.
+ */
+.cell-weekday[style],
+.cell-day[style],
+.cell-shift[style] {
+  position: relative;
+  z-index: 1;
+  margin: -4px 0;
+}
+
+/**
  * Überlagerungsebene für querliegende Texte der Zusatzspalten.
  *
  * Wichtig: `.day-table` ist eine Spalten-Flexbox; die Spaltenbreiten stehen
