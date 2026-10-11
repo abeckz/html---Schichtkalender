@@ -1,9 +1,17 @@
 /**
  * Werkzeugleiste.
  *
- * Enthält Titel, Jahresauswahl, Schichtauswahl, den Umschalter für die
- * Anzeige (Hell/Dunkel) und den Wechsel in die Druckansicht. Die Leiste wird
- * niemals gedruckt.
+ * Anordnung an der Leiste (von links nach rechts):
+ * - ganz links der Jahresselektor, darunter die Auswahl der Schichten,
+ * - daneben als Block die Anzeige-Kästchen samt Umschalter (Anzeigen-Gruppe),
+ * - daneben als Block der Umschalter Anzeige (Hell/Dunkel), darunter die
+ *   Datei-Steuerung (Sichern/Laden),
+ * - daneben die Schaltfläche "Druckansicht",
+ * - ganz rechts oben der Titel "BASF Schichtkalender", darunter das ausgewählte
+ *   Jahr und darunter die ausgewählte Schicht - wie in der Druckansicht am
+ *   rechten Rand ausgerichtet.
+ *
+ * Die Leiste wird niemals gedruckt.
  */
 
 import type { ShiftId, CalendarViewMode } from '../domain/types.ts';
@@ -81,17 +89,23 @@ export function Toolbar({
 }: ToolbarProps) {
   return (
     <header className={collapsed ? 'toolbar no-print is-collapsed' : 'toolbar no-print'}>
-      <h1 className="app-title">BASF Schichtkalender</h1>
       <div className="toolbar-controls" id="toolbar-controls">
-        <YearSelector
-          year={year}
-          onSelectYear={onSelectYear}
-          onPreviousYear={onPreviousYear}
-          onNextYear={onNextYear}
-          canGoPrevious={canGoPrevious}
-          canGoNext={canGoNext}
-        />
-        <ShiftSelector selectedShift={selectedShift} onSelectShift={onSelectShift} />
+        {/*
+          Linker Block: Jahresselektor oben, darunter die Auswahl der Schichten.
+          Beide Bedienelemente stehen als Spalte untereinander, damit sie als
+          Einheit ganz links an der Leiste beginnen.
+        */}
+        <div className="toolbar-stack toolbar-stack-left">
+          <YearSelector
+            year={year}
+            onSelectYear={onSelectYear}
+            onPreviousYear={onPreviousYear}
+            onNextYear={onNextYear}
+            canGoPrevious={canGoPrevious}
+            canGoNext={canGoNext}
+          />
+          <ShiftSelector selectedShift={selectedShift} onSelectShift={onSelectShift} />
+        </div>
         {/*
           Anzeige-Gruppe: zuerst die Kästchen (Mehrfachauswahl), darunter die
           Umschalter (Ein/Aus). Alle Elemente stehen untereinander in einer
@@ -149,20 +163,34 @@ export function Toolbar({
           Druckansicht
         </button>
       </div>
-      <button
-        type="button"
-        className="toolbar-collapse-toggle"
-        onClick={onToggleCollapsed}
-        aria-expanded={!collapsed}
-        aria-controls="toolbar-controls legend-box"
-        title={collapsed ? 'Menübar und Legende einblenden' : 'Menübar und Legende einklappen'}
-        aria-label={collapsed ? 'Menübar und Legende einblenden' : 'Menübar und Legende einklappen'}
-      >
-        {/* Dreieckspfeil, Spitze nach unten; gedreht bei eingeklapptem Zustand. */}
-        <span className="toolbar-collapse-arrow" aria-hidden="true">
-          ▼
-        </span>
-      </button>
+      {/*
+        Rechter Abschluss der Leiste: oben der Titel, darunter das ausgewählte
+        Jahr und darunter die ausgewählte Schicht - wie in der Druckansicht am
+        rechten Rand ausgerichtet. Der Einklapp-Schalter folgt ganz rechts.
+      */}
+      <div className="toolbar-tail">
+        <div className="toolbar-titles">
+          <h1 className="app-title">BASF Schichtkalender</h1>
+          <span className="toolbar-title-year">{year}</span>
+          {viewMode === 'shift' && (
+            <span className="toolbar-title-shift">Schicht {selectedShift}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          className="toolbar-collapse-toggle"
+          onClick={onToggleCollapsed}
+          aria-expanded={!collapsed}
+          aria-controls="toolbar-controls legend-box"
+          title={collapsed ? 'Menübar und Legende einblenden' : 'Menübar und Legende einklappen'}
+          aria-label={collapsed ? 'Menübar und Legende einblenden' : 'Menübar und Legende einklappen'}
+        >
+          {/* Dreieckspfeil, Spitze nach unten; gedreht bei eingeklapptem Zustand. */}
+          <span className="toolbar-collapse-arrow" aria-hidden="true">
+            ▼
+          </span>
+        </button>
+      </div>
     </header>
   );
 }

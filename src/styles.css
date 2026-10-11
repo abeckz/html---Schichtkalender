@@ -75,6 +75,12 @@ body {
 
 /* ----------------------------------------------------------- Toolbar */
 
+/**
+ * Werkzeugleiste.
+ *
+ * Die Steuerung (`.toolbar-controls`) beginnt ganz links; der rechte Abschluss
+ * (`.toolbar-tail`) wird über `margin-left: auto` an den rechten Rand gedrückt.
+ */
 .toolbar {
   position: sticky;
   top: 0;
@@ -82,12 +88,37 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   gap: 10px 18px;
   padding: 10px 14px;
   margin: -12px -16px 14px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
+}
+
+/**
+ * Rechter Abschluss der Leiste: Titelblock und Einklapp-Schalter nebeneinander.
+ *
+ * `margin-left: auto` schiebt diesen Block unabhängig vom Einklapp-Zustand an
+ * den rechten Rand, damit der Pfeil beim Ein-/Ausklappen an derselben Stelle
+ * stehen bleibt.
+ */
+.toolbar-tail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/**
+ * Titelblock am rechten Rand: Titel, Jahr und Schicht stehen untereinander und
+ * sind - wie in der Druckansicht - rechtsbündig ausgerichtet.
+ */
+.toolbar-titles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .app-title {
@@ -99,27 +130,42 @@ body {
   color: var(--color-accent);
 }
 
+.toolbar-title-year {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.toolbar-title-shift {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+/**
+ * Steuerbereich der Leiste: die Blöcke (Jahr/Schicht, Anzeigen, Anzeige +
+ * Datei-Steuerung, Druckansicht) liegen nebeneinander. Ein großzügiger
+ * Spaltenabstand trennt die Blöcke sichtbar voneinander.
+ */
 .toolbar-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14px 22px;
+  gap: 16px 40px;
 }
 
 /**
  * Einklapp-Schalter der Menübar (Dreieck, Spitze nach unten). Er ist immer
  * sichtbar und schaltet Menübar-Steuerung und Legendenbox gemeinsam um.
  *
- * `margin-left: auto` schiebt ihn unabhängig vom Einklapp-Zustand an den
- * rechten Rand, damit der Pfeil beim Ein-/Ausklappen an derselben Stelle
- * stehen bleibt.
+ * Der Schalter sitzt im rechten Abschluss (`.toolbar-tail`) und behält damit
+ * unabhängig vom Einklapp-Zustand seine Position am rechten Rand.
  */
 .toolbar-collapse-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  margin-left: auto;
   width: 30px;
   height: 30px;
   padding: 0;
@@ -147,8 +193,7 @@ body {
   transform: rotate(180deg);
 }
 
-/* Eingeklappt bleibt nur der Titel mit dem Pfeil sichtbar. Der Pfeil behält
-   über `margin-left: auto` seine Position rechts am Rand. */
+/* Eingeklappt bleibt nur der rechte Abschluss (Titel und Pfeil) sichtbar. */
 .toolbar.is-collapsed .toolbar-controls {
   display: none;
 }
@@ -277,14 +322,60 @@ body {
 /* ------------------------------------------------- Anzeige & Datei-Steuerung */
 
 /**
- * Rechte Steuerungsspalte: Anzeige (Hell/Dunkel) oben, Datei-Steuerung
- * (Sichern/Laden) darunter. Beide Gruppen bündeln sich linksbündig.
+ * Steuerungsspalte: mehrere Bedienelemente stehen untereinander.
+ *
+ * Links bündelt `.toolbar-stack-left` den Jahresselektor (oben) und die
+ * Schichtauswahl (darunter); rechts bündelt `.toolbar-stack` die Anzeige
+ * (Hell/Dunkel) oben und die Datei-Steuerung (Sichern/Laden) darunter. Beide
+ * Gruppen richten sich linksbündig aus.
  */
 .toolbar-stack {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
+}
+
+/**
+ * Linker Steuerungsblock der Leiste: Jahresselektor oben, Schichtauswahl
+ * darunter.
+ *
+ * Beide Zeilen liegen in einem gemeinsamen Raster aus zwei Spalten: links die
+ * Beschriftungen (JAHR / SCHICHT), rechts die Bedienelemente. Über
+ * `display: contents` geben die umgebenden `.toolbar-group`-Hüllen ihre Kinder
+ * direkt an dieses Raster ab, sodass die Beschriftungen untereinander und die
+ * Bedienelemente an derselben Kante beginnen.
+ *
+ * Spalte 2 ist so breit wie die breiteste Bedienzeile (die vier Schichten
+ * A–D); die Jahr-Zeile `<` / Jahr / `>` streckt sich daher über genau dieselbe
+ * Breite und schließt links mit A und rechts mit D bündig ab.
+ */
+.toolbar-stack-left {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 10px 8px;
+}
+
+.toolbar-stack-left > .toolbar-group {
+  display: contents;
+}
+
+/**
+ * Bedienzeile der Jahr-Auswahl: `<` links, Auswahlfeld in der Mitte, `>` rechts.
+ * Das Auswahlfeld wächst mit und füllt die Mitte, damit die Zeile bündig mit
+ * der Schichtzeile A–D abschließt.
+ */
+.year-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.year-controls .year-select {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .theme-toggle {
