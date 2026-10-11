@@ -498,11 +498,11 @@ export function MonthCalendar({
           {month.name}
         </h2>
         {showShiftCalendar ? (
-          <span className="month-stat" title="Sollschichten (T + N)">
+          <span className="month-stat month-stat-end" title="Sollschichten (T + N)">
             {statistics.requiredShiftCount} Soll
           </span>
         ) : (
-          <span className="month-stat" aria-hidden="true" />
+          <span className="month-stat month-stat-end" aria-hidden="true" />
         )}
 
         {/*

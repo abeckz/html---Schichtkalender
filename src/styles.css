@@ -883,7 +883,17 @@ body {
   white-space: nowrap;
 }
 
-.month-stat:last-child {
+/*
+ * Rechte Kennzahl im Monatskopf (Anzahl „Soll“).
+ *
+ * Sie ist nicht das letzte Grid-Kind des Kopfes: hinter ihr stehen noch die
+ * absolut positionierten Bedienpunkte (`+`/`-`). Ein `:last-child`-Selektor
+ * würde daher ins Leere greifen und den Text linksbündig am Anfang seines
+ * `1fr`-Tracks stehen lassen. Deshalb wird die Zelle über die eigene Klasse
+ * `month-stat-end` rechtsbündig an den Rand ihres Rasters gesetzt – die
+ * Bedienpunkte bleiben davon unberührt.
+ */
+.month-stat-end {
   text-align: right;
 }
 
