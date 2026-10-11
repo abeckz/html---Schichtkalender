@@ -20,6 +20,8 @@ import {
   ageInYear,
   anniversariesAt,
   formatIntervalLabel,
+  isEndedOn,
+  isExcludedOn,
   occursInYear,
   matchesForDateKey,
 } from '../engines/anniversaryEngine.ts';
@@ -225,6 +227,83 @@ describe('AnniversaryEngine', () => {
       formatIntervalLabel({ ...entry({ intervalKind: 'monthly', intervalCount: 1 }), monthDay: '03-13' }),
     ).toBe('jeden 2. Mo im Monat (monatlich)');
   });
+  it('zeigt ein jährliches Ereignis ausschließlich an seinem Ankertag', () => {
+    // Regression: Zuvor lieferte `occursOnDateKey` für „jährlich" an jedem Tag
+    // `true`, sodass das Ereignis im gesamten Kalender erschien.
+    const map: AnniversaryMap = {
+      '03-15': [
+        {
+          id: 'r1',
+          monthDay: '03-15',
+          name: 'Jubiläum',
+          kind: 'recurring',
+          intervalKind: 'yearly',
+          intervalCount: 1,
+        },
+      ],
+    };
+    expect(matchesForDateKey(map, '2021-03-15', 2021)).toHaveLength(1);
+    expect(matchesForDateKey(map, '2021-03-16', 2021)).toHaveLength(0);
+    expect(matchesForDateKey(map, '2021-07-04', 2021)).toHaveLength(0);
+    // Alle zwei Jahre: nur in Jahren, die zum Anker passen, erscheint der Termin.
+    // Basisjahr 2000: gerade Jahre (2020, 2022) treffen, ungerade (2021) nicht.
+    const biennial: AnniversaryMap = {
+      '03-15': [{ ...map['03-15'][0], intervalCount: 2 }],
+    };
+    expect(matchesForDateKey(biennial, '2022-03-15', 2022, 2000)).toHaveLength(1);
+    expect(matchesForDateKey(biennial, '2021-03-15', 2021, 2000)).toHaveLength(0);
+    // Auch im Trefferjahr gilt: nur der Ankertag selbst.
+    expect(matchesForDateKey(biennial, '2022-03-16', 2022, 2000)).toHaveLength(0);
+  });
+
+  it('führt eine Serie bis zum gesetzten Ende (until) und nicht weiter', () => {
+    const map: AnniversaryMap = {
+      '03-01': [
+        {
+          id: 'r1',
+          monthDay: '03-01',
+          name: 'Zinslauf',
+          kind: 'recurring',
+          intervalKind: 'daily',
+          intervalCount: 1,
+          until: '2021-03-05',
+        },
+      ],
+    };
+    // Bis einschließlich des Endes finden Termine statt …
+    expect(matchesForDateKey(map, '2021-03-05', 2021)).toHaveLength(1);
+    // … danach nicht mehr.
+    expect(matchesForDateKey(map, '2021-03-06', 2021)).toHaveLength(0);
+    expect(matchesForDateKey(map, '2021-03-31', 2021)).toHaveLength(0);
+    expect(isEndedOn(map['03-01'][0], '2021-03-06')).toBe(true);
+    expect(isEndedOn(map['03-01'][0], '2021-03-05')).toBe(false);
+  });
+
+
+
+  it('nimmt einzelne Vorkommen einer Serie über die Ausnahmeliste aus', () => {
+    // Täglich ab 01.03.2000; der 03.03.2000 ist als Ausnahme ausgenommen.
+    const map: AnniversaryMap = {
+      '03-01': [
+        {
+          id: 'r1',
+          monthDay: '03-01',
+          name: 'Zinslauf',
+          kind: 'recurring',
+          intervalKind: 'daily',
+          intervalCount: 1,
+          excludedDates: ['2000-03-03'],
+        },
+      ],
+    };
+    // Der ausgenommene Tag fällt aus, die Serie bleibt an allen anderen Tagen.
+    expect(matchesForDateKey(map, '2000-03-02', 2000)).toHaveLength(1);
+    expect(matchesForDateKey(map, '2000-03-03', 2000)).toHaveLength(0);
+    expect(matchesForDateKey(map, '2000-03-04', 2000)).toHaveLength(1);
+    // Die Ausnahmeprüfung selbst.
+    expect(isExcludedOn(map['03-01'][0], '2000-03-03')).toBe(true);
+    expect(isExcludedOn(map['03-01'][0], '2000-03-04')).toBe(false);
+  });
 });
 
 /* ------------------------------------------------------------ Storage */
@@ -286,6 +365,22 @@ describe('Normalisierung der Jahrestage', () => {
     expect(normalizeAnniversaryIntervalCount(1000, 'daily')).toBe(365);
     // Unbekannte Rhythmus-Arten fallen auf „jedes Jahr" zurück.
     expect(normalizeAnniversary({ monthDay: '05-01', name: 'x', kind: 'recurring', intervalKind: 'stündlich' })?.intervalKind).toBe('yearly');
+  });
+
+  it('bereinigt die Ausnahmetermine einer Serie', () => {
+    // Gültige Ausnahmen bleiben (eindeutig, chronologisch); Ungültiges entfällt.
+    const normalized = normalizeAnniversary({
+      monthDay: '05-01',
+      name: 'Jubiläum',
+      kind: 'recurring',
+      intervalKind: 'yearly',
+      intervalCount: 1,
+      excludedDates: ['2026-05-01', '2026-05-01', 'unsinn', '2026-05-03', 42, '2026-05-02'],
+    });
+    expect(normalized?.excludedDates).toEqual(['2026-05-01', '2026-05-02', '2026-05-03']);
+    // Ohne Ausnahmen bleibt das Feld weg.
+    const plain = normalizeAnniversary({ monthDay: '05-01', name: 'Fest', kind: 'recurring' });
+    expect(plain?.excludedDates).toBeUndefined();
   });
 
   it('bereinigt eine Sammlung und gruppiert nach Monat-Tag', () => {
@@ -540,6 +635,9 @@ describe('Anzeige-Kästchen der regulären Ansicht', () => {
     try {
       const container = render(<App />);
       expect(container.textContent).toContain('🔁 Jubiläum');
+      // Der Wiederholungsrhythmus wird in der Zelle nicht mehr genannt.
+      expect(container.textContent).not.toContain('jedes Jahr');
+      expect(container.querySelector('.anniversary-interval')).toBeNull();
       toggleCheckbox(checkboxByLabel(container, 'Wiederkehrende Ereignisse'));
       expect(container.textContent).not.toContain('🔁 Jubiläum');
     } finally {
@@ -559,6 +657,99 @@ describe('Jahreslose Ansicht', () => {
     // Keine Schichtspalte in der jahreslosen Ansicht.
     expect(view!.querySelectorAll('.cell-shift').length).toBe(0);
     unmountAll();
+  });
+
+  /**
+   * Regression: In der jahreslosen Ansicht erschien ein wiederkehrendes
+   * Ereignis nur an seinem Ankertag. Jetzt werden die Folgetermine nach dem
+   * Rhythmus weitergeführt (z. B. „wöchentlich" an jedem passenden Wochentag).
+   */
+  it('führt wiederkehrende Ereignisse entsprechend ihrer Regel weiter', () => {
+    // 06.03.2021 ist ein Samstag; „wöchentlich" muss an jedem Samstag erscheinen.
+    window.localStorage.setItem(
+      STATE_KEY,
+      JSON.stringify({
+        version: 1,
+        settings: { ...DEFAULT_SETTINGS, selectedYear: 2021, viewMode: 'anniversaries' },
+        annotations: {},
+        anniversaries: {
+          '03-06': [
+            {
+              id: 'r1',
+              monthDay: '03-06',
+              name: 'Müllabfuhr',
+              kind: 'recurring',
+              intervalKind: 'weekly',
+              intervalCount: 1,
+            },
+          ],
+        },
+      }),
+    );
+    try {
+      const container = render(<App />);
+      const march = Array.from(container.querySelectorAll('.anniversary-month-card')).find(
+        (card) => card.querySelector('.month-title')?.textContent === 'März',
+      ) as HTMLElement;
+      const rowsFor = (day: string) =>
+        Array.from(march.querySelectorAll('.anniversary-row')).filter(
+          (row) => row.querySelector('.cell-day')?.textContent === day,
+        );
+      // Der Ankertag und alle folgenden Samstage tragen das Ereignis.
+      for (const day of ['06', '13', '20', '27']) {
+        const rows = rowsFor(day);
+        expect(rows.length).toBeGreaterThan(0);
+        expect(rows[0].textContent).toContain('Müllabfuhr');
+      }
+      // Ein Sonntag ist kein Vorkommen.
+      expect(rowsFor('07')[0].textContent).not.toContain('Müllabfuhr');
+    } finally {
+      window.localStorage.removeItem(STATE_KEY);
+      unmountAll();
+    }
+  });
+
+  it('beendet eine Serie ab einem Datum und zeigt danach keine Termine mehr', () => {
+    // Wöchentliche Serie, die mit dem 13.03.2021 endet.
+    window.localStorage.setItem(
+      STATE_KEY,
+      JSON.stringify({
+        version: 1,
+        settings: { ...DEFAULT_SETTINGS, selectedYear: 2021, viewMode: 'anniversaries' },
+        annotations: {},
+        anniversaries: {
+          '03-06': [
+            {
+              id: 'r1',
+              monthDay: '03-06',
+              name: 'Müllabfuhr',
+              kind: 'recurring',
+              intervalKind: 'weekly',
+              intervalCount: 1,
+              until: '2021-03-13',
+            },
+          ],
+        },
+      }),
+    );
+    try {
+      const container = render(<App />);
+      const march = Array.from(container.querySelectorAll('.anniversary-month-card')).find(
+        (card) => card.querySelector('.month-title')?.textContent === 'März',
+      ) as HTMLElement;
+      const rowFor = (day: string) =>
+        Array.from(march.querySelectorAll('.anniversary-row')).find(
+          (row) => row.querySelector('.cell-day')?.textContent === day,
+        ) as HTMLElement;
+      expect(rowFor('06').textContent).toContain('Müllabfuhr');
+      expect(rowFor('13').textContent).toContain('Müllabfuhr');
+      // Nach dem Serienende kein Termin mehr.
+      expect(rowFor('20').textContent).not.toContain('Müllabfuhr');
+      expect(rowFor('27').textContent).not.toContain('Müllabfuhr');
+    } finally {
+      window.localStorage.removeItem(STATE_KEY);
+      unmountAll();
+    }
   });
 });
 
@@ -813,6 +1004,247 @@ describe('AnniversaryEditor', () => {
       unmountAll();
     }
   });
+
+  /**
+   * Beim Löschen eines wiederkehrenden Ereignisses muss wählbar sein, ob die
+   * ganze Serie oder nur das eine Vorkommen (der angeklickte Tag) entfällt.
+   */
+  it('löscht wahlweise die ganze Serie oder nur das eine Vorkommen', () => {
+    window.localStorage.setItem(
+      STATE_KEY,
+      JSON.stringify({
+        version: 1,
+        settings: { ...DEFAULT_SETTINGS, selectedYear: 2021 },
+        annotations: {},
+        anniversaries: {
+          '03-15': [
+            {
+              id: 'r1',
+              monthDay: '03-15',
+              name: 'Jubiläum',
+              kind: 'recurring',
+              intervalKind: 'yearly',
+              intervalCount: 1,
+            },
+          ],
+        },
+      }),
+    );
+    try {
+      const container = render(<App />);
+      const editor = openMarch15Editor(container);
+
+      // Nur dieses eine Vorkommen (15.03.2021) ausnehmen – die Serie bleibt.
+      act(() => buttonByText(editor, 'Nur dieses Vorkommen löschen').click());
+      act(() => buttonByText(editor, 'Speichern').click());
+
+      const afterExclude = JSON.parse(window.localStorage.getItem(STATE_KEY) ?? '{}');
+      const day = afterExclude.anniversaries['03-15'] as Array<Record<string, unknown>>;
+      expect(day).toHaveLength(1);
+      expect(day[0].name).toBe('Jubiläum');
+      expect(day[0].excludedDates).toEqual(['2021-03-15']);
+    } finally {
+      window.localStorage.removeItem(STATE_KEY);
+      unmountAll();
+    }
+  });
+
+  it('entfernt über „Serie löschen" den gesamten Eintrag', () => {
+    window.localStorage.setItem(
+      STATE_KEY,
+      JSON.stringify({
+        version: 1,
+        settings: { ...DEFAULT_SETTINGS, selectedYear: 2021 },
+        annotations: {},
+        anniversaries: {
+          '03-15': [
+            {
+              id: 'r1',
+              monthDay: '03-15',
+              name: 'Jubiläum',
+              kind: 'recurring',
+              intervalKind: 'yearly',
+              intervalCount: 1,
+            },
+          ],
+        },
+      }),
+    );
+    try {
+      const container = render(<App />);
+      const editor = openMarch15Editor(container);
+      act(() => buttonByText(editor, 'Serie löschen').click());
+      act(() => buttonByText(editor, 'Speichern').click());
+
+      const persisted = JSON.parse(window.localStorage.getItem(STATE_KEY) ?? '{}');
+      expect(persisted.anniversaries['03-15']).toBeUndefined();
+    } finally {
+      window.localStorage.removeItem(STATE_KEY);
+      unmountAll();
+    }
+  });
+
+  /**
+   * Regression: Beim Anlegen einer neuen Ereigniszeile steuerte der Editor über
+   * `dateKey`/`year` die Vorkommen-Aktion bei. Fehlten diese Props (z. B. durch
+   * einen Versions-Mix aus veralteter App und neuem Editor), warf
+   * `formatGermanDate(undefined)` einen RangeError und die **gesamte App**
+   * verschwand („alles verschwindet"). Dieser Test stellt sicher, dass App und
+   * Editor bestehen bleiben und die Vorkommen-Aktion weiterhin erscheint.
+   */
+  it('bleibt nach dem Anlegen einer Ereigniszeile bestehen und zeigt die Vorkommen-Aktion', () => {
+    window.localStorage.setItem(
+      STATE_KEY,
+      JSON.stringify({
+        version: 1,
+        settings: { ...DEFAULT_SETTINGS, selectedYear: 2021 },
+        annotations: {},
+        anniversaries: {
+          '03-15': [
+            {
+              id: 'r1',
+              monthDay: '03-15',
+              name: 'Jubiläum',
+              kind: 'recurring',
+              intervalKind: 'daily',
+              intervalCount: 1,
+            },
+          ],
+        },
+      }),
+    );
+    try {
+      const container = render(<App />);
+      const editor = openMarch15Editor(container);
+      const recurringColumn = editor.querySelectorAll('.anniversary-column')[1] as HTMLElement;
+
+      // Eine weitere Ereigniszeile anlegen: die App darf dadurch nicht verschwinden.
+      act(() => buttonByText(editor, '＋ Ereignis hinzufügen').click());
+      expect(container.querySelector('.app')).not.toBeNull();
+      expect(container.querySelector('.anniversary-editor')).not.toBeNull();
+      expect(recurringColumn.querySelectorAll('.anniversary-entry-row').length).toBe(2);
+
+      // Am Ankertag (15.03.) ist der Tag ein Vorkommen: die Vorkommen-Aktion
+      // muss (weil `dateKey` durchgereicht wird) vorhanden sein.
+      expect(
+        Array.from(editor.querySelectorAll('button')).some(
+          (button) => button.textContent?.trim() === 'Nur dieses Vorkommen löschen',
+        ),
+      ).toBe(true);
+    } finally {
+      window.localStorage.removeItem(STATE_KEY);
+      unmountAll();
+    }
+  });
+
+  /**
+   * „Serie ab diesem Datum nicht weiterführen": Der angeklickte Tag bleibt
+   * Termin, alle späteren fallen weg. Das Ende wird als `until` gespeichert.
+   */
+  it('beendet eine Serie ab dem angeklickten Tag (until)', () => {
+    window.localStorage.setItem(
+      STATE_KEY,
+      JSON.stringify({
+        version: 1,
+        settings: { ...DEFAULT_SETTINGS, selectedYear: 2021 },
+        annotations: {},
+        anniversaries: {
+          '03-15': [
+            {
+              id: 'r1',
+              monthDay: '03-15',
+              name: 'Jubiläum',
+              kind: 'recurring',
+              intervalKind: 'daily',
+              intervalCount: 1,
+            },
+          ],
+        },
+      }),
+    );
+    try {
+      const container = render(<App />);
+      const editor = openMarch15Editor(container);
+
+      // Am Ankertag ist die Serie ein Vorkommen; das Ende wird gesetzt.
+      act(() => buttonByText(editor, 'Serie ab hier beenden').click());
+      act(() => buttonByText(editor, 'Speichern').click());
+
+      const persisted = JSON.parse(window.localStorage.getItem(STATE_KEY) ?? '{}');
+      const day = persisted.anniversaries['03-15'] as Array<Record<string, unknown>>;
+      expect(day).toHaveLength(1);
+      expect(day[0].name).toBe('Jubiläum');
+      expect(day[0].until).toBe('2021-03-15');
+    } finally {
+      window.localStorage.removeItem(STATE_KEY);
+      unmountAll();
+    }
+  });
+
+  /**
+   * Wird der Editor an einem Folgetag geöffnet, muss die dort stattfindende
+   * Serie erscheinen und sich auf diesen Tag ausnehmen lassen. Der Rhythmus
+   * wird dabei gegen den Ursprungsanker geprüft.
+   */
+  it('zeigt an einem Folgetag das Vorkommen und nimmt genau diesen Tag aus', () => {
+    window.localStorage.setItem(
+      STATE_KEY,
+      JSON.stringify({
+        version: 1,
+        settings: { ...DEFAULT_SETTINGS, selectedYear: 2021, viewMode: 'anniversaries' },
+        annotations: {},
+        anniversaries: {
+          '03-06': [
+            {
+              id: 'r1',
+              monthDay: '03-06',
+              name: 'Müllabfuhr',
+              kind: 'recurring',
+              intervalKind: 'weekly',
+              intervalCount: 1,
+            },
+          ],
+        },
+      }),
+    );
+    try {
+      const container = render(<App />);
+      const march = Array.from(container.querySelectorAll('.anniversary-month-card')).find(
+        (card) => card.querySelector('.month-title')?.textContent === 'März',
+      ) as HTMLElement;
+      const row = Array.from(march.querySelectorAll('.anniversary-row')).find(
+        (candidate) => candidate.querySelector('.cell-day')?.textContent === '13',
+      ) as HTMLElement;
+      click(row);
+
+      const editor = container.querySelector('.anniversary-editor') as HTMLElement;
+      expect(editor).not.toBeNull();
+      // Die Serie erscheint als Vorkommen vom 06.03. (Name steht im Feld).
+      expect(editor.querySelector('.anniversary-occurrence-note')?.textContent).toContain(
+        'Vorkommen der Serie vom 6. März',
+      );
+      const nameInput = editor.querySelector(
+        '.anniversary-column:nth-child(2) input[type="text"]',
+      ) as HTMLInputElement;
+      expect(nameInput.value).toBe('Müllabfuhr');
+
+      // Nur den 13.03. ausnehmen – die Serie bleibt am Ursprung (06.03.).
+      act(() => buttonByText(editor, 'Nur dieses Vorkommen löschen').click());
+
+      const persisted = JSON.parse(window.localStorage.getItem(STATE_KEY) ?? '{}');
+      const day = persisted.anniversaries['03-06'] as Array<Record<string, unknown>>;
+      expect(day).toHaveLength(1);
+      expect(day[0].name).toBe('Müllabfuhr');
+      expect(day[0].excludedDates).toEqual(['2021-03-13']);
+      // Kein Duplikat am Folgetag.
+      expect(persisted.anniversaries['03-13']).toBeUndefined();
+    } finally {
+      window.localStorage.removeItem(STATE_KEY);
+      unmountAll();
+    }
+  });
+
+
 });
 
 

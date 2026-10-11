@@ -18,6 +18,17 @@ const offline = process.env.BUILD_OFFLINE === '1';
 export default defineConfig({
   plugins: [react(), ...(offline ? [viteSingleFile()] : [])],
   base: './',
+  /**
+   * Auflösungsreihenfolge der Dateiendungen.
+   *
+   * Neben den TypeScript-Quellen (`*.ts`/`*.tsx`) liegen teils noch ältere,
+   * kompilierte `*.js`-Dateien im Quellbaum. Damit Importe ohne Endung stets die
+   * aktuelle TypeScript-Quelle laden (und nie ein veraltetes `.js`), wird die
+   * Reihenfolge hier fest vorgegeben: `.ts`/`.tsx` vor `.js`.
+   */
+  resolve: {
+    extensions: ['.mjs', '.ts', '.tsx', '.mts', '.jsx', '.js', '.json'],
+  },
   build: {
     outDir: offline ? 'offline' : 'dist',
     sourcemap: false,

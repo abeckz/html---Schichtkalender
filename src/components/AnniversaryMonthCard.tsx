@@ -14,9 +14,8 @@ import {
   getIsoWeekday,
   getWeekdayShort,
   toDateKey,
-  toMonthDayKey,
 } from '../utils/dateUtils.ts';
-import { anniversariesAt, formatIntervalLabel } from '../engines/anniversaryEngine.ts';
+import { matchesForDateKey } from '../engines/anniversaryEngine.ts';
 
 export interface AnniversaryMonthCardProps {
   /** Bezugsjahr (nur für Tagesanzahl und Wochentag). */
@@ -49,8 +48,20 @@ export function AnniversaryMonthCard({
         {Array.from({ length: dayCount }, (_, index) => index + 1).map((day) => {
           const isoWeekday = getIsoWeekday(year, month, day);
           const dateKey = toDateKey(year, month, day);
-          const monthDay = toMonthDayKey(month, day);
-          const entries = anniversariesAt(anniversaries, monthDay);
+          // Alle Jahrestage dieses konkreten Kalendertags: Geburtstage hängen am
+          // Monat-Tag-Schlüssel; wiederkehrende Ereignisse werden über ihren
+          // Rhythmus geprüft und erscheinen daher auch an anderen Tagen als
+          // ihrem Ankertag (z. B. „wöchentlich" an jedem passenden Wochentag).
+          // Ausgenommene Einzeltermine (`excludedDates`) und ein gesetztes
+          // Serienende (`until`) werden dabei berücksichtigt.
+          //
+          // Als Basisjahr dient das angezeigte Jahr selbst: In der jahreslosen
+          // Ansicht soll das Muster stabil bleiben (der Anker liegt immer im
+          // selben „Jahr" wie der geprüfte Tag), damit z. B. „jeden 2. Montag"
+          // unabhängig vom Bezugsjahr immer dieselben Wochentage trifft.
+          const entries = matchesForDateKey(anniversaries, dateKey, year, year).map(
+            ({ entry }) => entry,
+          );
           const weekdayShort = getWeekdayShort(isoWeekday);
           const weekdayLabel = `${weekdayShort} ${day}.`;
           const isWeekend = isoWeekday >= 6;
@@ -92,9 +103,6 @@ export function AnniversaryMonthCard({
                       {entry.kind === 'birthday' ? '🎂' : '🔁'}
                     </span>{' '}
                     <span className="anniversary-name">{entry.name}</span>
-                    {entry.kind === 'recurring' && (
-                      <span className="anniversary-interval"> ({formatIntervalLabel(entry)})</span>
-                    )}
                   </span>
                 ))}
               </span>

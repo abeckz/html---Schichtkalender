@@ -49,6 +49,30 @@ verschmelzen kann:
 cmd /c "node node_modules/vitest/vitest.mjs run 2>err.txt 1>out.txt"
 ```
 
+## Glitch „alles verschwindet" beim Anlegen eines wiederkehrenden Ereignisses
+
+**Symptom:** In der jahreslosen Ansicht verschwand die **gesamte App**, sobald im
+`AnniversaryEditor` eine Ereigniszeile angelegt wurde („＋ Ereignis hinzufügen").
+In der Konsole stand `Uncaught RangeError: Ungültiger dateKey: undefined`.
+
+**Ursache:** Neben den TypeScript-Quellen liegen im Quellbaum **veraltete,
+kompilierte `*.js`-Dubletten** (z. B. `src/components/App.js`). `src/main.tsx`
+importierte die App **ohne Dateiendung** (`from './components/App'`). Beim Build
+wählte Vite dafür die veraltete `App.js`, während der neuere
+`AnniversaryEditor.tsx` (in `App.js` mit expliziter `.tsx`-Endung importiert)
+geladen wurde - ein **Versions-Mix**: Der neue Editor erwartet die Props
+`dateKey`/`year`/`onToggleOccurrence`, die alte App reichte sie nicht durch.
+`formatGermanDate(undefined)` wirft dann `RangeError`, React unmountet die App
+(kein Error-Boundary) -> „alles verschwindet". In den Vitest-Tests blieb der
+Fehler unsichtbar, weil sie `App.tsx` direkt importieren.
+
+**Fix (dauerhaft):** `src/main.tsx` importiert `App` **mit expliziter Endung**
+(`from './components/App.tsx'`). `App.tsx` selbst importiert alle weiteren
+Module bereits mit `.ts`/`.tsx`, sodass die veralteten `.js`-Dubletten nicht
+mehr herangezogen werden. Faustregel für neue Importe: relative Importe immer
+mit passender Endung schreiben (`.ts`/`.tsx`), damit die Auflösung unabhängig
+von `resolve.extensions` eindeutig ist.
+
 ## Jahrestage: Geburtstage und wiederkehrende Ereignisse
 
 **Datenmodell.** Jahrestage sind **jahreslos**: gespeichert wird nur der
@@ -66,21 +90,42 @@ Kompatibilität ignoriert.
   und `intervalCount` (Zähler, ≥ 1) beschreiben den Wiederholungsrhythmus:
   täglich, wöchentlich, monatlich und jährlich sowie „alle n Tage/Wochen/
   Monate/Jahre". Fehlt `intervalKind`, gilt `interval` als Jahresintervall
-  (Rückwärtskompatibilität mit früheren Zuständen und Dateien).
+  (Rückwärtskompatibilität mit früheren Zuständen und Dateien). Der Rhythmus
+  wird **nur im Editor** angezeigt, **nicht** in der Zellen-/Druckdarstellung
+  (die Zellen sind zu klein).
+- `AnniversaryEntry.excludedDates` (nur bei `kind === 'recurring'`) ist eine
+  chronologisch sortierte Liste konkreter Datumsschlüssel (`"YYYY-MM-DD"`), an
+  denen die Serie **ausgesetzt** ist. Die Serie bleibt bestehen und erscheint
+  an allen übrigen Terminen; `isExcludedOn(entry, dateKey)` prüft den Ausschluss.
+  `normalizeExcludedDates` bereinigt die Liste (gültig, eindeutig, sortiert).
 - **Anker = erstes Auftreten.** Der Monat-Tag-Schlüssel ist zugleich der
-  Anker; alle Rhythmen werden ab dem Anker im Basisjahr (`baseYear = 2000`)
-  fortlaufend gerechnet.
-- **Zwei Prüfungen.** `occursOnDateKey(entry, dateKey, year)` prüft den
-  konkreten Tag (maßgeblich für die Anzeige, u. a. „alle n Tage" und „jeden
-  n-ten Wochentag im Monat"); `occursInYear(entry, year)` liefert die einfache
-  Jahresaussage. `formatIntervalLabel(entry)` erzeugt die Kurzbeschreibung
-  („alle 90 Tage") für Bildschirm, Editor-Hinweis und Druck.
-- **Zuordnung.** `matchesForDateKey(anniversaries, dateKey, year)` liefert für
-  einen Kalendertag **alle** passenden Einträge (mehrere Geburtstage und/oder
-  mehrere Ereignisse) samt Alter. Geburtstage hängen am Monat-Tag-Schlüssel;
-  wiederkehrende Ereignisse werden vollständig über ihren Rhythmus geprüft und
-  können daher auch an anderen Tagen als ihrem Ankertag erscheinen. Dieselbe
-  Funktion nutzen Bildschirm und Druck (Single Source of Truth).
+  Anker; alle Rhythmen werden ab dem Anker fortlaufend gerechnet. Das
+  **Basisjahr** ist der Anzeigezeitraum: Bildschirm (`CalendarDayRow`,
+  `AnniversaryMonthCard`) und Druck (`PrintMonth`) sowie der Editor übergeben
+  das jeweils angezeigte Jahr als `baseYear`, damit das Muster (z. B. „jeden
+  2. Montag") unabhängig vom Bezugsjahr stabil bleibt. Nur die Engine-Tests
+  nutzen weiterhin das Standard-Basisjahr `2000` (`baseYear = 2000`).
+- **Serienende `until`.** Ein wiederkehrendes Ereignis kann ein Enddatum
+  (`AnniversaryEntry.until`, `"YYYY-MM-DD"`) tragen. Der Termin am `until`-Tag
+  selbst findet noch statt, alle späteren werden übersprungen;
+  `isEndedOn(entry, dateKey)` prüft das.
+- **Zwei Prüfungen.** `occursOnDateKey(entry, dateKey, year, baseYear)` prüft
+  den konkreten Tag (maßgeblich für die Anzeige, u. a. „alle n Tage" und „jeden
+  n-ten Wochentag im Monat"). Bei „jährlich" ist **nur der Ankertag** (Monat/
+  Tag) ein Termin – ein früherer Fehler ließ das Ereignis an jedem Tag
+  erscheinen. `occursInYear(entry, year)` liefert die einfache Jahresaussage.
+  `formatIntervalLabel(entry)` erzeugt die Kurzbeschreibung („alle 90 Tage")
+  für den Editor-Hinweis.
+- **Zuordnung.** `matchesForDateKey(anniversaries, dateKey, year, baseYear)`
+  liefert für einen Kalendertag **alle** passenden Einträge (mehrere
+  Geburtstage und/oder mehrere Ereignisse) samt Alter. Geburtstage hängen am
+  Monat-Tag-Schlüssel; wiederkehrende Ereignisse werden vollständig über ihren
+  Rhythmus geprüft und können daher auch an anderen Tagen als ihrem Ankertag
+  erscheinen. Ausnahmen (`excludedDates`) und ein Serienende (`until`) werden
+  übersprungen. Dieselbe Funktion nutzen Bildschirm und Druck (Single Source of
+  Truth); die jahreslose Ansicht prüft damit **alle** Tage eines Monats, nicht
+  nur die Ankertage.
+
 - **Accessoren.** `anniversariesAt`, `birthdaysAt`, `recurringsAt` liefern die
   Listen eines Tages; `birthdayAt`/`recurringAt` weiterhin den ersten Eintrag
   der jeweiligen Art (Bequemlichkeit).
@@ -113,9 +158,32 @@ keine Schichten, keine KW und keine Datumszellen; ein Zellklick öffnet den
 zweispaltigen `AnniversaryEditor`. Links stehen die **Geburtstage** (Name +
 optionales Geburtsjahr), rechts die **wiederkehrenden Ereignisse** (Name +
 Rhythmus-Auswahl und Zähler). Beide Spalten führen **Listen**: „＋ … hinzufügen"
-legt eine leere Zeile an, „Entfernen" löscht einen Eintrag. Beim Speichern
-übergibt der Editor die vollständige Liste des Tages; leere Namen werden
-verworfen (der Store entfernt sie).
+legt eine leere Zeile an. Beim Speichern übergibt der Editor die vollständige
+Liste des Tages; leere Namen werden verworfen (der Store entfernt sie).
+
+**Löschen: Serie, Vorkommen oder Serienende.** Bei einem wiederkehrenden
+Ereignis bietet der Editor drei Wege:
+- **„Serie löschen"** entfernt den Eintrag vollständig (alle Termine).
+- **„Nur dieses Vorkommen löschen"** nimmt ausschließlich den angeklickten Tag
+  (`dateKey`) über `excludedDates` aus; die Serie bleibt an allen übrigen
+  Terminen erhalten. Der Knopf erscheint nur, wenn der angeklickte Tag nach dem
+  Rhythmus tatsächlich ein Vorkommen ist (`occursOnDateKey`); ist es bereits
+  ausgenommen, heißt er „Vorkommen zurücknehmen". Die Anzeige
+  (`matchesForDateKey`) überspringt ausgenommene Tage.
+- **„Serie ab hier beenden"** setzt das Serienende (`until`) auf den
+  angeklickten Tag: Der Tag selbst bleibt Termin, alle späteren fallen weg
+  („Serie ab diesem Datum nicht weiterführen"). Erneut ausgelöst („Serienende
+  aufheben") läuft die Serie wieder unbegrenzt.
+
+**Vorkommen an einem Folgetag.** Öffnet der Benutzer den Editor an einem Tag,
+der nur ein **Vorkommen** einer an einem anderen Tag verankerten Serie ist,
+erscheint die Serie als Zeile mit dem Hinweis „Vorkommen der Serie vom …".
+„Nur dieses Vorkommen löschen" und „Serie ab hier beenden" wirken dann **sofort
+und direkt** auf die bestehende Serie am Ursprungsanker (der Store schreibt
+unmittelbar). Ein bloßes **Speichern** verschiebt den Serien-Anker **nicht**:
+Fremde Vorkommen werden von `collectEntries` ausgelassen und bleiben an ihrem
+Ursprung; so entsteht kein Duplikat und der Rhythmus-Anker bleibt stabil.
+
 
 **Klickverhalten in der Schichtansicht.** Im regulären Schichtkalender öffnet
 **jeder Zellklick immer den `DayEditor`** (Beschriftung/Farbe). Geburtstage und

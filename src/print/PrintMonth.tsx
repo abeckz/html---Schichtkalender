@@ -36,7 +36,7 @@ import type {
 import { getColorHex } from '../config/annotationColors.ts';
 import { getPrintEventName } from '../config/eventDefinitions.ts';
 import { hasPublicHoliday } from '../engines/eventEngine.ts';
-import { matchesForDateKey, formatIntervalLabel } from '../engines/anniversaryEngine.ts';
+import { matchesForDateKey } from '../engines/anniversaryEngine.ts';
 import { cellLineClass } from '../utils/textFit.ts';
 import { buildExtraColumnLayout } from '../components/ExtraColumnCell.tsx';
 import { countMarkedShiftsByColorTable } from '../components/MonthCalendar.tsx';
@@ -154,7 +154,7 @@ export function buildAnniversaryPrintParts(
   showRecurringEvents: boolean,
 ): string[] {
   if (!anniversaries) return [];
-  return matchesForDateKey(anniversaries, day.dateKey, year)
+  return matchesForDateKey(anniversaries, day.dateKey, year, year)
     .filter(
       ({ entry }) =>
         (entry.kind === 'birthday' && showBirthdays) ||
@@ -165,8 +165,9 @@ export function buildAnniversaryPrintParts(
         const agePart = age !== undefined ? ` (${age})` : '';
         return `🎂 ${entry.name}${agePart}`;
       }
-      const intervalPart = ` (${formatIntervalLabel(entry)})`;
-      return `🔁 ${entry.name}${intervalPart}`;
+      // Der Wiederholungsrhythmus wird bewusst nicht angezeigt: die Zellen sind
+      // klein, und der Rhythmus ist beim Bearbeiten sichtbar.
+      return `🔁 ${entry.name}`;
     });
 }
 

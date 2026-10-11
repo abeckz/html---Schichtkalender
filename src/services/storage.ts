@@ -433,8 +433,29 @@ export function normalizeAnniversary(
           : MIN_ANNIVERSARY_INTERVAL;
       entry.intervalCount = legacyYears;
     }
+    // Ausnahmetermine: nur gültige, eindeutige Datumsschlüssel, chronologisch.
+    const excluded = normalizeExcludedDates(candidate.excludedDates);
+    if (excluded.length > 0) entry.excludedDates = excluded;
+    // Serienende: nur ein gültiger Datumsschlüssel wird übernommen.
+    if (typeof candidate.until === 'string' && isValidDateKey(candidate.until)) {
+      entry.until = candidate.until;
+    }
   }
   return entry;
+}
+
+/** Bereinigt die Ausnahmetermine einer Serie (gültig, eindeutig, sortiert). */
+export function normalizeExcludedDates(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of value) {
+    if (typeof raw !== 'string' || !isValidDateKey(raw) || seen.has(raw)) continue;
+    seen.add(raw);
+    result.push(raw);
+  }
+  result.sort();
+  return result;
 }
 
 /** Freitext eines Ereignis-/Personennamens begrenzen und trimmen. */

@@ -263,6 +263,24 @@ export interface AnniversaryEntry {
    * Jahre". Neue Einträge nutzen ausschließlich `intervalKind`/`intervalCount`.
    */
   interval?: number;
+  /**
+   * Konkrete Ausnahmetermine einer Ereignisserie (nur bei kind === 'recurring').
+   *
+   * Enthält die Datumsschlüssel ("YYYY-MM-DD") einzelner Vorkommen, die aus der
+   * Serie herausgenommen wurden. Die Serie selbst bleibt bestehen und erscheint
+   * an allen übrigen Terminen; nur die hier gelisteten Tage werden übersprungen.
+   */
+  excludedDates?: string[];
+  /**
+   * Letzter Termin der Serie (nur bei kind === 'recurring').
+   *
+   * Datumsschlüssel ("YYYY-MM-DD"), bis zu dem die Serie **einschließlich**
+   * läuft. Alle nach diesem Tag liegenden Termine werden nicht mehr angezeigt
+   * („Serie ab diesem Datum nicht weiterführen"). Fehlt das Feld, läuft die
+   * Serie unbegrenzt weiter. Ein gesetztes `until` vor dem Ankertag beendet die
+   * Serie vollständig.
+   */
+  until?: string;
 }
 
 /**

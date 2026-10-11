@@ -16,7 +16,7 @@ import type {
   AnniversaryIntervalKind,
   AnniversaryMap,
 } from '../domain/types.ts';
-import { monthDayOfDateKey, parseMonthDayKey, WEEKDAY_SHORT_NAMES } from '../utils/dateUtils.ts';
+import { monthDayOfDateKey, parseMonthDayKey, toDateKey, WEEKDAY_SHORT_NAMES } from '../utils/dateUtils.ts';
 import { DAYS_PER_WEEK, MS_PER_DAY, dayIndex } from '../utils/dayIndex.ts';
 
 /** Kennzeichnet die Altersanzeige eines Geburtstags in einem Jahr. */
@@ -108,6 +108,9 @@ export function occursInYear(entry: AnniversaryEntry, year: number, baseYear = 2
   const { kind, count } = intervalSpecOf(entry);
   const parts = parseMonthDayKey(entry.monthDay);
   if (!parts) return false;
+  // Ein gesetztes Serienende vor dem Jahresbeginn schließt das Jahr aus.
+  const until = entry.until;
+  if (typeof until === 'string' && until !== '' && until < toDateKey(year, 1, 1)) return false;
   if (kind === 'yearly' && count <= 1) return true;
 
   switch (kind) {
@@ -185,10 +188,12 @@ export function matchesForDateKey(
   // Wiederkehrende Ereignisse: der Anker bindet den Rhythmus; der Termin muss
   // exakt auf den Kalendertag fallen. Ein Ereignis kann daher auch an anderen
   // Tagen als seinem Ankertag erscheinen (z. B. „alle 10 Tage" oder „jeden
-  // Montag"), weshalb alle wiederkehrenden Einträge geprüft werden.
+  // Montag"), weshalb alle wiederkehrenden Einträge geprüft werden. Einzelne
+  // Vorkommen können als Ausnahme (`excludedDates`) ausgenommen sein.
   for (const list of Object.values(anniversaries)) {
     for (const entry of list) {
       if (entry.kind !== 'recurring' || seen.has(entry.id)) continue;
+      if (isExcludedOn(entry, dateKey)) continue;
       if (!occursOnDateKey(entry, dateKey, year, baseYear)) continue;
       seen.add(entry.id);
       result.push({ entry });
@@ -199,11 +204,36 @@ export function matchesForDateKey(
 }
 
 /**
+ * Prüft, ob ein konkretes Vorkommen eines wiederkehrenden Ereignisses als
+ * Ausnahme ausgenommen wurde (`excludedDates` enthält den Datumsschlüssel).
+ * Die Serie bleibt bestehen; nur dieser eine Tag fällt aus.
+ */
+export function isExcludedOn(entry: AnniversaryEntry, dateKey: string): boolean {
+  return entry.excludedDates?.includes(dateKey) ?? false;
+}
+
+/**
+ * Prüft, ob ein Tag **nach** dem gesetzten Serienende (`until`) liegt.
+ *
+ * Das Ende ist einschließlich: ein Termin am `until`-Tag selbst findet noch
+ * statt, alle späteren nicht. Ist kein Ende gesetzt, läuft die Serie weiter.
+ * Datumsschlüssel haben das Format "YYYY-MM-DD" und lassen sich daher direkt
+ * lexikografisch vergleichen.
+ */
+export function isEndedOn(entry: AnniversaryEntry, dateKey: string): boolean {
+  const until = entry.until;
+  return typeof until === 'string' && until !== '' && dateKey > until;
+}
+
+/**
  * Prüft, ob ein wiederkehrendes Ereignis exakt auf einen Kalendertag fällt.
  *
  * Der Anker (Monat-Tag im Ankerjahr) ist das erste Auftreten; danach wird der
  * Rhythmus auf den konkreten Tag hochgerechnet. Der Tagesrhythmus zählt
  * fortlaufend über Monats- und Jahresgrenzen.
+ *
+ * Ein gesetztes `until` (letzter Termin der Serie, einschließlich) beendet die
+ * Serie: alle späteren Tage sind keine Vorkommen mehr.
  */
 export function occursOnDateKey(
   entry: AnniversaryEntry,
@@ -211,8 +241,11 @@ export function occursOnDateKey(
   year: number,
   baseYear = 2000,
 ): boolean {
+  if (isEndedOn(entry, dateKey)) return false;
   const parts = parseMonthDayKey(entry.monthDay);
   if (!parts) return false;
+  const targetParts = parseMonthDayKey(monthDayOfDateKey(dateKey) ?? '');
+  if (!targetParts) return false;
   const { kind, count } = intervalSpecOf(entry);
   const target = dateKeyDayIndex(dateKey);
   const anchor = dayIndex(baseYear, parts.month, parts.day);
@@ -220,7 +253,9 @@ export function occursOnDateKey(
 
   switch (kind) {
     case 'yearly':
-      if (count <= 1) return true;
+      // Nur der Ankertag (Monat/Tag) selbst ist ein Termin; der Abstand in
+      // Jahren muss ein Vielfaches des Zählers sein.
+      if (targetParts.month !== parts.month || targetParts.day !== parts.day) return false;
       return ((year - baseYear) % count + count) % count === 0;
     case 'daily':
       return offset >= 0 && offset % count === 0;
@@ -234,8 +269,6 @@ export function occursOnDateKey(
     case 'monthly': {
       const months = (year - baseYear) * 12 + (parts.month - 1);
       if (months < 0 || months % count !== 0) return false;
-      const targetParts = parseMonthDayKey(monthDayOfDateKey(dateKey) ?? '');
-      if (!targetParts) return false;
       const nth = Math.floor((parts.day - 1) / DAYS_PER_WEEK) + 1;
       const anchorWeekday = ((anchor + 3) % DAYS_PER_WEEK) + 1;
       const candidate = nthWeekdayOfMonth(year, targetParts.month, anchorWeekday, nth);

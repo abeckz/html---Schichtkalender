@@ -42,6 +42,23 @@ export interface AnniversaryStore {
   resetAnniversary: (monthDay: string) => void;
   /** Entfernt gezielt einen Eintrag über seine `id`. */
   removeAnniversary: (monthDay: string, id: string) => void;
+  /**
+   * Nimmt ein einzelnes Vorkommen einer Ereignisserie aus oder wieder auf.
+   *
+   * Die Serie bleibt bestehen; nur der eine Tag (`dateKey`) wird über die
+   * Ausnahmeliste `excludedDates` ein- bzw. ausgeschlossen.
+   */
+  setOccurrenceExcluded: (
+    monthDay: string,
+    id: string,
+    dateKey: string,
+    excluded: boolean,
+  ) => void;
+  /**
+   * Setzt das Ende einer Serie (`until`, "YYYY-MM-DD") bzw. hebt es mit einem
+   * leeren Wert wieder auf. Der Termin am `until`-Tag selbst findet noch statt.
+   */
+  setSeriesEnd: (monthDay: string, id: string, until: string) => void;
   /** Ersetzt die gesamte Map (Reset/Import). */
   replaceAnniversaries: (next: AnniversaryMap) => void;
 }
@@ -127,6 +144,48 @@ export function useAnniversaryStore(
     });
   }, []);
 
+  const setSeriesEnd = useCallback((monthDay: string, id: string, until: string) => {
+    setAnniversaries((current) => {
+      const list = (current[monthDay] ?? []).map((item) => {
+        if (item.id !== id || item.kind !== 'recurring') return item;
+        const updated: AnniversaryEntry = { ...item };
+        if (until !== '') {
+          updated.until = until;
+        } else {
+          delete updated.until;
+        }
+        return normalizeAnniversary(updated, item.id) ?? updated;
+      });
+      return withDay(current, monthDay, list);
+    });
+  }, []);
+
+  const setOccurrenceExcluded = useCallback(
+    (monthDay: string, id: string, dateKey: string, excluded: boolean) => {
+      setAnniversaries((current) => {
+        const list = (current[monthDay] ?? []).map((item) => {
+          if (item.id !== id || item.kind !== 'recurring') return item;
+          const dates = new Set(item.excludedDates ?? []);
+          if (excluded) {
+            dates.add(dateKey);
+          } else {
+            dates.delete(dateKey);
+          }
+          const next = [...dates].sort();
+          const updated: AnniversaryEntry = { ...item };
+          if (next.length > 0) {
+            updated.excludedDates = next;
+          } else {
+            delete updated.excludedDates;
+          }
+          return normalizeAnniversary(updated, item.id) ?? updated;
+        });
+        return withDay(current, monthDay, list);
+      });
+    },
+    [],
+  );
+
   const replaceAnniversaries = useCallback((next: AnniversaryMap) => {
     setAnniversaries(next);
   }, []);
@@ -137,6 +196,8 @@ export function useAnniversaryStore(
     replaceDay,
     resetAnniversary,
     removeAnniversary,
+    setOccurrenceExcluded,
+    setSeriesEnd,
     replaceAnniversaries,
   };
 }

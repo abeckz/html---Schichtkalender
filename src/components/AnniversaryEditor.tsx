@@ -21,16 +21,16 @@
  */
 
 import { useEffect, useId, useRef, useState } from 'react';
-import type { AnniversaryEntry, AnniversaryIntervalKind } from '../domain/types';
+import type { AnniversaryEntry, AnniversaryIntervalKind } from '../domain/types.ts';
 import {
   MAX_ANNIVERSARY_NAME_LENGTH,
   MAX_DAILY_INTERVAL_COUNT,
   MIN_ANNIVERSARY_INTERVAL,
   createAnniversaryId,
   maxIntervalCountFor,
-} from '../services/storage';
-import { intervalSpecOf } from '../engines/anniversaryEngine';
-import { formatMonthDay } from '../utils/dateUtils';
+} from '../services/storage.ts';
+import { intervalSpecOf, isExcludedOn, occursOnDateKey } from '../engines/anniversaryEngine.ts';
+import { formatGermanDate, formatMonthDay } from '../utils/dateUtils.ts';
 
 /**
  * Auswahl des Wiederholungsrhythmus.
@@ -123,11 +123,27 @@ interface RecurringDraft {
   intervalCount: string;
   selectorValue: string;
   countEditable: boolean;
+  /** Ausgenommene Einzeltermine (dateKeys), die aus der Serie herausfallen. */
+  excludedDates: string[];
+  /**
+   * Monat-Tag-Schlüssel, an dem die Serie aktuell verankert (gespeichert) ist.
+   *
+   * Wird der Editor an einem Folgetag geöffnet, kann eine Serie hier mit ihrem
+   * Ursprungsanker erscheinen. Beim Speichern wandert der Anker an den
+   * angeklickten Tag; die ursprüngliche Position wird entfernt (kein Duplikat).
+   */
+  originMonthDay: string;
+  /** Letzter Termin der Serie ("YYYY-MM-DD"); leer = unbegrenzt. */
+  until: string;
 }
 
 export interface AnniversaryEditorProps {
   /** Monat-Tag-Schlüssel des bearbeiteten Tages ("MM-DD"). */
   monthDay: string;
+  /** Konkret angeklickter Tag ("YYYY-MM-DD") der bearbeiteten Zelle. */
+  dateKey: string;
+  /** Bezugsjahr (für die Prüfung, ob dieser Tag ein Vorkommen ist). */
+  year: number;
   /** Alle vorhandenen Einträge des Tages (Geburtstage und Ereignisse). */
   initialEntries: AnniversaryEntry[];
   /**
@@ -137,6 +153,21 @@ export interface AnniversaryEditorProps {
   onSave: (entries: AnniversaryEntry[]) => void;
   /** Entfernt alle Einträge des Tages. */
   onReset: () => void;
+  /**
+   * Nimmt ein einzelnes Vorkommen einer Serie aus bzw. wieder auf.
+   * `excluded === true` entfernt nur diesen Tag, die Serie bleibt bestehen.
+   */
+  onToggleOccurrence: (
+    monthDay: string,
+    id: string,
+    dateKey: string,
+    excluded: boolean,
+  ) => void;
+  /**
+   * Setzt das Ende einer Serie (`until`, "YYYY-MM-DD") bzw. hebt es mit einem
+   * leeren Wert wieder auf. Der Tag selbst findet noch statt.
+   */
+  onEndSeries: (monthDay: string, id: string, until: string) => void;
   onClose: () => void;
 }
 
@@ -162,6 +193,9 @@ function toRecurringDraft(entry: AnniversaryEntry): RecurringDraft {
     intervalCount: String(spec.count),
     selectorValue: selector.value,
     countEditable: selector.value.endsWith('-n'),
+    excludedDates: entry.excludedDates ?? [],
+    originMonthDay: entry.monthDay,
+    until: entry.until ?? '',
   };
 }
 
@@ -172,7 +206,7 @@ function emptyBirthdayDraft(): BirthdayDraft {
 }
 
 /** Eine neue, leere Ereignis-Zeile (Standardrhythmus: jährlich). */
-function emptyRecurringDraft(): RecurringDraft {
+function emptyRecurringDraft(monthDay: string): RecurringDraft {
   const id = createAnniversaryId();
   return {
     key: id,
@@ -182,14 +216,21 @@ function emptyRecurringDraft(): RecurringDraft {
     intervalCount: '1',
     selectorValue: 'yearly',
     countEditable: false,
+    excludedDates: [],
+    originMonthDay: monthDay,
+    until: '',
   };
 }
 
 export function AnniversaryEditor({
   monthDay,
+  dateKey,
+  year,
   initialEntries,
   onSave,
   onReset,
+  onToggleOccurrence,
+  onEndSeries,
   onClose,
 }: AnniversaryEditorProps) {
   const [birthdays, setBirthdays] = useState<BirthdayDraft[]>(() =>
@@ -220,6 +261,70 @@ export function AnniversaryEditor({
 
   function updateRecurring(key: string, patch: Partial<RecurringDraft>) {
     setRecurrings((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  }
+
+  /** Baut aus einem Entwurf einen Eintrag (für die Rhythmus-Prüfung). */
+  function draftEntry(row: RecurringDraft): AnniversaryEntry {
+    const parsedCount = Number(row.intervalCount);
+    const entry: AnniversaryEntry = {
+      id: row.id,
+      // Anker = Ursprungsspeicherort; nur so stimmt der Rhythmus auch dann,
+      // wenn der Editor an einem Folgetag geöffnet wurde.
+      monthDay: row.originMonthDay,
+      name: row.name,
+      kind: 'recurring',
+      intervalKind: row.intervalKind,
+      intervalCount: parsedCount >= 1 ? parsedCount : 1,
+    };
+    if (row.excludedDates.length > 0) entry.excludedDates = row.excludedDates;
+    if (row.until !== '') entry.until = row.until;
+    return entry;
+  }
+
+  /**
+   * true, wenn der angeklickte Tag (`dateKey`) nach dem Rhythmus ein Vorkommen
+   * dieses Eintrags ist. Nur dann lässt sich genau dieses Vorkommen ausnehmen.
+   *
+   * Als Basisjahr dient das angezeigte Jahr selbst - so stimmt das Muster mit
+   * der jahreslosen Anzeige überein (dort ist der Anker ebenfalls im
+   * angezeigten Jahr verortet).
+   */
+  function occurrenceHere(row: RecurringDraft): boolean {
+    return occursOnDateKey(draftEntry(row), dateKey, year, year);
+  }
+
+  /** true, wenn genau dieses Vorkommen aktuell ausgenommen ist. */
+  function occurrenceExcluded(row: RecurringDraft): boolean {
+    return isExcludedOn(draftEntry(row), dateKey);
+  }
+
+  /**
+   * true, wenn diese Serie an einem anderen Tag verankert ist als dem
+   * angeklickten – sie erscheint hier also nur als Vorkommen.
+   */
+  function isForeignOccurrence(row: RecurringDraft): boolean {
+    return row.originMonthDay !== monthDay;
+  }
+
+  /** true, wenn die Serie mit dem angeklickten Tag endet (letzter Termin). */
+  function endsHere(row: RecurringDraft): boolean {
+    return row.until !== '' && row.until === dateKey;
+  }
+
+  /** true, wenn der angeklickte Tag nach dem gesetzten Serienende liegt. */
+  function isAfterEnd(row: RecurringDraft): boolean {
+    return row.until !== '' && dateKey > row.until;
+  }
+
+  /**
+   * Beendet die Serie mit dem angeklickten Tag: der Tag selbst findet noch
+   * statt, alle späteren Termine fallen weg. Erneutes Auslösen hebt das Ende
+   * wieder auf (Serie läuft unbegrenzt weiter).
+   */
+  function endSeriesHere(row: RecurringDraft) {
+    const next = endsHere(row) ? '' : dateKey;
+    updateRecurring(row.key, { until: next });
+    onEndSeries(row.originMonthDay, row.id, next);
   }
 
   /** Wechselt den Wiederholungsrhythmus einer Zeile und passt den Zähler an. */
@@ -295,9 +400,17 @@ export function AnniversaryEditor({
     birthdays.some((row) => row.name.trim() !== '') ||
     recurrings.some((row) => row.name.trim() !== '');
 
-  /** Überträgt die Entwürfe in speicherbare Einträge (ohne leere Namen). */
+  /**
+   * Überträgt die Entwürfe in speicherbare Einträge (ohne leere Namen).
+   *
+   * Serie, die hier nur als **Vorkommen** erscheint (Anker an einem anderen
+   * Tag), werden dabei nicht übernommen: Sie gehören weiterhin ihrem
+   * Ursprungstag und werden ausschließlich über die Sofort-Aktionen
+   * „Nur dieses Vorkommen löschen" bzw. „Serie ab hier beenden" verändert. So
+   * verschiebt ein bloßes Speichern den Serien-Anker nicht.
+   */
   function collectEntries(): AnniversaryEntry[] {
-    const result: AnniversaryEntry[] = [];
+    const entries: AnniversaryEntry[] = [];
     for (const row of birthdays) {
       if (row.name.trim() === '') continue;
       const entry: AnniversaryEntry = {
@@ -310,21 +423,27 @@ export function AnniversaryEditor({
       if (row.birthYear !== '' && Number.isInteger(parsedYear) && parsedYear > 0) {
         entry.birthYear = parsedYear;
       }
-      result.push(entry);
+      entries.push(entry);
     }
     for (const row of recurrings) {
       if (row.name.trim() === '') continue;
+      if (isForeignOccurrence(row)) continue;
       const parsedCount = Number(row.intervalCount);
-      result.push({
+      const entry: AnniversaryEntry = {
         id: row.id,
         monthDay,
         name: row.name.trim(),
         kind: 'recurring',
         intervalKind: row.intervalKind,
         intervalCount: parsedCount >= 1 ? parsedCount : 1,
-      });
+      };
+      // Ausgenommene Einzeltermine bleiben beim Speichern erhalten.
+      if (row.excludedDates.length > 0) entry.excludedDates = [...row.excludedDates].sort();
+      // Ein gesetztes Serienende bleibt erhalten.
+      if (row.until !== '') entry.until = row.until;
+      entries.push(entry);
     }
-    return result;
+    return entries;
   }
 
   return (
@@ -416,6 +535,12 @@ export function AnniversaryEditor({
             </h3>
             {recurrings.map((row) => (
               <div className="anniversary-entry-row" key={row.key}>
+                {isForeignOccurrence(row) && (
+                  <p className="anniversary-occurrence-note field-hint">
+                    Vorkommen der Serie vom {formatMonthDay(row.originMonthDay)}
+                    {row.until !== '' && `, Ende ${formatGermanDate(row.until)}`}
+                  </p>
+                )}
                 <div className="editor-field">
                   <label className="field-label" htmlFor={`${row.key}-name`}>
                     Name
@@ -480,23 +605,81 @@ export function AnniversaryEditor({
                     </span>
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="row-remove-button"
-                  aria-label="Ereignis entfernen"
-                  title="Dieses wiederkehrende Ereignis entfernen"
-                  onClick={() =>
-                    setRecurrings((current) => current.filter((item) => item.key !== row.key))
-                  }
-                >
-                  Entfernen
-                </button>
+                <div className="anniversary-remove-actions">
+                  <button
+                    type="button"
+                    className="row-remove-button"
+                    aria-label="Ereignisserie entfernen"
+                    title="Die gesamte Ereignisserie entfernen (alle Termine)"
+                    onClick={() =>
+                      setRecurrings((current) => current.filter((item) => item.key !== row.key))
+                    }
+                  >
+                    Serie löschen
+                  </button>
+                  {occurrenceHere(row) && (
+                    <button
+                      type="button"
+                      className="row-remove-button is-occurrence"
+                      aria-label={
+                        occurrenceExcluded(row)
+                          ? 'Vorkommen wieder aufnehmen'
+                          : 'Nur dieses Vorkommen löschen'
+                      }
+                      title={
+                        occurrenceExcluded(row)
+                          ? `${formatGermanDate(dateKey)} wieder in die Serie aufnehmen`
+                          : `Nur den ${formatGermanDate(dateKey)} aus der Serie ausnehmen`
+                      }
+                      onClick={() => {
+                        const nextExcluded = !occurrenceExcluded(row);
+                        updateRecurring(row.key, {
+                          excludedDates: nextExcluded
+                            ? [...row.excludedDates, dateKey].sort()
+                            : row.excludedDates.filter((key) => key !== dateKey),
+                        });
+                        onToggleOccurrence(row.originMonthDay, row.id, dateKey, nextExcluded);
+                      }}
+                    >
+                      {occurrenceExcluded(row)
+                        ? 'Vorkommen zurücknehmen'
+                        : 'Nur dieses Vorkommen löschen'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="row-remove-button is-occurrence"
+                    aria-label={
+                      endsHere(row) ? 'Serienende aufheben' : 'Serie ab diesem Datum beenden'
+                    }
+                    title={
+                      endsHere(row)
+                        ? 'Das Serienende aufheben – die Serie läuft wieder unbegrenzt weiter'
+                        : `Die Serie nach dem ${formatGermanDate(dateKey)} nicht weiterführen`
+                    }
+                    onClick={() => endSeriesHere(row)}
+                  >
+                    {endsHere(row) ? 'Serienende aufheben' : 'Serie ab hier beenden'}
+                  </button>
+                </div>
+                {row.until !== '' && (
+                  <p
+                    className={
+                      isAfterEnd(row)
+                        ? 'anniversary-occurrence-note field-hint is-ended'
+                        : 'anniversary-occurrence-note field-hint'
+                    }
+                  >
+                    Serie endet am {formatGermanDate(row.until)}
+                    {isAfterEnd(row) && ' – dieser Tag liegt danach'}
+                  </p>
+                )}
               </div>
             ))}
             <button
               type="button"
               className="row-add-button"
-              onClick={() => setRecurrings((current) => [...current, emptyRecurringDraft()])}
+              onClick={() => setRecurrings((current) => [...current, emptyRecurringDraft(monthDay)])}
             >
               ＋ Ereignis hinzufügen
             </button>

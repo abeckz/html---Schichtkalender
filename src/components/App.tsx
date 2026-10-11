@@ -30,7 +30,7 @@ import { STORAGE_VERSION, extraColumnTextId } from '../services/storage.ts';
 import { saveState } from '../services/persistence.ts';
 import { useUnsavedChangesGuard } from '../services/unsavedChanges.ts';
 import { monthDayOfDateKey } from '../utils/dateUtils.ts';
-import { anniversariesAt } from '../engines/anniversaryEngine.ts';
+import { anniversariesAt, matchesForDateKey } from '../engines/anniversaryEngine.ts';
 import { Toolbar } from './Toolbar.tsx';
 import { YearCalendar } from './YearCalendar.tsx';
 import { CalendarLegend } from './CalendarLegend.tsx';
@@ -77,8 +77,14 @@ export function App() {
     annotations,
   );
   // Jahreslose Geburtstage und wiederkehrende Ereignisse (nach Monat-Tag "MM-DD").
-  const { anniversaries, replaceDay, resetAnniversary, replaceAnniversaries } =
-    useAnniversaryStore(settings);
+  const {
+    anniversaries,
+    replaceDay,
+    resetAnniversary,
+    setOccurrenceExcluded,
+    setSeriesEnd,
+    replaceAnniversaries,
+  } = useAnniversaryStore(settings);
   // Anzeige-Einstellung (Hell/Dunkel): reine Darstellung, keine Fachdaten.
   const theme = useThemeStore();
 
@@ -91,7 +97,10 @@ export function App() {
     dateKeys: string[];
   } | null>(null);
   // Jahrestag-Tag, dessen Editor gerade geöffnet ist ("MM-DD" oder null).
-  const [editingAnniversary, setEditingAnniversary] = useState<string | null>(null);
+  const [editingAnniversary, setEditingAnniversary] = useState<{
+    monthDay: string;
+    dateKey: string;
+  } | null>(null);
   // Farbe, deren Erklärung gerade bearbeitet wird (öffnet den Eingabedialog).
   const [editingLegendColor, setEditingLegendColor] = useState<AnnotationColorId | null>(null);
 
@@ -161,14 +170,20 @@ export function App() {
   }, []);
 
   // Öffnet den Jahrestag-Editor für einen Kalendertag (Jahres- oder
-  // jahreslose Ansicht). Der Monat-Tag-Schlüssel ist jahresunabhängig.
+  // jahreslose Ansicht). Der Monat-Tag-Schlüssel ist jahresunabhängig; das
+  // konkrete Datum (`dateKey`) wird zusätzlich festgehalten, damit einzelne
+  // Vorkommen einer Serie gezielt ausgenommen werden können.
   const handleOpenAnniversary = useCallback((day: CalendarDay) => {
-    setEditingAnniversary(monthDayOfDateKey(day.dateKey));
+    const monthDay = monthDayOfDateKey(day.dateKey);
+    if (!monthDay) return;
+    setEditingAnniversary({ monthDay, dateKey: day.dateKey });
   }, []);
 
   // Speichert alle Einträge eines Tages (mehrere Geburtstage und mehrere
   // wiederkehrende Ereignisse). Der Editor liefert die vollständige Liste; sie
-  // ersetzt die bisherigen Einträge des Tages in einem Schritt.
+  // ersetzt die bisherigen Einträge des Tages in einem Schritt. Serien, die an
+  // einem anderen Tag verankert sind und hier nur als Vorkommen erscheinen,
+  // werden nicht übernommen (der Anker bleibt dort, wo er ist).
   const handleSaveAnniversary = useCallback(
     (monthDay: string, entries: AnniversaryEntry[]) => {
       replaceDay(monthDay, entries);
@@ -181,6 +196,24 @@ export function App() {
       resetAnniversary(monthDay);
     },
     [resetAnniversary],
+  );
+
+  // Nimmt ein einzelnes Vorkommen einer Ereignisserie aus ("nur dieses
+  // Vorkommen löschen"). Die Serie bleibt an allen übrigen Terminen erhalten.
+  const handleExcludeAnniversaryOccurrence = useCallback(
+    (monthDay: string, id: string, dateKey: string, excluded: boolean) => {
+      setOccurrenceExcluded(monthDay, id, dateKey, excluded);
+    },
+    [setOccurrenceExcluded],
+  );
+
+  // Beendet eine Serie ab dem angeklickten Tag ("Serie ab diesem Datum nicht
+  // weiterführen"); ein leerer Wert hebt das Ende wieder auf.
+  const handleEndAnniversarySeries = useCallback(
+    (monthDay: string, id: string, until: string) => {
+      setSeriesEnd(monthDay, id, until);
+    },
+    [setSeriesEnd],
   );
 
   /**
@@ -511,10 +544,19 @@ export function App() {
 
       {editingAnniversary && (
         <AnniversaryEditor
-          monthDay={editingAnniversary}
-          initialEntries={anniversariesAt(anniversaries, editingAnniversary)}
-          onSave={(entries) => handleSaveAnniversary(editingAnniversary, entries)}
-          onReset={() => handleResetAnniversary(editingAnniversary)}
+          monthDay={editingAnniversary.monthDay}
+          dateKey={editingAnniversary.dateKey}
+          year={settings.selectedYear}
+          initialEntries={entriesForAnniversaryEditor(
+            anniversaries,
+            editingAnniversary.monthDay,
+            editingAnniversary.dateKey,
+            settings.selectedYear,
+          )}
+          onSave={(entries) => handleSaveAnniversary(editingAnniversary.monthDay, entries)}
+          onReset={() => handleResetAnniversary(editingAnniversary.monthDay)}
+          onToggleOccurrence={handleExcludeAnniversaryOccurrence}
+          onEndSeries={handleEndAnniversarySeries}
           onClose={() => setEditingAnniversary(null)}
         />
       )}
@@ -556,6 +598,35 @@ export function App() {
  */
 function isFixedColumn(column: StreakTarget): column is ColumnColorName {
   return column === 'weekday' || column === 'day' || column === 'shift';
+}
+
+/**
+ * Ermittelt die Startliste für den Jahrestag-Editor eines konkreten Tages.
+ *
+ * Neben den an diesem Tag verankerten Einträgen (`anniversariesAt`) werden auch
+ * die an diesem Tag stattfindenden wiederkehrenden Vorkommen berücksichtigt.
+ * So lassen sich an einem Folgetag „nur dieses Vorkommen löschen" und „Serie ab
+ * hier beenden" direkt im Editor bedienen - die Serie bleibt dort sichtbar, wo
+ * sie tatsächlich auftritt. Geburtstage erscheinen ohnehin nur an ihrem Tag.
+ *
+ * Als Basisjahr dient das angezeigte Jahr selbst, damit das Muster stabil
+ * bleibt (vgl. `AnniversaryMonthCard`).
+ */
+function entriesForAnniversaryEditor(
+  anniversaries: Parameters<typeof anniversariesAt>[0],
+  monthDay: string,
+  dateKey: string,
+  year: number,
+): AnniversaryEntry[] {
+  const occurring = matchesForDateKey(anniversaries, dateKey, year, year).map(
+    ({ entry }) => entry,
+  );
+  // Ausgenommene Vorkommen des Tages sind nicht Teil der Anzeige, müssen aber
+  // im Editor sichtbar bleiben, solange die Serie dort verankert ist.
+  const anchoredAndExcluded = anniversariesAt(anniversaries, monthDay).filter(
+    (entry) => !occurring.some((other) => other.id === entry.id),
+  );
+  return [...occurring, ...anchoredAndExcluded];
 }
 
 /**

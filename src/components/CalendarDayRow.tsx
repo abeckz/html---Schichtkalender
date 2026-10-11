@@ -38,7 +38,7 @@ import type {
 } from '../domain/types.ts';
 import { getColorHex } from '../config/annotationColors.ts';
 import { hasPublicHoliday } from '../engines/eventEngine.ts';
-import { matchesForDateKey, formatIntervalLabel } from '../engines/anniversaryEngine.ts';
+import { matchesForDateKey } from '../engines/anniversaryEngine.ts';
 import { PUBLIC_HOLIDAY_MARK, PUBLIC_HOLIDAY_TITLE } from '../print/PrintMonth.tsx';
 import { cellLineClass } from '../utils/textFit.ts';
 import { ExtraColumnCell, type ExtraColumnDisplay } from './ExtraColumnCell.tsx';
@@ -145,7 +145,7 @@ export function CalendarDayRow({
   // Passende Jahrestage des Kalendertags: Geburtstag und/oder wiederkehrendes
   // Ereignis. Über die Checkboxen lassen sich beide Arten getrennt ein- und
   // ausblenden; die angezeigten Einträge werden hier danach gefiltert.
-  const anniversaryMatches = matchesForDateKey(anniversaries, day.dateKey, day.year).filter(
+  const anniversaryMatches = matchesForDateKey(anniversaries, day.dateKey, day.year, day.year).filter(
     ({ entry }) =>
       (entry.kind === 'birthday' && showBirthdays) ||
       (entry.kind === 'recurring' && showRecurringEvents),
@@ -216,7 +216,7 @@ export function CalendarDayRow({
       if (entry.kind === 'birthday') {
         return `Geburtstag ${entry.name}${age !== undefined ? ` (${age})` : ''}`;
       }
-      return `wiederkehrendes Ereignis ${entry.name} (${formatIntervalLabel(entry)})`;
+      return `wiederkehrendes Ereignis ${entry.name}`;
     })
     .join(', ');
 
@@ -337,9 +337,6 @@ export function CalendarDayRow({
                 {entry.name}
                 {entry.kind === 'birthday' && age !== undefined && (
                   <span className="anniversary-age"> ({age})</span>
-                )}
-                {entry.kind === 'recurring' && (
-                  <span className="anniversary-interval"> ({formatIntervalLabel(entry)})</span>
                 )}
               </span>
             ))}

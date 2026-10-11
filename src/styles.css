@@ -1757,6 +1757,42 @@ body {
   border-radius: var(--radius);
 }
 
+/*
+ * Löschaktionen einer Ereignis-Zeile: „Serie löschen" und (nur wenn der
+ * angeklickte Tag ein Vorkommen ist) „Nur dieses Vorkommen löschen". Sie
+ * stehen nebeneinander und umbrechen bei Platzmangel.
+ */
+.anniversary-remove-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.anniversary-remove-actions .row-remove-button {
+  align-self: auto;
+}
+
+/* Das Ausnehmen eines einzelnen Vorkommens wird betont (weniger destruktiv). */
+.row-remove-button.is-occurrence {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border-color: var(--color-border-strong);
+}
+
+/*
+ * Hinweiszeile in einer Ereignis-Zeile: kennzeichnet ein Vorkommen einer
+ * fremden Serie bzw. ein gesetztes Serienende. Bei einem bereits beendeten
+ * Vorkommen (Tag liegt nach dem Ende) wird der Text gedämpft dargestellt.
+ */
+.anniversary-occurrence-note {
+  margin: 0;
+}
+
+.anniversary-occurrence-note.is-ended {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
 .row-add-button {
   align-self: stretch;
   padding: 6px 10px;
