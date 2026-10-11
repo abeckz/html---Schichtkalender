@@ -100,9 +100,13 @@ export function PrintMonth({ month, annotationLabels, annotationColors }: PrintM
   return (
     <div className="print-month" data-month={month.month}>
       <div className="print-month-header">
-        <span className="print-month-stat">{month.statistics.weekdayCount}</span>
+        <span className="print-month-stat" title="Werktage Montag bis Freitag">
+          {month.statistics.weekdayCount} Werktage
+        </span>
         <span className="print-month-name">{month.name.toUpperCase()}</span>
-        <span className="print-month-stat">{month.statistics.requiredShiftCount}</span>
+        <span className="print-month-stat print-month-stat-end" title="Sollschichten (T + N)">
+          {month.statistics.requiredShiftCount} Sollschichten
+        </span>
       </div>
       <div className="print-month-body">
         {rows.map((row) => {

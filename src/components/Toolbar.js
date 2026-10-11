@@ -1,0 +1,8 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { YearSelector } from './YearSelector';
+import { ShiftSelector } from './ShiftSelector';
+import { ThemeToggle } from './ThemeToggle';
+import { DataControls } from './DataControls';
+export function Toolbar({ year, selectedShift, onSelectYear, onPreviousYear, onNextYear, canGoPrevious, canGoNext, onSelectShift, onOpenPrint, theme, onSaveFile, onLoadFile, collapsed, onToggleCollapsed, }) {
+    return (_jsxs("header", { className: collapsed ? 'toolbar no-print is-collapsed' : 'toolbar no-print', children: [_jsx("h1", { className: "app-title", children: "BASF Schichtkalender" }), _jsxs("div", { className: "toolbar-controls", id: "toolbar-controls", children: [_jsx(YearSelector, { year: year, onSelectYear: onSelectYear, onPreviousYear: onPreviousYear, onNextYear: onNextYear, canGoPrevious: canGoPrevious, canGoNext: canGoNext }), _jsx(ShiftSelector, { selectedShift: selectedShift, onSelectShift: onSelectShift }), _jsx(DataControls, { onSave: onSaveFile, onLoad: onLoadFile }), _jsx(ThemeToggle, { theme: theme }), _jsx("button", { type: "button", className: "primary-button", onClick: onOpenPrint, children: "Druckansicht" })] }), _jsx("button", { type: "button", className: "toolbar-collapse-toggle", onClick: onToggleCollapsed, "aria-expanded": !collapsed, "aria-controls": "toolbar-controls legend-box", title: collapsed ? 'Menübar und Legende einblenden' : 'Menübar und Legende einklappen', "aria-label": collapsed ? 'Menübar und Legende einblenden' : 'Menübar und Legende einklappen', children: _jsx("span", { className: "toolbar-collapse-arrow", "aria-hidden": "true", children: "\u25BC" }) })] }));
+}

@@ -302,6 +302,29 @@ describe('PrintCalendar', () => {
     expect(unity?.querySelector('.print-col-info')?.textContent).not.toContain('F');
   });
 
+  it('schreibt im Monatskopf "Werktage" und "Sollschichten" aus', () => {
+    const container = render(
+      <PrintCalendar
+        calendar={calendar}
+        annotations={annotations}
+        onPrint={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    // Der Monatskopf nennt die Kennzahlen ausgeschrieben statt nur als Zahl:
+    // links die Werktage, rechts die Sollschichten.
+    const january = container.querySelector('.print-month[data-month="1"]');
+    expect(january).not.toBeNull();
+    const stats = Array.from(january?.querySelectorAll('.print-month-stat') ?? []).map(
+      (node) => node.textContent,
+    );
+    const januaryStats = calendar.months[0].statistics;
+    expect(stats).toEqual([
+      `${januaryStats.weekdayCount} Werktage`,
+      `${januaryStats.requiredShiftCount} Sollschichten`,
+    ]);
+  });
+
   it('nennt den Kalender im Seitenheader "BASF Schichtkalender"', () => {
     const container = render(
       <PrintCalendar
