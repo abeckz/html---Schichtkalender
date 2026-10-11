@@ -23,6 +23,25 @@ export interface ToggleSwitchProps {
   title?: string;
   /** Optionaler Zustandstext (Standard: "Ein"/"Aus"). */
   stateLabels?: [on: string, off: string];
+  /**
+   * Blendet den Zustandstext im Schalter aus (Standard: an).
+   *
+   * Für Umschalter, deren beide Stellungen durch je eine eigene Beschriftung
+   * links (`label`) und rechts (`trailingLabel`) benannt sind, ist der
+   * Innentext entbehrlich.
+   */
+  showState?: boolean;
+  /** Optionaler Text rechts vom Schalter (z. B. die Gegenstellung). */
+  trailingLabel?: string;
+  /**
+   * Dreht die Laufrichtung des Knopfes um (Standard: aus).
+   *
+   * Ohne diese Option wandert der Knopf beim Einschalten nach rechts. Benennen
+   * die beiden Beschriftungen links und rechts jedoch je eine Stellung (z. B.
+   * links „Geburtstag & wiederkehrende Ereignisse", rechts „Schichtkalender"),
+   * so zeigt der Knopf erst mit umgedrehter Richtung auf die gewählte Seite.
+   */
+  inverted?: boolean;
 }
 
 export function ToggleSwitch({
@@ -31,6 +50,9 @@ export function ToggleSwitch({
   onChange,
   title,
   stateLabels = ['Ein', 'Aus'],
+  showState = true,
+  trailingLabel,
+  inverted = false,
 }: ToggleSwitchProps) {
   const labelId = useId();
   const [onLabel, offLabel] = stateLabels;
@@ -43,7 +65,13 @@ export function ToggleSwitch({
       </span>
       <button
         type="button"
-        className={checked ? 'toggle-switch is-checked' : 'toggle-switch'}
+        className={[
+          'toggle-switch',
+          checked ? 'is-checked' : '',
+          inverted ? 'is-inverted' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         role="switch"
         aria-checked={checked}
         aria-labelledby={labelId}
@@ -51,11 +79,12 @@ export function ToggleSwitch({
         onClick={() => onChange(!checked)}
       >
         {/* Der Zustand ist auch ohne Farbwahrnehmung lesbar. */}
-        <span className="toggle-switch-state">{stateText}</span>
+        {showState ? <span className="toggle-switch-state">{stateText}</span> : null}
         <span className="toggle-switch-track" aria-hidden="true">
           <span className="toggle-switch-knob" />
         </span>
       </button>
+      {trailingLabel ? <span className="toggle-field-trailing">{trailingLabel}</span> : null}
     </div>
   );
 }

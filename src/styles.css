@@ -376,6 +376,14 @@ body {
   gap: 8px;
 }
 
+/**
+ * Text rechts vom Umschalter: benennt die Gegenstellung (z. B. "Schichtkalender"),
+ * damit der Umschalter ohne Innentext beide Stellungen eindeutig beschriftet.
+ */
+.toggle-field-trailing {
+  color: var(--color-text-muted);
+}
+
 .toggle-switch {
   display: inline-flex;
   align-items: center;
@@ -436,6 +444,19 @@ body {
 
 .toggle-switch.is-checked .toggle-switch-knob {
   transform: translateX(18px);
+}
+
+/**
+ * Umgedrehte Laufrichtung: Der Knopf ruht rechts (Gegenstellung, z. B.
+ * "Schichtkalender") und wandert beim Einschalten nach links zur gewählten
+ * Beschriftung. Damit zeigt die Knopfstellung auf die jeweils benannte Seite.
+ */
+.toggle-switch.is-inverted .toggle-switch-knob {
+  transform: translateX(18px);
+}
+
+.toggle-switch.is-inverted.is-checked .toggle-switch-knob {
+  transform: translateX(0);
 }
 
 /* --------------------------------------------- Anzeige-Gruppe der Menübar */

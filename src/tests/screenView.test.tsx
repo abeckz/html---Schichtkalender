@@ -102,6 +102,29 @@ function toggleByLabel(container: HTMLElement, label: string): Element | null {
   );
 }
 
+/**
+ * Findet ein Anzeige-Kästchen über die sichtbare Beschriftung.
+ *
+ * Die Kästchen sind echte `<input type="checkbox">`-Elemente; das Label trägt
+ * die Beschriftung als `aria-labelledby`-Ziel.
+ */
+function checkboxByLabel(container: HTMLElement, label: string): HTMLInputElement | null {
+  return (
+    (Array.from(container.querySelectorAll<HTMLInputElement>('.checkbox-input')).find((element) => {
+      const labelledBy = element.getAttribute('aria-labelledby');
+      if (!labelledBy) return false;
+      const labelElement = document.getElementById(labelledBy);
+      return container.contains(labelElement) && labelElement?.textContent === label;
+    }) ?? null) as HTMLInputElement | null
+  );
+}
+
+/** Klickt ein Kästchen fachgerecht (löst change aus). */
+function toggleCheckbox(element: HTMLInputElement | null): void {
+  if (!element) throw new Error('Kästchen nicht gefunden.');
+  click(element);
+}
+
 describe('Bildschirmdarstellung', () => {
   it('nennt die Anwendung "BASF Schichtkalender"', () => {
     const container = render(<App />);
@@ -804,11 +827,11 @@ describe('Anzeige-Option "Wochentag über Datum"', () => {
     window.localStorage.removeItem('schichtkalender.state');
     try {
       const container = render(<App />);
-      const toggle = toggleByLabel(container, 'Wochentag über Datum');
-      expect(toggle).not.toBeNull();
-      expect(toggle?.getAttribute('aria-checked')).toBe('false');
+      const box = checkboxByLabel(container, 'Wochentag über Datum');
+      expect(box).not.toBeNull();
+      expect(box?.checked).toBe(false);
 
-      // Ohne Schalter: getrennte Spalten, keine gestapelte Zelle.
+      // Ohne Kästchen: getrennte Spalten, keine gestapelte Zelle.
       expect(container.querySelector('.day-table.is-weekday-over-date')).toBeNull();
       const row = container.querySelector('.day-row');
       expect(row?.querySelector('.cell-day')).not.toBeNull();
@@ -821,11 +844,11 @@ describe('Anzeige-Option "Wochentag über Datum"', () => {
     window.localStorage.removeItem('schichtkalender.state');
     try {
       const container = render(<App />);
-      const toggle = toggleByLabel(container, 'Wochentag über Datum');
-      click(toggle);
+      const box = checkboxByLabel(container, 'Wochentag über Datum');
+      toggleCheckbox(box);
 
-      // Der Schalter meldet den eingeschalteten Zustand ...
-      expect(toggle?.getAttribute('aria-checked')).toBe('true');
+      // Das Kästchen meldet den eingeschalteten Zustand ...
+      expect(box?.checked).toBe(true);
 
       // ... und der Monat nutzt das gestapelte Raster.
       expect(container.querySelector('.day-table.is-weekday-over-date')).not.toBeNull();
@@ -848,16 +871,29 @@ describe('Anzeige-Option "Wochentag über Datum"', () => {
     window.localStorage.removeItem('schichtkalender.state');
     try {
       const first = render(<App />);
-      const toggle = toggleByLabel(first, 'Wochentag über Datum');
-      click(toggle);
+      const box = checkboxByLabel(first, 'Wochentag über Datum');
+      toggleCheckbox(box);
       unmountAll();
 
       // Neue Sitzung: die Einstellung wird aus dem Speicher übernommen.
       const second = render(<App />);
-      expect(toggleByLabel(second, 'Wochentag über Datum')?.getAttribute('aria-checked')).toBe(
-        'true',
-      );
+      expect(checkboxByLabel(second, 'Wochentag über Datum')?.checked).toBe(true);
       expect(second.querySelector('.day-table.is-weekday-over-date')).not.toBeNull();
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('führt die Anzeige-Option als Kästchen in der Anzeigen-Gruppe', () => {
+    window.localStorage.removeItem('schichtkalender.state');
+    try {
+      const container = render(<App />);
+      const group = container.querySelector('.checkbox-group');
+      expect(group).not.toBeNull();
+      // Das Kästchen steht in derselben Gruppe wie die übrigen Anzeigen.
+      expect(group?.querySelectorAll('.checkbox-input').length).toBe(4);
+      // Und nicht mehr unter den Umschaltern (Pillen).
+      expect(toggleByLabel(container, 'Wochentag über Datum')).toBeNull();
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }

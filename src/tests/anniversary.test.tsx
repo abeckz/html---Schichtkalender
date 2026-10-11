@@ -648,6 +648,28 @@ describe('Anzeige-Kästchen der regulären Ansicht', () => {
 });
 
 describe('Jahreslose Ansicht', () => {
+  it('beschriftet den Modus-Umschalter beidseitig und dreht die Knopflaufrichtung um', () => {
+    window.localStorage.removeItem(STATE_KEY);
+    try {
+      const container = render(<App />);
+      const toggle = toggleByLabel(container, 'Geburtstag & wiederkehrende Ereignisse');
+      expect(toggle).not.toBeNull();
+      // Kein Innentext ("An"/"Aus") mehr im Schalter.
+      expect(toggle?.querySelector('.toggle-switch-state')).toBeNull();
+      // Rechts vom Schalter steht die Gegenstellung "Schichtkalender".
+      const trailing = toggle?.closest('.toggle-field')?.querySelector('.toggle-field-trailing');
+      expect(trailing?.textContent).toBe('Schichtkalender');
+      // Der Knopf läuft umgedreht: aus = rechts (Schichtkalender), ein = links.
+      expect(toggle?.classList.contains('is-inverted')).toBe(true);
+      expect(toggle?.classList.contains('is-checked')).toBe(false);
+      click(toggle);
+      expect(toggle?.classList.contains('is-checked')).toBe(true);
+    } finally {
+      window.localStorage.removeItem(STATE_KEY);
+      unmountAll();
+    }
+  });
+
   it('schaltet über den Modus-Umschalter um und zeigt die zwölf Monate', () => {
     const container = render(<App />);
     click(toggleByLabel(container, 'Geburtstag & wiederkehrende Ereignisse'));

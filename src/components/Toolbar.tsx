@@ -117,21 +117,26 @@ export function Toolbar({
               onChange={onToggleShowRecurringEvents}
               title="Wiederkehrende Ereignisse in Kalender und Druck ein-/ausblenden"
             />
-          </div>
-          <div className="toggle-group" role="group" aria-label="Anzeige-Optionen">
-            <ToggleSwitch
+            <CheckboxField
               label="Wochentag über Datum"
               checked={weekdayOverDate}
               onChange={onToggleWeekdayOverDate}
               title="Datum unter den Wochentag setzen (Tagesnummer-Spalte entfällt)"
             />
-            {/* Umschalter der Betriebsart: Schichtkalender <-> jahreslose Ansicht. */}
+          </div>
+          <div className="toggle-group" role="group" aria-label="Anzeige-Optionen">
+            {/* Umschalter der Betriebsart: jahreslose Ansicht <-> Schichtkalender.
+                Linke Beschriftung nennt die jahreslose Ansicht, rechts steht die
+                Gegenstellung "Schichtkalender"; der Innentext entfällt und der
+                Knopf zeigt – umgedreht – auf die jeweils gewählte Seite. */}
             <ToggleSwitch
               label="Geburtstag & wiederkehrende Ereignisse"
               checked={viewMode === 'anniversaries'}
               onChange={onToggleViewMode}
               title="Jahreslose Ansicht ohne Schichten und ohne feste Tage ein-/ausschalten"
-              stateLabels={['An', 'Aus']}
+              showState={false}
+              trailingLabel="Schichtkalender"
+              inverted
             />
           </div>
         </div>
