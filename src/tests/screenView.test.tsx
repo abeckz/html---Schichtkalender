@@ -277,15 +277,45 @@ describe('Bildschirmdarstellung', () => {
 
     try {
       const container = render(<App />);
-      const info = container.querySelector(
-        '.day-row .cell-information.label-lines-3',
-      );
-      expect(info).not.toBeNull();
+      // Gezielt die Zelle mit der persönlichen Beschriftung prüfen: Seit der
+      // Schriftgrößen-Prüfung für Termine tragen auch reine Ereigniszellen
+      // eine `label-lines-*`-Klasse, daher nicht auf das erste Element
+      // verlassen, sondern über den Textinhalt auswählen.
+      const info = Array.from(
+        container.querySelectorAll('.day-row .cell-information'),
+      ).find((cell) => cell.textContent === 'Urlaub\nArzt\nSchulung');
+      expect(info).toBeDefined();
+      expect(info?.classList.contains('label-lines-3')).toBe(true);
       expect(info?.textContent).toBe('Urlaub\nArzt\nSchulung');
       expect(info?.textContent).not.toContain('|');
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }
+  });
+
+  it('deckelt die Schrift reiner Terminnamen über eine label-lines-Klasse', () => {
+    // Übernommene Ereignisse ohne persönliche Beschriftung trugen zuvor keine
+    // label-lines-Klasse und erbten die ungedeckelte Standardgröße. Jetzt wird
+    // ihre Schrift geprüft und gedeckelt.
+    const container = render(<App />);
+    const rows = Array.from(container.querySelectorAll('.day-row'));
+
+    // Maifeiertag (kurz) -> höchstens mittelgroß.
+    const maiRow = rows.find((row) =>
+      (row.getAttribute('aria-label') ?? '').includes('Maifeiertag'),
+    );
+    const maiInfo = maiRow?.querySelector('.cell-information') as HTMLElement | null;
+    expect(maiInfo?.textContent).toBe('Maifeiertag');
+    expect(maiInfo?.classList.contains('label-lines-2')).toBe(true);
+    expect(maiInfo?.classList.contains('label-lines-1')).toBe(false);
+
+    // Tag der Deutschen Einheit (lang) -> kleinste Stufe.
+    const einheitRow = rows.find((row) =>
+      (row.getAttribute('aria-label') ?? '').includes('Tag der Deutschen Einheit'),
+    );
+    const einheitInfo = einheitRow?.querySelector('.cell-information') as HTMLElement | null;
+    expect(einheitInfo?.textContent).toContain('Tag der Deutschen Einheit');
+    expect(einheitInfo?.classList.contains('label-lines-3')).toBe(true);
   });
 
   it('markiert Feiertage anderer Bundesländer in Rheinland-Pfalz nicht', () => {

@@ -197,11 +197,20 @@ Jahrestage, werden beide Inhalte in derselben Info-Zelle angezeigt:
 Tageseditor-Eintrag darunter. Liegt ein zusätzlicher Tageseditor-Eintrag vor,
 wird der Zellinhalt mehrzeilig umgebrochen. Die **Schriftgröße folgt den
 DayEditor-Regeln**, wobei **jeder Jahrestag als eine zusätzliche Zeile zählt**
-(`cellLineClass(informationText, anniversaryCount)` in `utils/textFit.ts`):
-Eine Beschriftung + ein Geburtstag ergeben so zwei Zeilen und damit die mittlere
-Stufe (`label-lines-2`). Ohne Beschriftung und ohne Jahrestage (nur Terminnamen)
-bleibt die normale Zeilengröße erhalten. Bildschirm (`CalendarDayRow`) und Druck
-(`PrintMonth`) nutzen dieselbe Funktion.
+(`informationLineClass(...)` in `utils/textFit.ts`): Eine Beschriftung + ein
+Geburtstag ergeben so zwei Zeilen und damit die mittlere Stufe (`label-lines-2`).
+
+**Schriftgrößen-Prüfung für übernommene Ereignisse.** Reine Termin-/
+Feiertagsnamen (keine persönliche Beschriftung) werden seitdem ebenfalls der
+adaptiven Schriftprüfung unterzogen: Sie bekommen über
+`EVENT_EXTRA_LINES` **eine Zeile mehr angerechnet** und sind damit stets eine
+Stufe kleiner als eine gleich lange Beschriftung. Ein einzelner kurzer Termin
+ist so höchstens mittelgroß (`label-lines-2`, 15px/8pt); lange Namen wie
+„Tag der Deutschen Einheit" rutschen in die kleinste Stufe (`label-lines-3`,
+12px/6.5pt). Zuvor blieb die Zelle bei reinen Terminen ohne Klasse und erbte die
+ungedeckelte Standardgröße - die Schrift wirkte dadurch „viel zu groß".
+Bildschirm (`CalendarDayRow`) und Druck (`PrintMonth`) nutzen dieselbe Funktion
+`informationLineClass(label, extraLines, eventOnly)`.
 
 **Färbung.** Die persönliche Farbe der Info-Spalte sitzt auf dem Textblock
 `.cell-information-text` bzw. `.print-col-info-text` (nur so breit wie sein

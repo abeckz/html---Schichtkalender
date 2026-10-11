@@ -40,7 +40,7 @@ import { getColorHex } from '../config/annotationColors.ts';
 import { hasPublicHoliday } from '../engines/eventEngine.ts';
 import { matchesForDateKey } from '../engines/anniversaryEngine.ts';
 import { PUBLIC_HOLIDAY_MARK, PUBLIC_HOLIDAY_TITLE } from '../print/PrintMonth.tsx';
-import { cellLineClass } from '../utils/textFit.ts';
+import { informationLineClass } from '../utils/textFit.ts';
 import { ExtraColumnCell, type ExtraColumnDisplay } from './ExtraColumnCell.tsx';
 
 export interface CalendarDayRowProps {
@@ -190,14 +190,18 @@ export function CalendarDayRow({
       : day.events.map((event) => event.name).join(' · ');
 
   // Adaptive Schrift über den gesamten Zellinhalt: Die Beschriftung folgt den
-  // DayEditor-Regeln, jeder Jahrestag belegt zusätzlich eine Zeile (siehe
-  // `cellLineClass`). Dadurch wird die Schrift kleiner, sobald zu einer
-  // einzeiligen Beschriftung noch ein Geburtstag/ereignis hinzukommt. Ohne
-  // Beschriftung und ohne Jahrestage (nur Terminnamen) bleibt die normale
-  // Zeilengröße erhalten.
+  // DayEditor-Regeln, jeder Jahrestag belegt zusätzlich eine Zeile. Reine
+  // Termin-/Feiertagsnamen (keine persönliche Beschriftung) werden um eine
+  // Zeile höher angesetzt (siehe `informationLineClass`), damit sie nie so
+  // groß wie eine Beschriftung erscheinen - die Schriftgröße wird geprüft und
+  // gedeckelt.
   const infoLineClass =
-    annotationLabel !== '' || anniversaryMatches.length > 0
-      ? cellLineClass(informationText, anniversaryMatches.length)
+    informationText !== ''
+      ? informationLineClass(
+          informationText,
+          anniversaryMatches.length,
+          annotationLabel === '',
+        )
       : '';
 
   const classNames = ['day-row'];

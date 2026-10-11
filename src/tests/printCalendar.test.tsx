@@ -239,6 +239,36 @@ describe('PrintCalendar', () => {
     expect(info.getAttribute('style')).toBeNull();
   });
 
+  it('deckelt die Schrift reiner Terminnamen über eine label-lines-Klasse', () => {
+    // Ohne persönliche Beschriftung trug die Info-Zelle zuvor keine
+    // label-lines-Klasse und erbte die ungedeckelte Standardgröße. Jetzt wird
+    // die Schrift auch für reine Termine geprüft und gedeckelt: kurze Namen
+    // höchstens mittelgroß, lange Namen in der kleinsten Stufe.
+    const container = render(
+      <PrintCalendar
+        calendar={calendar}
+        annotations={{}}
+        onPrint={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+
+    // 01.01.2021 = Neujahr (kurz) -> höchstens mittelgroß.
+    const neujahr = container.querySelector(
+      '[data-date-key="2021-01-01"] .print-col-info',
+    ) as HTMLElement;
+    expect(neujahr.textContent).toBe('Neujahr');
+    expect(neujahr.classList.contains('label-lines-2')).toBe(true);
+    expect(neujahr.classList.contains('label-lines-1')).toBe(false);
+
+    // 03.10.2021 = Tag der Deutschen Einheit (lang) -> kleinste Stufe.
+    const einheit = container.querySelector(
+      '[data-date-key="2021-10-03"] .print-col-info',
+    ) as HTMLElement;
+    expect(einheit.textContent).toContain('Tag der Deutschen Einheit');
+    expect(einheit.classList.contains('label-lines-3')).toBe(true);
+  });
+
   it('zeigt die KW ausschließlich am Montag', () => {
     const container = render(
       <PrintCalendar

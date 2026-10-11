@@ -37,7 +37,7 @@ import { getColorHex } from '../config/annotationColors.ts';
 import { getPrintEventName } from '../config/eventDefinitions.ts';
 import { hasPublicHoliday } from '../engines/eventEngine.ts';
 import { matchesForDateKey } from '../engines/anniversaryEngine.ts';
-import { cellLineClass } from '../utils/textFit.ts';
+import { informationLineClass } from '../utils/textFit.ts';
 import { buildExtraColumnLayout } from '../components/ExtraColumnCell.tsx';
 import { countMarkedShiftsByColorTable } from '../components/MonthCalendar.tsx';
 
@@ -468,11 +468,18 @@ export function PrintMonth({
           const baseInformation = buildPrintInformation(day, label);
           // Adaptive Schrift über den gesamten Zellinhalt: Die Beschriftung
           // folgt den DayEditor-Regeln, jeder Jahrestag belegt zusätzlich eine
-          // Zeile (siehe `cellLineClass`). Ohne Beschriftung und ohne
-          // Jahrestage (nur Terminnamen) bleibt die normale Zeilengröße.
+          // Zeile. Reine Termin-/Feiertagsnamen (keine persönliche
+          // Beschriftung) werden um eine Zeile höher angesetzt (siehe
+          // `informationLineClass`), damit sie nie so groß wie eine
+          // Beschriftung erscheinen - die Schriftgröße wird geprüft und
+          // gedeckelt.
           const infoLineClass =
-            label !== '' || anniversaryParts.length > 0
-              ? cellLineClass(baseInformation, anniversaryParts.length)
+            baseInformation !== ''
+              ? informationLineClass(
+                  baseInformation,
+                  anniversaryParts.length,
+                  label === '',
+                )
               : '';
           const classNames = ['print-row'];
           if (weekdayOverDate) classNames.push('print-row-weekday-over-date');
