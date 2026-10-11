@@ -565,6 +565,30 @@
 }
 
 /**
+ * Durchgehende farbliche Markierung der Tagesspalten.
+ *
+ * Trägt eine der festen Tagesspalten (Wochentag, Datum oder Schicht T/N) eine
+ * persönliche Farbe, soll ihr Farbfeld über mehrere Zeilen hinweg - genau wie
+ * bei den markierten Zusatzspalten - **ungebrochen** erscheinen. Störend ist
+ * allein die dünne horizontale Zeilenlinie (`.print-row` `border-top: 0.25pt`),
+ * die den Streifen an jeder Zeilengrenze zerschneiden würde. Die gefärbte Zelle
+ * wird daher um die Linienstärke über die Zeilengrenzen hinausgezogen
+ * (negatives `margin` je 0.25pt) und mit `z-index` über die Linien der
+ * Nachbarzeilen gelegt. Da zwei benachbarte gefärbte Zellen die gemeinsame
+ * Grenze von beiden Seiten überdecken, verschwindet die Linie vollständig und
+ * der Streifen erscheint durchgehend. Rasterzeilen und Nachbarspalten bleiben
+ * unverändert; der senkrechte Trennstrich (Wochentag/Datum: rechts, Schicht:
+ * links) bleibt erhalten, weil das negative `margin` nur senkrecht wirkt.
+ */
+.print-row > .print-col-wo[style],
+.print-row > .print-col-datum[style],
+.print-row > .print-col-schicht[style] {
+  position: relative;
+  z-index: 1;
+  margin: -0.25pt 0;
+}
+
+/**
  * Überlagerungsebene der querliegenden Texte im Druck.
  *
  * Wichtig: Sie liegt zwar als letztes Kind in `.print-month-body`

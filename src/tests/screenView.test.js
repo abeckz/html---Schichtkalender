@@ -461,6 +461,47 @@ describe('Bildschirmdarstellung', () => {
         expect(container.querySelector('.toolbar-controls')).not.toBeNull();
         expect(container.querySelector('.legend')).not.toBeNull();
     });
+    it('ordnet Titel, Jahr und Schicht rechts und die Steuerung von links an', () => {
+        const container = render(_jsx(App, {}));
+        // Rechter Abschluss: Titel oben, ausgewähltes Jahr darunter, Schicht ganz
+        // unten - wie in der Druckansicht am rechten Rand.
+        const titles = container.querySelector('.toolbar-titles');
+        expect(titles).not.toBeNull();
+        const titleChildren = Array.from(titles.children).map((element) => element.textContent);
+        expect(titleChildren[0]).toBe('BASF Schichtkalender');
+        expect(titleChildren[1]).toBe(String(startYear));
+        expect(titleChildren[2]).toBe(`Schicht ${DEFAULT_SHIFT}`);
+        // Der Titelblock sitzt im rechten Abschluss der Leiste.
+        expect(titles?.closest('.toolbar-tail')).not.toBeNull();
+        // Ganz links beginnt die Steuerung mit dem Jahr, darunter die Schichtauswahl.
+        const controls = container.querySelector('.toolbar-controls');
+        expect(controls).not.toBeNull();
+        const leftStack = controls.firstElementChild;
+        expect(leftStack.classList.contains('toolbar-stack-left')).toBe(true);
+        expect(leftStack.querySelector('.year-select')).not.toBeNull();
+        expect(leftStack.querySelector('.shift-buttons')).not.toBeNull();
+        // Die Jahr-Zeile trägt - wie die Schichtauswahl - eine Beschriftung links.
+        // Beide Beschriftungen liegen im gemeinsamen Raster der linken Spalte.
+        const leftLabels = Array.from(leftStack.querySelectorAll('.field-label')).map((element) => element.textContent);
+        expect(leftLabels).toEqual(['Jahr', 'Schicht']);
+        // Die Jahr-Bedienelemente sind gebündelt, damit die Zeile bündig mit der
+        // Schichtzeile A-D abschließen kann.
+        const yearControls = leftStack.querySelector('.year-controls');
+        expect(yearControls).not.toBeNull();
+        expect(yearControls?.querySelector('.year-select')).not.toBeNull();
+        expect(yearControls?.querySelectorAll('.icon-button').length).toBe(2);
+        // Reihenfolge der Blöcke in der Leiste: Kästchen, Hell/Dunkel + Sichern/
+        // Laden, danach die Druckansicht.
+        const groups = Array.from(controls.children);
+        expect(groups[1].classList.contains('checkbox-group')).toBe(false);
+        expect(groups[1].classList.contains('display-toggles')).toBe(true);
+        expect(groups[1].querySelector('.checkbox-group')).not.toBeNull();
+        expect(groups[2].classList.contains('toolbar-stack')).toBe(true);
+        expect(groups[2].querySelector('.theme-toggle')).not.toBeNull();
+        expect(groups[2].querySelector('.data-controls')).not.toBeNull();
+        expect(groups[3].classList.contains('primary-button')).toBe(true);
+        expect(groups[3].textContent).toBe('Druckansicht');
+    });
     it('schaltet die Anzeige zwischen Hell und Dunkel um', () => {
         const container = render(_jsx(App, {}));
         const buttons = Array.from(container.querySelectorAll('.theme-button'));
@@ -1047,6 +1088,18 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
     it('zieht gefärbte Zusatzspalten über Padding und Zeilenlinie (ungebrochen)', () => {
         const stylesheet = readStylesheet();
         const rule = /\.cell-extra\[style\]\s*\{[^}]*margin:\s*-4px\s+0/s;
+        expect(rule.test(stylesheet)).toBe(true);
+    });
+    /**
+     * Regression: Eine links angelegte Zusatzspalte war beidseitig mit einem
+     * senkrechten Trennstrich abgetrennt (links durch den rechten Rahmen der
+     * Tagesspalte, rechts durch den eigenen Rahmen). Auf der rechten Seite fehlte
+     * der linke Strich, weil die KW-Spalte bewusst strichfrei bleibt. Die rechte
+     * Zusatzspalte zeichnet ihn deshalb selbst.
+     */
+    it('trennt auch rechts liegende Zusatzspalten beidseitig ab', () => {
+        const stylesheet = readStylesheet();
+        const rule = /\.cell-extra\[data-extra-column-side='right'\]\s*\{[^}]*border-left:/s;
         expect(rule.test(stylesheet)).toBe(true);
     });
     /**

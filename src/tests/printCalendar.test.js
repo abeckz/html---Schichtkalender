@@ -614,4 +614,27 @@ describe('PrintMonth – Zusatzspalten', () => {
         const rule = /\.print-row\s*>\s*\.print-col-extra\[style\]\s*\{[^}]*margin:\s*-0\.25pt\s+0/s;
         expect(rule.test(stylesheet)).toBe(true);
     });
+    /**
+     * Regression: Auch die farblich markierten Tagesspalten (Wochentag, Datum und
+     * Schicht T/N) wurden an jeder Zeilengrenze von der dünnen horizontalen
+     * Zeilenlinie (`.print-row` `border-top`) durchschnitten. Sie werden nun -
+     * genau wie die markierten Zusatzspalten - um die Linienstärke über die
+     * Zeilengrenzen hinausgezogen (negatives `margin`), damit ihr Farbfeld
+     * durchgehend erscheint.
+     */
+    it('zieht gefärbte Wochentag-, Datum- und Schichtspalten über die Zeilenlinie', () => {
+        const stylesheet = readPrintStylesheet();
+        const rule = /\.print-row\s*>\s*\.print-col-wo\[style\][^{}]*,\s*\.print-row\s*>\s*\.print-col-datum\[style\][^{}]*,\s*\.print-row\s*>\s*\.print-col-schicht\[style\]\s*\{[^}]*margin:\s*-0\.25pt\s+0/s;
+        expect(rule.test(stylesheet)).toBe(true);
+    });
+    /**
+     * Regression: Wie am Bildschirm war eine rechts liegende Zusatzspalte im Druck
+     * nur rechts abgetrennt. Die KW-Spalte bleibt bewusst strichfrei, der linke
+     * Trennstrich kommt daher jetzt von der rechten Zusatzspalte selbst.
+     */
+    it('trennt auch rechts liegende Zusatzspalten im Druck beidseitig ab', () => {
+        const stylesheet = readPrintStylesheet();
+        const rule = /\.print-row\s*>\s*\.print-col-extra\[data-extra-column-side='right'\]\s*\{[^}]*border-left:/s;
+        expect(rule.test(stylesheet)).toBe(true);
+    });
 });
