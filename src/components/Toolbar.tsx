@@ -29,6 +29,10 @@ export interface ToolbarProps {
   onSaveFile: () => Promise<boolean>;
   /** Lädt einen zuvor gesicherten Zustand aus einer Datei. */
   onLoadFile: (state: PersistedState) => void;
+  /** true = Menübar und Legendenbox sind eingeklappt (nur Titel und Pfeil). */
+  collapsed: boolean;
+  /** Schaltet das Einklappen von Menübar und Legendenbox um. */
+  onToggleCollapsed: () => void;
 }
 
 export function Toolbar({
@@ -44,11 +48,13 @@ export function Toolbar({
   theme,
   onSaveFile,
   onLoadFile,
+  collapsed,
+  onToggleCollapsed,
 }: ToolbarProps) {
   return (
-    <header className="toolbar no-print">
+    <header className={collapsed ? 'toolbar no-print is-collapsed' : 'toolbar no-print'}>
       <h1 className="app-title">BASF Schichtkalender</h1>
-      <div className="toolbar-controls">
+      <div className="toolbar-controls" id="toolbar-controls">
         <YearSelector
           year={year}
           onSelectYear={onSelectYear}
@@ -64,6 +70,20 @@ export function Toolbar({
           Druckansicht
         </button>
       </div>
+      <button
+        type="button"
+        className="toolbar-collapse-toggle"
+        onClick={onToggleCollapsed}
+        aria-expanded={!collapsed}
+        aria-controls="toolbar-controls legend-box"
+        title={collapsed ? 'Menübar und Legende einblenden' : 'Menübar und Legende einklappen'}
+        aria-label={collapsed ? 'Menübar und Legende einblenden' : 'Menübar und Legende einklappen'}
+      >
+        {/* Dreieckspfeil, Spitze nach unten; gedreht bei eingeklapptem Zustand. */}
+        <span className="toolbar-collapse-arrow" aria-hidden="true">
+          ▼
+        </span>
+      </button>
     </header>
   );
 }

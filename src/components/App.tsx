@@ -51,6 +51,10 @@ export function App() {
   // Farbe, deren Erklärung gerade bearbeitet wird (öffnet den Eingabedialog).
   const [editingLegendColor, setEditingLegendColor] = useState<AnnotationColorId | null>(null);
 
+  // Menübar und Legendenbox oben gemeinsam ein-/ausklappen (reine Anzeige).
+  const [collapsed, setCollapsed] = useState(false);
+  const handleToggleCollapsed = useCallback(() => setCollapsed((current) => !current), []);
+
   // Hinweis-Fenster bei ungespeicherten Daten (Schließen-Versuch).
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
 
@@ -238,18 +242,24 @@ export function App() {
         theme={theme}
         onSaveFile={handleSaveFile}
         onLoadFile={handleLoadFile}
+        collapsed={collapsed}
+        onToggleCollapsed={handleToggleCollapsed}
       />
 
       {view === 'screen' ? (
         <main className="screen-view screen-only">
-          <CalendarLegend
-            year={settings.selectedYear}
-            selectedShift={settings.selectedShift}
-            workedShiftCount={workedShiftCount}
-            usedColors={usedColors}
-            colorTexts={colorTexts}
-            onEditColor={setEditingLegendColor}
-          />
+          {!collapsed && (
+            <div className="legend-box" id="legend-box">
+              <CalendarLegend
+                year={settings.selectedYear}
+                selectedShift={settings.selectedShift}
+                workedShiftCount={workedShiftCount}
+                usedColors={usedColors}
+                colorTexts={colorTexts}
+                onEditColor={setEditingLegendColor}
+              />
+            </div>
+          )}
           <YearCalendar
             calendar={calendar}
             annotations={annotations}

@@ -460,6 +460,35 @@ describe('Bildschirmdarstellung', () => {
     );
   });
 
+  it('klappt Menübar und Legendenbox über den Dreieckspfeil gemeinsam ein und wieder aus', () => {
+    const container = render(<App />);
+
+    const toggle = container.querySelector('.toolbar-collapse-toggle');
+    expect(toggle).not.toBeNull();
+    // Der Pfeil ist ein Dreieck mit der Spitze nach unten.
+    expect(toggle?.querySelector('.toolbar-collapse-arrow')?.textContent).toBe('▼');
+
+    // Ausgangszustand: ausgeklappt, Steuerung und Legendenbox sichtbar.
+    expect(container.querySelector('.toolbar')?.classList.contains('is-collapsed')).toBe(false);
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelector('.toolbar-controls')).not.toBeNull();
+    expect(container.querySelector('.legend')).not.toBeNull();
+
+    // Einklappen: Steuerung wird ausgeblendet (CSS-Klasse), Legendenbox entfernt.
+    click(toggle);
+    expect(container.querySelector('.toolbar')?.classList.contains('is-collapsed')).toBe(true);
+    expect(container.querySelector('.toolbar-collapse-toggle')).not.toBeNull();
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('.legend')).toBeNull();
+
+    // Erneutes Klicken klappt beides wieder aus.
+    click(toggle);
+    expect(container.querySelector('.toolbar')?.classList.contains('is-collapsed')).toBe(false);
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelector('.toolbar-controls')).not.toBeNull();
+    expect(container.querySelector('.legend')).not.toBeNull();
+  });
+
   it('schaltet die Anzeige zwischen Hell und Dunkel um', () => {
     const container = render(<App />);
     const buttons = Array.from(container.querySelectorAll('.theme-button'));

@@ -106,6 +106,53 @@ body {
   gap: 14px 22px;
 }
 
+/**
+ * Einklapp-Schalter der Menübar (Dreieck, Spitze nach unten). Er ist immer
+ * sichtbar und schaltet Menübar-Steuerung und Legendenbox gemeinsam um.
+ *
+ * `margin-left: auto` schiebt ihn unabhängig vom Einklapp-Zustand an den
+ * rechten Rand, damit der Pfeil beim Ein-/Ausklappen an derselben Stelle
+ * stehen bleibt.
+ */
+.toolbar-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--color-text);
+  cursor: pointer;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+}
+
+.toolbar-collapse-toggle:hover {
+  border-color: var(--color-accent);
+}
+
+/* Dreieck zeigt nach unten (ausgeklappt); eingeklappt zeigt es nach oben. */
+.toolbar-collapse-arrow {
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.toolbar.is-collapsed .toolbar-collapse-arrow {
+  transform: rotate(180deg);
+}
+
+/* Eingeklappt bleibt nur der Titel mit dem Pfeil sichtbar. Der Pfeil behält
+   über `margin-left: auto` seine Position rechts am Rand. */
+.toolbar.is-collapsed .toolbar-controls {
+  display: none;
+}
+
 .toolbar-group {
   display: flex;
   align-items: center;
