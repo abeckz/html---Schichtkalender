@@ -83,6 +83,48 @@ export function useAnniversaryStore(settings, storage = getDefaultStorage()) {
             return withDay(current, monthDay, list);
         });
     }, []);
+    const setSeriesEnd = useCallback((monthDay, id, until) => {
+        setAnniversaries((current) => {
+            const list = (current[monthDay] ?? []).map((item) => {
+                if (item.id !== id || item.kind !== 'recurring')
+                    return item;
+                const updated = { ...item };
+                if (until !== '') {
+                    updated.until = until;
+                }
+                else {
+                    delete updated.until;
+                }
+                return normalizeAnniversary(updated, item.id) ?? updated;
+            });
+            return withDay(current, monthDay, list);
+        });
+    }, []);
+    const setOccurrenceExcluded = useCallback((monthDay, id, dateKey, excluded) => {
+        setAnniversaries((current) => {
+            const list = (current[monthDay] ?? []).map((item) => {
+                if (item.id !== id || item.kind !== 'recurring')
+                    return item;
+                const dates = new Set(item.excludedDates ?? []);
+                if (excluded) {
+                    dates.add(dateKey);
+                }
+                else {
+                    dates.delete(dateKey);
+                }
+                const next = [...dates].sort();
+                const updated = { ...item };
+                if (next.length > 0) {
+                    updated.excludedDates = next;
+                }
+                else {
+                    delete updated.excludedDates;
+                }
+                return normalizeAnniversary(updated, item.id) ?? updated;
+            });
+            return withDay(current, monthDay, list);
+        });
+    }, []);
     const replaceAnniversaries = useCallback((next) => {
         setAnniversaries(next);
     }, []);
@@ -92,6 +134,8 @@ export function useAnniversaryStore(settings, storage = getDefaultStorage()) {
         replaceDay,
         resetAnniversary,
         removeAnniversary,
+        setOccurrenceExcluded,
+        setSeriesEnd,
         replaceAnniversaries,
     };
 }

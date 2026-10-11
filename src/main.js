@@ -1,7 +1,7 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { App } from './components/App';
+import { App } from './components/App.tsx';
 import { applyTheme, readThemePreference } from './services/themeStore';
 import './styles.css';
 import './print/print.css';

@@ -75,16 +75,29 @@ export function normalizeAnnotation(value) {
             }
         }
     }
-    // Querliegende Texte der Zusatzspalten (`extra0`, `extra1`, …).
+    // Querliegende Texte der Zusatzspalten (`extra0`, `extra1`, …). Je Spalte
+    // liegt eine Liste von Spannen-Texten vor, damit mehrere unabhängige
+    // Markierungen derselben Spalte nebeneinander bestehen können. Zur
+    // Rückwärtskompatibilität wird auch das frühere Einzel-Objekt je Spalte
+    // übernommen.
     const extraTexts = {};
     const rawExtraTexts = candidate.extraTexts;
     if (rawExtraTexts && typeof rawExtraTexts === 'object') {
         for (const [key, value] of Object.entries(rawExtraTexts)) {
             if (!isExtraColumnColorKey(key))
                 continue;
-            const text = normalizeExtraColumnText(value, key);
-            if (text)
-                extraTexts[key] = text;
+            const entries = Array.isArray(value) ? value : [value];
+            const list = [];
+            const seenIds = new Set();
+            for (const entry of entries) {
+                const text = normalizeExtraColumnText(entry, key);
+                if (!text || seenIds.has(text.id))
+                    continue;
+                seenIds.add(text.id);
+                list.push(text);
+            }
+            if (list.length > 0)
+                extraTexts[key] = list;
         }
     }
     // Vollständig leere Annotationen werden nicht gespeichert.
@@ -115,12 +128,23 @@ function normalizeExtraText(value) {
     return typeof value === 'string' ? value.slice(0, MAX_EXTRA_TEXT_LENGTH) : '';
 }
 /**
+ * Stabiler Anzeige-Schlüssel eines Zusatzspalten-Textes.
+ *
+ * Er verbindet Farbschlüssel und Anker (oberster Tag der Spanne). Da in einer
+ * Spalte mehrere unabhängige Spannen existieren dürfen, ist allein der
+ * Farbschlüssel nicht eindeutig; der Anker unterscheidet die Spannen.
+ */
+export function extraColumnTextId(colorKey, anchor) {
+    return `${colorKey}@${anchor}`;
+}
+/**
  * Bereinigt einen querliegenden Text einer Zusatzspalte.
  *
  * Erwartet als `fallbackKey` den Farbschlüssel der Spalte (aus dem Map-Schlüssel).
  * Liefert null, wenn weder Text noch Spanne gültig sind bzw. kein Text vorliegt.
  * Die Spanne (`dateKeys`) wird auf gültige, eindeutige Datumsschlüssel beschränkt
- * und chronologisch sortiert; `length` folgt aus ihrer Länge.
+ * und chronologisch sortiert; `length` folgt aus ihrer Länge. Die `id` folgt
+ * (bzw. wird neu bestimmt) aus Farbschlüssel und Anker.
  */
 export function normalizeExtraColumnText(value, fallbackKey) {
     if (!value || typeof value !== 'object')
@@ -144,7 +168,9 @@ export function normalizeExtraColumnText(value, fallbackKey) {
     dateKeys.sort();
     if (dateKeys.length === 0 && text === '')
         return null;
+    const anchor = dateKeys[0] ?? '';
     return {
+        id: extraColumnTextId(colorKey, anchor),
         colorKey,
         columnLabel: typeof candidate.columnLabel === 'string'
             ? candidate.columnLabel.slice(0, MAX_LABEL_LENGTH)
@@ -356,8 +382,31 @@ export function normalizeAnniversary(value, fallbackId) {
                 : MIN_ANNIVERSARY_INTERVAL;
             entry.intervalCount = legacyYears;
         }
+        // Ausnahmetermine: nur gültige, eindeutige Datumsschlüssel, chronologisch.
+        const excluded = normalizeExcludedDates(candidate.excludedDates);
+        if (excluded.length > 0)
+            entry.excludedDates = excluded;
+        // Serienende: nur ein gültiger Datumsschlüssel wird übernommen.
+        if (typeof candidate.until === 'string' && isValidDateKey(candidate.until)) {
+            entry.until = candidate.until;
+        }
     }
     return entry;
+}
+/** Bereinigt die Ausnahmetermine einer Serie (gültig, eindeutig, sortiert). */
+export function normalizeExcludedDates(value) {
+    if (!Array.isArray(value))
+        return [];
+    const seen = new Set();
+    const result = [];
+    for (const raw of value) {
+        if (typeof raw !== 'string' || !isValidDateKey(raw) || seen.has(raw))
+            continue;
+        seen.add(raw);
+        result.push(raw);
+    }
+    result.sort();
+    return result;
 }
 /** Freitext eines Ereignis-/Personennamens begrenzen und trimmen. */
 export function normalizeAnniversaryName(name) {

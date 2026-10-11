@@ -2,8 +2,8 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { getColorHex } from '../config/annotationColors.ts';
 import { getPrintEventName } from '../config/eventDefinitions.ts';
 import { hasPublicHoliday } from '../engines/eventEngine.ts';
-import { matchesForDateKey, formatIntervalLabel } from '../engines/anniversaryEngine.ts';
-import { cellLineClass } from '../utils/textFit.ts';
+import { matchesForDateKey } from '../engines/anniversaryEngine.ts';
+import { informationLineClass } from '../utils/textFit.ts';
 import { buildExtraColumnLayout } from '../components/ExtraColumnCell.tsx';
 import { countMarkedShiftsByColorTable } from '../components/MonthCalendar.tsx';
 /** Feste Rasterhöhe: jeder Monatsblock besitzt genau 31 Tagespositionen. */
@@ -58,7 +58,7 @@ export function PublicHolidayMark() {
 export function buildAnniversaryPrintParts(day, year, anniversaries, showBirthdays, showRecurringEvents) {
     if (!anniversaries)
         return [];
-    return matchesForDateKey(anniversaries, day.dateKey, year)
+    return matchesForDateKey(anniversaries, day.dateKey, year, year)
         .filter(({ entry }) => (entry.kind === 'birthday' && showBirthdays) ||
         (entry.kind === 'recurring' && showRecurringEvents))
         .map(({ entry, age }) => {
@@ -66,8 +66,9 @@ export function buildAnniversaryPrintParts(day, year, anniversaries, showBirthda
             const agePart = age !== undefined ? ` (${age})` : '';
             return `🎂 ${entry.name}${agePart}`;
         }
-        const intervalPart = ` (${formatIntervalLabel(entry)})`;
-        return `🔁 ${entry.name}${intervalPart}`;
+        // Der Wiederholungsrhythmus wird bewusst nicht angezeigt: die Zellen sind
+        // klein, und der Rhythmus ist beim Bearbeiten sichtbar.
+        return `🔁 ${entry.name}`;
     });
 }
 /**
@@ -108,7 +109,7 @@ export function collectPrintExtraTexts(month, extraTextsByDateKey, extraColumns,
             if (rows.length === 0)
                 continue;
             overlays.push({
-                id: `${dateKey}-${text.colorKey}`,
+                id: text.id,
                 text: text.text,
                 vertical: text.vertical,
                 // Links liegende Spalten werden von links, rechts liegende von rechts
@@ -228,10 +229,13 @@ export function PrintMonth({ month, annotationLabels, annotationColors, weekdayO
                         const baseInformation = buildPrintInformation(day, label);
                         // Adaptive Schrift über den gesamten Zellinhalt: Die Beschriftung
                         // folgt den DayEditor-Regeln, jeder Jahrestag belegt zusätzlich eine
-                        // Zeile (siehe `cellLineClass`). Ohne Beschriftung und ohne
-                        // Jahrestage (nur Terminnamen) bleibt die normale Zeilengröße.
-                        const infoLineClass = label !== '' || anniversaryParts.length > 0
-                            ? cellLineClass(baseInformation, anniversaryParts.length)
+                        // Zeile. Reine Termin-/Feiertagsnamen (keine persönliche
+                        // Beschriftung) werden um eine Zeile höher angesetzt (siehe
+                        // `informationLineClass`), damit sie nie so groß wie eine
+                        // Beschriftung erscheinen - die Schriftgröße wird geprüft und
+                        // gedeckelt.
+                        const infoLineClass = baseInformation !== ''
+                            ? informationLineClass(baseInformation, anniversaryParts.length, label === '')
                             : '';
                         const classNames = ['print-row'];
                         if (weekdayOverDate)

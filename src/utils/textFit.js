@@ -34,6 +34,18 @@ const FONT_SIZES = {
 /** Kleinste verwendete Schriftgröße für PDF-unabhängige Vollständigkeit. */
 export const MIN_LABEL_FONT_SIZE = FONT_SIZES[MAX_LABEL_LINES];
 /**
+ * Zusätzliche logische Zeilen, die reine Termin-/Feiertagsnamen (ohne
+ * persönliche Beschriftung) angerechnet bekommen.
+ *
+ * Eine persönliche Beschriftung darf groß erscheinen (Stufe 1). Die fest
+ * übernommenen Ereignisse des Schichtkalenders (z. B. „Tag der Deutschen
+ * Einheit") sind dagegen reine Zusatzinformation und sollen nie so groß wie
+ * eine Beschriftung werden. Durch die um eine Zeile höhere Anrechnung starten
+ * sie eine Schriftstufe kleiner und rutschen bei langen Namen in die kleinste
+ * Stufe - die Schriftgröße wird also geprüft und nach oben gedeckelt.
+ */
+export const EVENT_EXTRA_LINES = 1;
+/**
  * Logische Zeilenzahl einer Beschriftung.
  *
  * Jede Zeile einer Beschriftung kann zusätzlich weich umbrechen. Gezählt
@@ -112,4 +124,28 @@ export function cellFitFontSize(label, extraLines = 0) {
     if (lines <= 0)
         return FONT_SIZES[1];
     return FONT_SIZES[lines] ?? MIN_LABEL_FONT_SIZE;
+}
+/**
+ * CSS-Klasse für die Info-Zelle (Bildschirm wie Druck).
+ *
+ * Sie bündelt die gemeinsame Regel für Beschriftung, Termine und Jahrestage
+ * an einer Stelle, damit Bildschirm (`CalendarDayRow`) und Druck (`PrintMonth`)
+ * exakt dieselbe Schriftstufe wählen:
+ *
+ * - Eine **persönliche Beschriftung** (`label`) folgt unverändert den
+ *   DayEditor-Regeln: 1/2/3 Zeilen -> `label-lines-1/2/3`.
+ * - **Reine Termin-/Feiertagsnamen** (keine Beschriftung, `eventOnly = true`)
+ *   bekommen {@link EVENT_EXTRA_LINES} Zeilen zusätzlich angerechnet. Dadurch
+ *   sind sie stets eine Stufe kleiner als eine gleich lange Beschriftung: ein
+ *   einzelner kurzer Termin ist höchstens mittelgroß, lange Namen wie
+ *   „Tag der Deutschen Einheit" rutschen in die kleinste Stufe.
+ * - **Jahrestage** (`extraLines`) zählen wie bisher je einen zusätzlichen Block.
+ *
+ * Die Zeilenzahl wird auf {@link MAX_LABEL_LINES} begrenzt, die Klasse liegt
+ * damit immer zwischen `label-lines-1` und `label-lines-3`.
+ */
+export function informationLineClass(label, extraLines = 0, eventOnly = false) {
+    const lines = countCellLines(label, extraLines + (eventOnly ? EVENT_EXTRA_LINES : 0));
+    const clamped = Math.min(Math.max(lines, 1), MAX_LABEL_LINES);
+    return `label-lines-${clamped}`;
 }

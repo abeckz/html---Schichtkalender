@@ -5,7 +5,7 @@
  * Zeilenzählung, Schriftgrößenwahl und die CSS-Klasse für die Zeilensteuerung.
  */
 import { describe, expect, it } from 'vitest';
-import { LABEL_CHARS_PER_LINE, MAX_LABEL_LINES, MIN_LABEL_FONT_SIZE, cellFitFontSize, cellLineClass, countCellLines, countLabelLines, fitFontSize, labelLineClass, } from '../utils/textFit';
+import { EVENT_EXTRA_LINES, LABEL_CHARS_PER_LINE, MAX_LABEL_LINES, MIN_LABEL_FONT_SIZE, cellFitFontSize, cellLineClass, countCellLines, countLabelLines, fitFontSize, informationLineClass, labelLineClass, } from '../utils/textFit';
 describe('countLabelLines', () => {
     it('liefert 0 für eine leere Beschriftung', () => {
         expect(countLabelLines('')).toBe(0);
@@ -92,5 +92,27 @@ describe('cellFitFontSize', () => {
         expect(one).toBeGreaterThan(two);
         expect(two).toBeGreaterThan(three);
         expect(three).toBe(MIN_LABEL_FONT_SIZE);
+    });
+});
+describe('informationLineClass', () => {
+    it('lässt eine persönliche Beschriftung unverändert (Stufe nach Zeilenzahl)', () => {
+        expect(informationLineClass('Urlaub')).toBe('label-lines-1');
+        expect(informationLineClass('Urlaub', 1)).toBe('label-lines-2');
+        expect(informationLineClass('Urlaub', 2)).toBe('label-lines-3');
+    });
+    it('stellt reine Terminnamen eine Stufe kleiner als eine Beschriftung', () => {
+        // Beschriftung „Urlaub" → Stufe 1; gleich langer Terminname → Stufe 2.
+        expect(informationLineClass('Urlaub', 0, true)).toBe('label-lines-2');
+        // Eine persönliche Beschriftung bleibt bei Stufe 1.
+        expect(informationLineClass('Urlaub', 0, false)).toBe('label-lines-1');
+        expect(EVENT_EXTRA_LINES).toBe(1);
+    });
+    it('deckelt lange Terminnamen auf die kleinste Stufe', () => {
+        // „Tag der Deutschen Einheit" (25 Zeichen) ergibt zwei Grundzeilen; mit
+        // der Termin-Anrechnung steigt das auf die Maximalstufe.
+        expect(informationLineClass('Tag der Deutschen Einheit', 0, true)).toBe('label-lines-3');
+    });
+    it('behandelt einen leeren Informationstext als eine Zeile', () => {
+        expect(informationLineClass('', 0, true)).toBe('label-lines-1');
     });
 });

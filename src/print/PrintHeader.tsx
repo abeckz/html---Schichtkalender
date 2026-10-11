@@ -38,11 +38,41 @@ export function PrintHeader({
   return (
     <header className="print-page-header">
       <div className="print-header-row">
-        <span className="print-header-title">BASF Schichtkalender</span>
-        <span className="print-header-year">{year}</span>
-        {showShiftCalendar && (
-          <span className="print-header-shift">Schicht {selectedShift}</span>
-        )}
+        {/* Links: Erklärungen übereinander. Zwei Spalten nebeneinander -
+            links die Schichtkennzahlen (T, N, Werktage, Sollschichten),
+            daneben die Zeichen (F, Geburtstag, wiederkehrendes Ereignis). */}
+        <div className="print-header-explain">
+          {showShiftCalendar && (
+            <div className="print-header-shifts">
+              <span>T = Tagschicht von 6 bis 18 Uhr</span>
+              <span>N = Nachtschicht von 18 bis 6 Uhr</span>
+              <span>Werktage = Anzahl Montag bis Freitag</span>
+              <span>Sollschichten = Anzahl T + N</span>
+            </div>
+          )}
+          <div className="print-header-marks">
+            <span>{PUBLIC_HOLIDAY_MARK} = {PUBLIC_HOLIDAY_TITLE}</span>
+            <span>🎂 = Geburtstag (Alter in Klammern)</span>
+            <span>🔁 = wiederkehrendes Ereignis</span>
+          </div>
+          {/* Beschriebene Farben als weitere Spalte übereinander. */}
+          {usedColors.length > 0 && (
+            <ColorLegendBox
+              colors={usedColors}
+              texts={colorLegend}
+              interactive={false}
+              className="print-header-colors"
+            />
+          )}
+        </div>
+        {/* Rechts: Titel, Jahr und Schicht übereinander am rechten Rand. */}
+        <div className="print-header-titles">
+          <span className="print-header-title">BASF Schichtkalender</span>
+          <span className="print-header-year">{year}</span>
+          {showShiftCalendar && (
+            <span className="print-header-shift">Schicht {selectedShift}</span>
+          )}
+        </div>
       </div>
       <div className="print-header-legend">
         {showShiftCalendar && (
@@ -51,25 +81,6 @@ export function PrintHeader({
             {workedShiftCount}
           </span>
         )}
-        {usedColors.length > 0 && (
-          <ColorLegendBox
-            colors={usedColors}
-            texts={colorLegend}
-            interactive={false}
-            className="print-header-colors"
-          />
-        )}
-        {showShiftCalendar && (
-          <>
-            <span>T = Tagschicht von 6 bis 18 Uhr</span>
-            <span>N = Nachtschicht von 18 bis 6 Uhr</span>
-            <span>Werktage = Anzahl Montag bis Freitag</span>
-            <span>Sollschichten = Anzahl T + N</span>
-          </>
-        )}
-        <span>{PUBLIC_HOLIDAY_MARK} = {PUBLIC_HOLIDAY_TITLE}</span>
-        <span>🎂 = Geburtstag (Alter in Klammern)</span>
-        <span>🔁 = wiederkehrendes Ereignis</span>
       </div>
     </header>
   );

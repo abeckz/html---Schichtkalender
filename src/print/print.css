@@ -74,10 +74,41 @@
 
 .print-header-row {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   width: 100%;
   gap: 3mm;
+}
+
+/**
+ * Linker Block des Seitenkopfs: die Erklärungen stehen übereinander am linken
+ * Rand. Darin bilden die Schichtkennzahlen (T, N, Werktage, Sollschichten) und
+ * die Zeichen (F, Geburtstag, wiederkehrendes Ereignis) zwei Spalten nebeneinander.
+ */
+.print-header-explain {
+  display: flex;
+  align-items: flex-start;
+  gap: 0 9mm;
+  font-size: 6.5pt;
+  line-height: 1.2;
+}
+
+.print-header-shifts,
+.print-header-marks {
+  display: flex;
+  flex-direction: column;
+}
+
+/**
+ * Rechter Block des Seitenkopfs: Titel, Jahr und Schicht stehen untereinander,
+ * am rechten Rand ausgerichtet.
+ */
+.print-header-titles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .print-header-title {
@@ -106,22 +137,23 @@
 }
 
 /**
- * Erste Legendenzeile: Gesamtzahl der gearbeiteten Schichten des Jahres.
- * flex-basis 100 % erzwingt eine eigene Zeile ganz oben in der Legende.
+ * Gesamtzahl der gearbeiteten Schichten des Jahres in der Kopfzeile.
  */
 .print-header-total {
-  flex-basis: 100%;
   font-weight: 700;
 }
 
 /**
- * Farblegende im Seitenkopf. Eigene Zeile (flex-basis 100 %), damit die
- * Farbblöcke in einer eigenen Zeile direkt unter der Gesamtzeile stehen.
+ * Beschriebene Farben im Seitenkopf als eigene Spalte des Erklärungsblocks.
+ * Wie die übrigen Legenden stehen die Einträge übereinander (column).
  * Die Erklärung steht immer als Text neben dem Farbblock.
  */
 .print-header-colors {
-  flex-basis: 100%;
-  gap: 0 9mm;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  font-size: 6.5pt;
+  line-height: 1.2;
 }
 
 .print-header-colors .color-legend-item {

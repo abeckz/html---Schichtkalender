@@ -9,7 +9,7 @@
  * und bleiben über Jahres- und Schichtwechsel hinweg erhalten.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { getDefaultStorage, normalizeAnnotation, MAX_EXTRA_TEXT_LENGTH, readState, writeState, } from '../services/storage.ts';
+import { getDefaultStorage, normalizeAnnotation, extraColumnTextId, MAX_EXTRA_TEXT_LENGTH, readState, writeState, } from '../services/storage.ts';
 /**
  * Verwaltet Annotationen inklusive Persistenz.
  *
@@ -125,17 +125,26 @@ export function useAnnotationStore(settings, storage = getDefaultStorage()) {
             return;
         const anchor = span[0];
         const trimmed = text.slice(0, MAX_EXTRA_TEXT_LENGTH);
+        const targetId = extraColumnTextId(colorKey, anchor);
         setAnnotations((current) => {
             const next = { ...current };
-            // Zuerst einen früheren Text desselben Schlüssels im gesamten Zustand
-            // entfernen (Spanne kann sich verschoben haben), dann neu auf dem Anker
-            // setzen. So existiert höchstens ein Text je Spalten-Schlüssel und Tag.
-            const removeFrom = (target, dateKey) => {
+            // Ausschließlich die Spanne mit demselben Anker ersetzen: andere,
+            // unabhängige Spannen derselben Spalte bleiben erhalten.
+            const removeText = (target, dateKey) => {
                 const existing = target[dateKey];
-                if (!existing?.extraTexts?.[colorKey])
+                const list = existing?.extraTexts?.[colorKey];
+                if (!existing || !list || list.length === 0)
+                    return;
+                const remaining = list.filter((entry) => entry.id !== targetId);
+                if (remaining.length === list.length)
                     return;
                 const extraTexts = { ...existing.extraTexts };
-                delete extraTexts[colorKey];
+                if (remaining.length > 0) {
+                    extraTexts[colorKey] = remaining;
+                }
+                else {
+                    delete extraTexts[colorKey];
+                }
                 const normalized = normalizeAnnotation({
                     ...existing,
                     extraTexts: Object.keys(extraTexts).length > 0 ? extraTexts : undefined,
@@ -148,11 +157,12 @@ export function useAnnotationStore(settings, storage = getDefaultStorage()) {
                 }
             };
             for (const dateKey of Object.keys(next)) {
-                removeFrom(next, dateKey);
+                removeText(next, dateKey);
             }
             if (trimmed === '')
                 return next;
             const existing = next[anchor] ?? current[anchor];
+            const list = existing?.extraTexts?.[colorKey] ?? [];
             const normalized = normalizeAnnotation({
                 dateKey: anchor,
                 label: existing?.label ?? '',
@@ -160,14 +170,18 @@ export function useAnnotationStore(settings, storage = getDefaultStorage()) {
                 extraColors: existing?.extraColors,
                 extraTexts: {
                     ...(existing?.extraTexts ?? {}),
-                    [colorKey]: {
-                        colorKey,
-                        columnLabel,
-                        vertical,
-                        text: trimmed,
-                        dateKeys: span,
-                        length: span.length,
-                    },
+                    [colorKey]: [
+                        ...list.filter((entry) => entry.id !== targetId),
+                        {
+                            id: targetId,
+                            colorKey,
+                            columnLabel,
+                            vertical,
+                            text: trimmed,
+                            dateKeys: span,
+                            length: span.length,
+                        },
+                    ],
                 },
             });
             if (normalized) {

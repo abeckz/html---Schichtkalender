@@ -227,14 +227,37 @@ describe('Bildschirmdarstellung', () => {
         }));
         try {
             const container = render(_jsx(App, {}));
-            const info = container.querySelector('.day-row .cell-information.label-lines-3');
-            expect(info).not.toBeNull();
+            // Gezielt die Zelle mit der persönlichen Beschriftung prüfen: Seit der
+            // Schriftgrößen-Prüfung für Termine tragen auch reine Ereigniszellen
+            // eine `label-lines-*`-Klasse, daher nicht auf das erste Element
+            // verlassen, sondern über den Textinhalt auswählen.
+            const info = Array.from(container.querySelectorAll('.day-row .cell-information')).find((cell) => cell.textContent === 'Urlaub\nArzt\nSchulung');
+            expect(info).toBeDefined();
+            expect(info?.classList.contains('label-lines-3')).toBe(true);
             expect(info?.textContent).toBe('Urlaub\nArzt\nSchulung');
             expect(info?.textContent).not.toContain('|');
         }
         finally {
             window.localStorage.removeItem('schichtkalender.state');
         }
+    });
+    it('deckelt die Schrift reiner Terminnamen über eine label-lines-Klasse', () => {
+        // Übernommene Ereignisse ohne persönliche Beschriftung trugen zuvor keine
+        // label-lines-Klasse und erbten die ungedeckelte Standardgröße. Jetzt wird
+        // ihre Schrift geprüft und gedeckelt.
+        const container = render(_jsx(App, {}));
+        const rows = Array.from(container.querySelectorAll('.day-row'));
+        // Maifeiertag (kurz) -> höchstens mittelgroß.
+        const maiRow = rows.find((row) => (row.getAttribute('aria-label') ?? '').includes('Maifeiertag'));
+        const maiInfo = maiRow?.querySelector('.cell-information');
+        expect(maiInfo?.textContent).toBe('Maifeiertag');
+        expect(maiInfo?.classList.contains('label-lines-2')).toBe(true);
+        expect(maiInfo?.classList.contains('label-lines-1')).toBe(false);
+        // Tag der Deutschen Einheit (lang) -> kleinste Stufe.
+        const einheitRow = rows.find((row) => (row.getAttribute('aria-label') ?? '').includes('Tag der Deutschen Einheit'));
+        const einheitInfo = einheitRow?.querySelector('.cell-information');
+        expect(einheitInfo?.textContent).toContain('Tag der Deutschen Einheit');
+        expect(einheitInfo?.classList.contains('label-lines-3')).toBe(true);
     });
     it('markiert Feiertage anderer Bundesländer in Rheinland-Pfalz nicht', () => {
         const container = render(_jsx(App, {}));
@@ -803,7 +826,7 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
             // Farbe und querliegender Text landen in der Persistenz (Anker = erster Tag).
             const persisted = JSON.parse(window.localStorage.getItem('schichtkalender.state') ?? '{}');
             expect(persisted.annotations['2026-01-01']?.extraColors?.extra0).toBe('red');
-            const text = persisted.annotations['2026-01-01']?.extraTexts?.extra0;
+            const text = persisted.annotations['2026-01-01']?.extraTexts?.extra0?.[0];
             expect(text?.text).toBe('Urlaub');
             expect(text?.vertical).toBe(true);
             expect(text?.dateKeys).toEqual(['2026-01-01', '2026-01-02', '2026-01-03']);
@@ -868,6 +891,121 @@ describe('Frei angelegte Zusatzspalten im Monatskopf', () => {
         const stylesheet = readStylesheet();
         const rule = /\.cell-weekday\s*,[\s\S]*?\.cell-extra\s*\{[^}]*cursor:\s*crosshair/s;
         expect(rule.test(stylesheet)).toBe(true);
+    });
+    /**
+     * Regression: Zwei unabhängige Markierungen derselben Zusatzspalte müssen mit
+     * eigenem Text nebeneinander bestehen können. Früher entfernte das Speichern
+     * eines Textes sämtliche Texte desselben Spalten-Schlüssels - die obere
+     * Markierung verlor ihren Text, sobald die untere bearbeitet wurde.
+     */
+    it('behält den Text zweier unabhängiger Markierungen derselben Zusatzspalte', () => {
+        window.localStorage.removeItem('schichtkalender.state');
+        try {
+            const container = render(_jsx(App, {}));
+            // Eine Zusatzspalte links anlegen (Januar 2026).
+            click(handle(container, 'left'));
+            const card = cardOf(container, 'Januar 2026');
+            expect(card).not.toBeNull();
+            const mouse = (element, type, target) => {
+                act(() => {
+                    (target ?? element).dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 }));
+                });
+            };
+            /** Führt ein Ziehen in der Zusatzspalte über die Zeilen `from..to` aus. */
+            const dragExtra = (from, to) => {
+                // Die Monatskarte nach jedem Render neu holen: nach dem Speichern wird
+                // die Ansicht neu aufgebaut, alte DOM-Referenzen wären veraltet.
+                const rows = Array.from(cardOf(container, 'Januar 2026').querySelectorAll('.day-row'));
+                mouse(rows[from], 'mousedown', rows[from].querySelector('.cell-extra') ?? rows[from]);
+                for (let i = from + 1; i <= to; i += 1) {
+                    act(() => {
+                        rows[i].dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+                    });
+                }
+                mouse(rows[to], 'mouseup', rows[to].querySelector('.cell-extra') ?? rows[to]);
+                act(() => window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })));
+            };
+            /** Trägt in den offenen Zusatzspalten-Editor einen Text ein und speichert. */
+            const saveText = (value) => {
+                const editor = container.querySelector('.day-editor');
+                expect(editor).not.toBeNull();
+                const textarea = editor.querySelector('textarea');
+                act(() => {
+                    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+                    setter?.call(textarea, value);
+                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+                const saveButton = Array.from(editor.querySelectorAll('button')).find((button) => button.textContent === 'Speichern');
+                click(saveButton ?? null);
+            };
+            // Obere Markierung (Zeilen 0–2) und untere Markierung (Zeilen 9–10).
+            dragExtra(0, 2);
+            saveText('Urlaub');
+            dragExtra(9, 10);
+            saveText('Schulung');
+            // Beide Texte liegen an ihren jeweiligen Ankern in derselben Spalte
+            // `extra0` (Anker 2026-01-01 und 2026-01-10).
+            const persisted = JSON.parse(window.localStorage.getItem('schichtkalender.state') ?? '{}');
+            const first = persisted.annotations['2026-01-01']?.extraTexts?.extra0 ?? [];
+            const second = persisted.annotations['2026-01-10']?.extraTexts?.extra0 ?? [];
+            expect(first).toHaveLength(1);
+            expect(second).toHaveLength(1);
+            expect(first[0].text).toBe('Urlaub');
+            expect(first[0].dateKeys).toEqual(['2026-01-01', '2026-01-02', '2026-01-03']);
+            expect(second[0].text).toBe('Schulung');
+            expect(second[0].dateKeys).toEqual(['2026-01-10', '2026-01-11']);
+        }
+        finally {
+            window.localStorage.removeItem('schichtkalender.state');
+        }
+    });
+    /**
+     * Regression: Eine über mehrere Tageszellen markierte Zusatzspalte wurde an
+     * jeder Zeilengrenze von der dünnen horizontalen Zeilenlinie durchschnitten
+     * und hatte durch das senkrechte Zellen-Padding der Zeile zusätzlich einen
+     * weißen Rand. Die gefärbte Zelle wird nun um Padding plus Linienstärke über
+     * die Zeilengrenzen hinausgezogen (negatives `margin`), damit der farbige
+     * Streifen randlos und ungebrochen erscheint.
+     */
+    it('zieht gefärbte Zusatzspalten über Padding und Zeilenlinie (ungebrochen)', () => {
+        const stylesheet = readStylesheet();
+        const rule = /\.cell-extra\[style\]\s*\{[^}]*margin:\s*-4px\s+0/s;
+        expect(rule.test(stylesheet)).toBe(true);
+    });
+    /**
+     * Regression: Der querliegende Text der Zusatzspalten lag hinter dem
+     * Farbstreifen der markierten Zelle. Die gefärbten Zellen werden über
+     * `.cell-extra[style]` auf `z-index: 1` gehoben (durchgehender Streifen);
+     * damit der Text sichtbar bleibt, muss die Überlagerungsebene einen höheren
+     * Stapelwert besitzen - nicht nur die spätere DOM-Reihenfolge für sich nutzen.
+     */
+    it('legt den querliegenden Text über den Farbstreifen (sichtbar)', () => {
+        const stylesheet = readStylesheet();
+        const cellRule = /\.cell-extra\[style\]\s*\{([^}]*)\}/s.exec(stylesheet)?.[1] ?? '';
+        const overlayRule = /\.day-table-overlay\s*\{([^}]*)\}/s.exec(stylesheet)?.[1] ?? '';
+        const cellZ = Number(/z-index:\s*(-?\d+)/.exec(cellRule)?.[1] ?? 'NaN');
+        const overlayZ = Number(/z-index:\s*(-?\d+)/.exec(overlayRule)?.[1] ?? 'NaN');
+        expect(Number.isFinite(cellZ)).toBe(true);
+        expect(Number.isFinite(overlayZ)).toBe(true);
+        expect(overlayZ).toBeGreaterThan(cellZ);
+    });
+    /**
+     * Regression: Der querliegende Text wurde mit `writing-mode: vertical-rl`
+     * plus `transform: rotate(180deg)` gedreht. Ein `transform` legt das Element
+     * auf eine eigene Compositing-Ebene, die der Browser beim Drucken als Bitmap
+     * in Bildschirmauflösung rastert - der Text erschien im Ausdruck verpixelt.
+     * `writing-mode: sideways-lr` erreicht dieselbe Leserichtung rein über
+     * Textlayout und bleibt vektoriell (scharfer Druck).
+     */
+    it('dreht den querliegenden Text ohne transform (scharfer Druck)', () => {
+        const stylesheet = readStylesheet();
+        // Die Grundregel nutzt `sideways-lr` (vektoriell) ohne `transform`.
+        const base = /\.cell-extra-text\.is-vertical\s*\{([^}]*)\}/s;
+        const baseBody = base.exec(stylesheet)?.[1] ?? '';
+        expect(baseBody).toContain('writing-mode: sideways-lr');
+        expect(baseBody).not.toContain('transform');
+        // Nur die Rückfallebene (ohne `sideways-lr`-Unterstützung) darf drehen.
+        expect(/@supports not \(writing-mode: sideways-lr\)/.test(stylesheet)).toBe(true);
     });
     it('behält die angelegten Spalten über eine neue Sitzung', () => {
         window.localStorage.removeItem('schichtkalender.state');

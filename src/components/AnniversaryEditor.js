@@ -21,9 +21,9 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  * werden ausschließlich über den Monat-Tag-Schlüssel geführt.
  */
 import { useEffect, useId, useRef, useState } from 'react';
-import { MAX_ANNIVERSARY_NAME_LENGTH, MAX_DAILY_INTERVAL_COUNT, MIN_ANNIVERSARY_INTERVAL, createAnniversaryId, maxIntervalCountFor, } from '../services/storage';
-import { intervalSpecOf } from '../engines/anniversaryEngine';
-import { formatMonthDay } from '../utils/dateUtils';
+import { MAX_ANNIVERSARY_NAME_LENGTH, MAX_DAILY_INTERVAL_COUNT, MIN_ANNIVERSARY_INTERVAL, createAnniversaryId, maxIntervalCountFor, } from '../services/storage.ts';
+import { intervalSpecOf, isExcludedOn, occursOnDateKey } from '../engines/anniversaryEngine.ts';
+import { formatGermanDate, formatMonthDay } from '../utils/dateUtils.ts';
 /**
  * Auswahl des Wiederholungsrhythmus.
  *
@@ -102,6 +102,9 @@ function toRecurringDraft(entry) {
         intervalCount: String(spec.count),
         selectorValue: selector.value,
         countEditable: selector.value.endsWith('-n'),
+        excludedDates: entry.excludedDates ?? [],
+        originMonthDay: entry.monthDay,
+        until: entry.until ?? '',
     };
 }
 /** Eine neue, leere Geburtstags-Zeile. */
@@ -110,7 +113,7 @@ function emptyBirthdayDraft() {
     return { key: id, id, name: '', birthYear: '' };
 }
 /** Eine neue, leere Ereignis-Zeile (Standardrhythmus: jährlich). */
-function emptyRecurringDraft() {
+function emptyRecurringDraft(monthDay) {
     const id = createAnniversaryId();
     return {
         key: id,
@@ -120,9 +123,12 @@ function emptyRecurringDraft() {
         intervalCount: '1',
         selectorValue: 'yearly',
         countEditable: false,
+        excludedDates: [],
+        originMonthDay: monthDay,
+        until: '',
     };
 }
-export function AnniversaryEditor({ monthDay, initialEntries, onSave, onReset, onClose, }) {
+export function AnniversaryEditor({ monthDay, dateKey, year, initialEntries, onSave, onReset, onToggleOccurrence, onEndSeries, onClose, }) {
     const [birthdays, setBirthdays] = useState(() => initialEntries.filter((entry) => entry.kind === 'birthday').map(toBirthdayDraft));
     const [recurrings, setRecurrings] = useState(() => initialEntries.filter((entry) => entry.kind === 'recurring').map(toRecurringDraft));
     const dialogRef = useRef(null);
@@ -141,6 +147,65 @@ export function AnniversaryEditor({ monthDay, initialEntries, onSave, onReset, o
     }
     function updateRecurring(key, patch) {
         setRecurrings((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+    }
+    /** Baut aus einem Entwurf einen Eintrag (für die Rhythmus-Prüfung). */
+    function draftEntry(row) {
+        const parsedCount = Number(row.intervalCount);
+        const entry = {
+            id: row.id,
+            // Anker = Ursprungsspeicherort; nur so stimmt der Rhythmus auch dann,
+            // wenn der Editor an einem Folgetag geöffnet wurde.
+            monthDay: row.originMonthDay,
+            name: row.name,
+            kind: 'recurring',
+            intervalKind: row.intervalKind,
+            intervalCount: parsedCount >= 1 ? parsedCount : 1,
+        };
+        if (row.excludedDates.length > 0)
+            entry.excludedDates = row.excludedDates;
+        if (row.until !== '')
+            entry.until = row.until;
+        return entry;
+    }
+    /**
+     * true, wenn der angeklickte Tag (`dateKey`) nach dem Rhythmus ein Vorkommen
+     * dieses Eintrags ist. Nur dann lässt sich genau dieses Vorkommen ausnehmen.
+     *
+     * Als Basisjahr dient das angezeigte Jahr selbst - so stimmt das Muster mit
+     * der jahreslosen Anzeige überein (dort ist der Anker ebenfalls im
+     * angezeigten Jahr verortet).
+     */
+    function occurrenceHere(row) {
+        return occursOnDateKey(draftEntry(row), dateKey, year, year);
+    }
+    /** true, wenn genau dieses Vorkommen aktuell ausgenommen ist. */
+    function occurrenceExcluded(row) {
+        return isExcludedOn(draftEntry(row), dateKey);
+    }
+    /**
+     * true, wenn diese Serie an einem anderen Tag verankert ist als dem
+     * angeklickten – sie erscheint hier also nur als Vorkommen.
+     */
+    function isForeignOccurrence(row) {
+        return row.originMonthDay !== monthDay;
+    }
+    /** true, wenn die Serie mit dem angeklickten Tag endet (letzter Termin). */
+    function endsHere(row) {
+        return row.until !== '' && row.until === dateKey;
+    }
+    /** true, wenn der angeklickte Tag nach dem gesetzten Serienende liegt. */
+    function isAfterEnd(row) {
+        return row.until !== '' && dateKey > row.until;
+    }
+    /**
+     * Beendet die Serie mit dem angeklickten Tag: der Tag selbst findet noch
+     * statt, alle späteren Termine fallen weg. Erneutes Auslösen hebt das Ende
+     * wieder auf (Serie läuft unbegrenzt weiter).
+     */
+    function endSeriesHere(row) {
+        const next = endsHere(row) ? '' : dateKey;
+        updateRecurring(row.key, { until: next });
+        onEndSeries(row.originMonthDay, row.id, next);
     }
     /** Wechselt den Wiederholungsrhythmus einer Zeile und passt den Zähler an. */
     function changeInterval(key, value) {
@@ -208,9 +273,17 @@ export function AnniversaryEditor({ monthDay, initialEntries, onSave, onReset, o
     }, [onClose]);
     const hasContent = birthdays.some((row) => row.name.trim() !== '') ||
         recurrings.some((row) => row.name.trim() !== '');
-    /** Überträgt die Entwürfe in speicherbare Einträge (ohne leere Namen). */
+    /**
+     * Überträgt die Entwürfe in speicherbare Einträge (ohne leere Namen).
+     *
+     * Serie, die hier nur als **Vorkommen** erscheint (Anker an einem anderen
+     * Tag), werden dabei nicht übernommen: Sie gehören weiterhin ihrem
+     * Ursprungstag und werden ausschließlich über die Sofort-Aktionen
+     * „Nur dieses Vorkommen löschen" bzw. „Serie ab hier beenden" verändert. So
+     * verschiebt ein bloßes Speichern den Serien-Anker nicht.
+     */
     function collectEntries() {
-        const result = [];
+        const entries = [];
         for (const row of birthdays) {
             if (row.name.trim() === '')
                 continue;
@@ -224,32 +297,59 @@ export function AnniversaryEditor({ monthDay, initialEntries, onSave, onReset, o
             if (row.birthYear !== '' && Number.isInteger(parsedYear) && parsedYear > 0) {
                 entry.birthYear = parsedYear;
             }
-            result.push(entry);
+            entries.push(entry);
         }
         for (const row of recurrings) {
             if (row.name.trim() === '')
                 continue;
+            if (isForeignOccurrence(row))
+                continue;
             const parsedCount = Number(row.intervalCount);
-            result.push({
+            const entry = {
                 id: row.id,
                 monthDay,
                 name: row.name.trim(),
                 kind: 'recurring',
                 intervalKind: row.intervalKind,
                 intervalCount: parsedCount >= 1 ? parsedCount : 1,
-            });
+            };
+            // Ausgenommene Einzeltermine bleiben beim Speichern erhalten.
+            if (row.excludedDates.length > 0)
+                entry.excludedDates = [...row.excludedDates].sort();
+            // Ein gesetztes Serienende bleibt erhalten.
+            if (row.until !== '')
+                entry.until = row.until;
+            entries.push(entry);
         }
-        return result;
+        return entries;
     }
     return (_jsx("div", { className: "editor-backdrop no-print", role: "presentation", onClick: onClose, children: _jsxs("div", { className: "anniversary-editor", role: "dialog", "aria-modal": "true", "aria-labelledby": titleId, ref: dialogRef, onClick: (event) => event.stopPropagation(), children: [_jsxs("header", { className: "anniversary-editor-header", children: [_jsx("h2", { className: "day-editor-title", id: titleId, children: "Geburtstage & wiederkehrende Ereignisse" }), _jsx("p", { className: "anniversary-editor-date", children: formatMonthDay(monthDay) })] }), _jsxs("div", { className: "anniversary-editor-columns", children: [_jsxs("section", { className: "anniversary-column", "aria-label": "Geburtstage", children: [_jsxs("h3", { className: "anniversary-column-title", children: [_jsx("span", { "aria-hidden": "true", children: "\uD83C\uDF82" }), " Geburtstage"] }), birthdays.map((row, index) => (_jsxs("div", { className: "anniversary-entry-row", children: [_jsxs("div", { className: "editor-field", children: [_jsx("label", { className: "field-label", htmlFor: `${row.key}-name`, children: "Name" }), _jsx("input", { id: `${row.key}-name`, ref: index === 0 ? firstInputRef : undefined, type: "text", className: "text-input", value: row.name, maxLength: MAX_ANNIVERSARY_NAME_LENGTH, placeholder: "z. B. Anna", onChange: (event) => updateBirthday(row.key, {
                                                         name: event.target.value.slice(0, MAX_ANNIVERSARY_NAME_LENGTH),
                                                     }) })] }), _jsxs("div", { className: "editor-field", children: [_jsx("label", { className: "field-label", htmlFor: `${row.key}-year`, children: "Geburtsjahr (optional)" }), _jsx("input", { id: `${row.key}-year`, type: "number", inputMode: "numeric", min: 1900, max: 2200, className: "text-input", value: row.birthYear, placeholder: "z. B. 1990", onChange: (event) => updateBirthday(row.key, {
                                                         birthYear: event.target.value.replace(/[^0-9]/g, '').slice(0, 4),
-                                                    }) })] }), _jsx("button", { type: "button", className: "row-remove-button", "aria-label": "Geburtstag entfernen", title: "Diesen Geburtstag entfernen", onClick: () => setBirthdays((current) => current.filter((item) => item.key !== row.key)), children: "Entfernen" })] }, row.key))), _jsx("button", { type: "button", className: "row-add-button", onClick: () => setBirthdays((current) => [...current, emptyBirthdayDraft()]), children: "\uFF0B Geburtstag hinzuf\u00FCgen" })] }), _jsxs("section", { className: "anniversary-column", "aria-label": "Wiederkehrende Ereignisse", children: [_jsxs("h3", { className: "anniversary-column-title", children: [_jsx("span", { "aria-hidden": "true", children: "\uD83D\uDD01" }), " Wiederkehrende Ereignisse"] }), recurrings.map((row) => (_jsxs("div", { className: "anniversary-entry-row", children: [_jsxs("div", { className: "editor-field", children: [_jsx("label", { className: "field-label", htmlFor: `${row.key}-name`, children: "Name" }), _jsx("input", { id: `${row.key}-name`, type: "text", className: "text-input", value: row.name, maxLength: MAX_ANNIVERSARY_NAME_LENGTH, placeholder: "z. B. Jubil\u00E4um", onChange: (event) => updateRecurring(row.key, {
+                                                    }) })] }), _jsx("button", { type: "button", className: "row-remove-button", "aria-label": "Geburtstag entfernen", title: "Diesen Geburtstag entfernen", onClick: () => setBirthdays((current) => current.filter((item) => item.key !== row.key)), children: "Entfernen" })] }, row.key))), _jsx("button", { type: "button", className: "row-add-button", onClick: () => setBirthdays((current) => [...current, emptyBirthdayDraft()]), children: "\uFF0B Geburtstag hinzuf\u00FCgen" })] }), _jsxs("section", { className: "anniversary-column", "aria-label": "Wiederkehrende Ereignisse", children: [_jsxs("h3", { className: "anniversary-column-title", children: [_jsx("span", { "aria-hidden": "true", children: "\uD83D\uDD01" }), " Wiederkehrende Ereignisse"] }), recurrings.map((row) => (_jsxs("div", { className: "anniversary-entry-row", children: [isForeignOccurrence(row) && (_jsxs("p", { className: "anniversary-occurrence-note field-hint", children: ["Vorkommen der Serie vom ", formatMonthDay(row.originMonthDay), row.until !== '' && `, Ende ${formatGermanDate(row.until)}`] })), _jsxs("div", { className: "editor-field", children: [_jsx("label", { className: "field-label", htmlFor: `${row.key}-name`, children: "Name" }), _jsx("input", { id: `${row.key}-name`, type: "text", className: "text-input", value: row.name, maxLength: MAX_ANNIVERSARY_NAME_LENGTH, placeholder: "z. B. Jubil\u00E4um", onChange: (event) => updateRecurring(row.key, {
                                                         name: event.target.value.slice(0, MAX_ANNIVERSARY_NAME_LENGTH),
                                                     }) })] }), _jsxs("div", { className: "editor-field", children: [_jsx("label", { className: "field-label", htmlFor: `${row.key}-interval`, children: "Wiederholung" }), _jsx("select", { id: `${row.key}-interval`, className: "year-select text-input", value: row.selectorValue, onChange: (event) => changeInterval(row.key, event.target.value), children: INTERVAL_OPTIONS.map((option) => (_jsx("option", { value: option.value, children: option.label }, option.value))) }), _jsxs("span", { className: "field-hint", children: ["Grundlage ist das Datum des angeklickten Tages (z. B. \u201EW\u00F6chentlich\" = jeder", ' ', WEEKDAY_NAMES_HINT, " nach diesem Datum)."] })] }), row.countEditable && (_jsxs("div", { className: "editor-field", children: [_jsxs("label", { className: "field-label", htmlFor: `${row.key}-count`, children: ["Anzahl ", INTERVAL_UNIT_NAMES[row.intervalKind]] }), _jsx("input", { id: `${row.key}-count`, type: "number", inputMode: "numeric", min: MIN_ANNIVERSARY_INTERVAL, max: maxIntervalCountFor(row.intervalKind), className: "text-input", value: row.intervalCount, onChange: (event) => updateRecurring(row.key, {
                                                         intervalCount: event.target.value.replace(/[^0-9]/g, '').slice(0, 3),
-                                                    }) }), _jsxs("span", { className: "field-hint", children: ["1 = ", INTERVAL_FIXED_HINT[row.intervalKind], "; h\u00F6chstens", ' ', maxIntervalCountFor(row.intervalKind), "."] })] })), _jsx("button", { type: "button", className: "row-remove-button", "aria-label": "Ereignis entfernen", title: "Dieses wiederkehrende Ereignis entfernen", onClick: () => setRecurrings((current) => current.filter((item) => item.key !== row.key)), children: "Entfernen" })] }, row.key))), _jsx("button", { type: "button", className: "row-add-button", onClick: () => setRecurrings((current) => [...current, emptyRecurringDraft()]), children: "\uFF0B Ereignis hinzuf\u00FCgen" })] })] }), _jsxs("p", { className: "field-hint anniversary-editor-hint", children: [MAX_DAILY_INTERVAL_COUNT, " Tage sind f\u00FCr \u201EAlle X Tage\" die Obergrenze; \u201EAlle X Wochen/Monate/Jahre\" endet bei 99."] }), _jsxs("div", { className: "editor-actions", children: [_jsx("button", { type: "button", className: "secondary-button", onClick: onClose, children: "Abbrechen" }), _jsx("button", { type: "button", className: "secondary-button", disabled: !hasContent && birthdays.length === 0 && recurrings.length === 0, onClick: () => {
+                                                    }) }), _jsxs("span", { className: "field-hint", children: ["1 = ", INTERVAL_FIXED_HINT[row.intervalKind], "; h\u00F6chstens", ' ', maxIntervalCountFor(row.intervalKind), "."] })] })), _jsxs("div", { className: "anniversary-remove-actions", children: [_jsx("button", { type: "button", className: "row-remove-button", "aria-label": "Ereignisserie entfernen", title: "Die gesamte Ereignisserie entfernen (alle Termine)", onClick: () => setRecurrings((current) => current.filter((item) => item.key !== row.key)), children: "Serie l\u00F6schen" }), occurrenceHere(row) && (_jsx("button", { type: "button", className: "row-remove-button is-occurrence", "aria-label": occurrenceExcluded(row)
+                                                        ? 'Vorkommen wieder aufnehmen'
+                                                        : 'Nur dieses Vorkommen löschen', title: occurrenceExcluded(row)
+                                                        ? `${formatGermanDate(dateKey)} wieder in die Serie aufnehmen`
+                                                        : `Nur den ${formatGermanDate(dateKey)} aus der Serie ausnehmen`, onClick: () => {
+                                                        const nextExcluded = !occurrenceExcluded(row);
+                                                        updateRecurring(row.key, {
+                                                            excludedDates: nextExcluded
+                                                                ? [...row.excludedDates, dateKey].sort()
+                                                                : row.excludedDates.filter((key) => key !== dateKey),
+                                                        });
+                                                        onToggleOccurrence(row.originMonthDay, row.id, dateKey, nextExcluded);
+                                                    }, children: occurrenceExcluded(row)
+                                                        ? 'Vorkommen zurücknehmen'
+                                                        : 'Nur dieses Vorkommen löschen' })), _jsx("button", { type: "button", className: "row-remove-button is-occurrence", "aria-label": endsHere(row) ? 'Serienende aufheben' : 'Serie ab diesem Datum beenden', title: endsHere(row)
+                                                        ? 'Das Serienende aufheben – die Serie läuft wieder unbegrenzt weiter'
+                                                        : `Die Serie nach dem ${formatGermanDate(dateKey)} nicht weiterführen`, onClick: () => endSeriesHere(row), children: endsHere(row) ? 'Serienende aufheben' : 'Serie ab hier beenden' })] }), row.until !== '' && (_jsxs("p", { className: isAfterEnd(row)
+                                                ? 'anniversary-occurrence-note field-hint is-ended'
+                                                : 'anniversary-occurrence-note field-hint', children: ["Serie endet am ", formatGermanDate(row.until), isAfterEnd(row) && ' – dieser Tag liegt danach'] }))] }, row.key))), _jsx("button", { type: "button", className: "row-add-button", onClick: () => setRecurrings((current) => [...current, emptyRecurringDraft(monthDay)]), children: "\uFF0B Ereignis hinzuf\u00FCgen" })] })] }), _jsxs("p", { className: "field-hint anniversary-editor-hint", children: [MAX_DAILY_INTERVAL_COUNT, " Tage sind f\u00FCr \u201EAlle X Tage\" die Obergrenze; \u201EAlle X Wochen/Monate/Jahre\" endet bei 99."] }), _jsxs("div", { className: "editor-actions", children: [_jsx("button", { type: "button", className: "secondary-button", onClick: onClose, children: "Abbrechen" }), _jsx("button", { type: "button", className: "secondary-button", disabled: !hasContent && birthdays.length === 0 && recurrings.length === 0, onClick: () => {
                                 onReset();
                                 onClose();
                             }, children: "Zur\u00FCcksetzen" }), _jsx("button", { type: "button", className: "primary-button", onClick: () => {

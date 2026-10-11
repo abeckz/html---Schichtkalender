@@ -14,11 +14,11 @@ import { useAnnotationStore } from '../services/annotationStore.ts';
 import { useAnniversaryStore } from '../services/anniversaryStore.ts';
 import { useColorLegendStore } from '../services/colorLegendStore.ts';
 import { useThemeStore } from '../services/themeStore.ts';
-import { STORAGE_VERSION } from '../services/storage.ts';
+import { STORAGE_VERSION, extraColumnTextId } from '../services/storage.ts';
 import { saveState } from '../services/persistence.ts';
 import { useUnsavedChangesGuard } from '../services/unsavedChanges.ts';
 import { monthDayOfDateKey } from '../utils/dateUtils.ts';
-import { anniversariesAt } from '../engines/anniversaryEngine.ts';
+import { anniversariesAt, matchesForDateKey } from '../engines/anniversaryEngine.ts';
 import { Toolbar } from './Toolbar.tsx';
 import { YearCalendar } from './YearCalendar.tsx';
 import { CalendarLegend } from './CalendarLegend.tsx';
@@ -36,7 +36,7 @@ export function App() {
     // Erklärtexte der Farblegende (jahresbezogen); rein darstellungsbezogen.
     const { colorLegend, setColorLegendText, replaceColorLegend } = useColorLegendStore(settings, annotations);
     // Jahreslose Geburtstage und wiederkehrende Ereignisse (nach Monat-Tag "MM-DD").
-    const { anniversaries, replaceDay, resetAnniversary, replaceAnniversaries } = useAnniversaryStore(settings);
+    const { anniversaries, replaceDay, resetAnniversary, setOccurrenceExcluded, setSeriesEnd, replaceAnniversaries, } = useAnniversaryStore(settings);
     // Anzeige-Einstellung (Hell/Dunkel): reine Darstellung, keine Fachdaten.
     const theme = useThemeStore();
     const [view, setView] = useState('screen');
@@ -90,19 +90,36 @@ export function App() {
         setEditingDay(day);
     }, []);
     // Öffnet den Jahrestag-Editor für einen Kalendertag (Jahres- oder
-    // jahreslose Ansicht). Der Monat-Tag-Schlüssel ist jahresunabhängig.
+    // jahreslose Ansicht). Der Monat-Tag-Schlüssel ist jahresunabhängig; das
+    // konkrete Datum (`dateKey`) wird zusätzlich festgehalten, damit einzelne
+    // Vorkommen einer Serie gezielt ausgenommen werden können.
     const handleOpenAnniversary = useCallback((day) => {
-        setEditingAnniversary(monthDayOfDateKey(day.dateKey));
+        const monthDay = monthDayOfDateKey(day.dateKey);
+        if (!monthDay)
+            return;
+        setEditingAnniversary({ monthDay, dateKey: day.dateKey });
     }, []);
     // Speichert alle Einträge eines Tages (mehrere Geburtstage und mehrere
     // wiederkehrende Ereignisse). Der Editor liefert die vollständige Liste; sie
-    // ersetzt die bisherigen Einträge des Tages in einem Schritt.
+    // ersetzt die bisherigen Einträge des Tages in einem Schritt. Serien, die an
+    // einem anderen Tag verankert sind und hier nur als Vorkommen erscheinen,
+    // werden nicht übernommen (der Anker bleibt dort, wo er ist).
     const handleSaveAnniversary = useCallback((monthDay, entries) => {
         replaceDay(monthDay, entries);
     }, [replaceDay]);
     const handleResetAnniversary = useCallback((monthDay) => {
         resetAnniversary(monthDay);
     }, [resetAnniversary]);
+    // Nimmt ein einzelnes Vorkommen einer Ereignisserie aus ("nur dieses
+    // Vorkommen löschen"). Die Serie bleibt an allen übrigen Terminen erhalten.
+    const handleExcludeAnniversaryOccurrence = useCallback((monthDay, id, dateKey, excluded) => {
+        setOccurrenceExcluded(monthDay, id, dateKey, excluded);
+    }, [setOccurrenceExcluded]);
+    // Beendet eine Serie ab dem angeklickten Tag ("Serie ab diesem Datum nicht
+    // weiterführen"); ein leerer Wert hebt das Ende wieder auf.
+    const handleEndAnniversarySeries = useCallback((monthDay, id, until) => {
+        setSeriesEnd(monthDay, id, until);
+    }, [setSeriesEnd]);
     /**
      * Anzeigename einer Zusatzspalte aus ihrem Farbschlüssel (`extraN`).
      *
@@ -259,7 +276,12 @@ export function App() {
     const handleDialogCancel = useCallback(() => {
         setShowUnsavedDialog(false);
     }, []);
-    return (_jsxs("div", { className: "app", children: [_jsx(Toolbar, { year: settings.selectedYear, selectedShift: settings.selectedShift, onSelectYear: setYear, onPreviousYear: goToPreviousYear, onNextYear: goToNextYear, canGoPrevious: canGoToPreviousYear, canGoNext: canGoToNextYear, onSelectShift: setShift, weekdayOverDate: settings.weekdayOverDate, onToggleWeekdayOverDate: setWeekdayOverDate, showShiftCalendar: settings.showShiftCalendar, onToggleShowShiftCalendar: setShowShiftCalendar, showBirthdays: settings.showBirthdays, onToggleShowBirthdays: setShowBirthdays, showRecurringEvents: settings.showRecurringEvents, onToggleShowRecurringEvents: setShowRecurringEvents, viewMode: settings.viewMode, onToggleViewMode: (anniversaries) => setViewMode(anniversaries ? 'anniversaries' : 'shift'), onOpenPrint: () => setView('print'), theme: theme, onSaveFile: handleSaveFile, onLoadFile: handleLoadFile, collapsed: collapsed, onToggleCollapsed: handleToggleCollapsed }), view === 'screen' ? (settings.viewMode === 'anniversaries' ? (_jsx("main", { className: "screen-view screen-only", children: _jsx(AnniversaryYearCalendar, { year: settings.selectedYear, anniversaries: anniversaries, onOpenEditor: handleOpenAnniversary }) })) : (_jsxs("main", { className: "screen-view screen-only", children: [!collapsed && (_jsx("div", { className: "legend-box", id: "legend-box", children: _jsx(CalendarLegend, { year: settings.selectedYear, selectedShift: settings.selectedShift, workedShiftCount: workedShiftCount, usedColors: usedColors, colorTexts: colorTexts, onEditColor: setEditingLegendColor }) })), _jsx(YearCalendar, { calendar: calendar, annotations: annotations, weekdayOverDate: settings.weekdayOverDate, onOpenEditor: handleOpenEditor, showShiftCalendar: settings.showShiftCalendar, anniversaries: anniversaries, showBirthdays: settings.showBirthdays, showRecurringEvents: settings.showRecurringEvents, selectedKeys: streakKeySet, selectedColumn: streakColumn, extraColumns: settings.extraColumns, onAddExtraColumn: addExtraColumn, onRemoveExtraColumn: handleRemoveExtraColumn, onStreakStart: handleStreakStart, onStreakEnter: handleStreakEnter, onStreakEnd: handleStreakEnd })] }))) : (_jsx("main", { className: "screen-view", children: _jsx(PrintCalendar, { calendar: calendar, annotations: annotations, colorLegend: colorTexts, weekdayOverDate: settings.weekdayOverDate, showShiftCalendar: settings.showShiftCalendar, anniversaries: anniversaries, showBirthdays: settings.showBirthdays, showRecurringEvents: settings.showRecurringEvents, extraColumns: settings.extraColumns, onPrint: handlePrint, onBack: () => setView('screen') }) })), editingDay && (_jsx(DayEditor, { day: editingDay, selectedShift: settings.selectedShift, initialLabel: annotations[editingDay.dateKey]?.label ?? '', initialColorId: annotations[editingDay.dateKey]?.colors.info ?? null, onSave: setAnnotation, onReset: resetAnnotation, onClose: () => setEditingDay(null) })), editingExtraColumn && (_jsx(ExtraColumnEditor, { colorKey: editingExtraColumn.colorKey, columnLabel: editingExtraColumn.columnLabel, dateKeys: editingExtraColumn.dateKeys, initialColorId: annotations[editingExtraColumn.dateKeys[0]]?.extraColors?.[editingExtraColumn.colorKey] ?? null, initialText: annotations[editingExtraColumn.dateKeys[0]]?.extraTexts?.[editingExtraColumn.colorKey]?.text ?? '', initialVertical: annotations[editingExtraColumn.dateKeys[0]]?.extraTexts?.[editingExtraColumn.colorKey]?.vertical ?? true, onSave: handleSaveExtraColumn, onSaveText: setExtraColumnText, onClose: () => setEditingExtraColumn(null) })), editingAnniversary && (_jsx(AnniversaryEditor, { monthDay: editingAnniversary, initialEntries: anniversariesAt(anniversaries, editingAnniversary), onSave: (entries) => handleSaveAnniversary(editingAnniversary, entries), onReset: () => handleResetAnniversary(editingAnniversary), onClose: () => setEditingAnniversary(null) })), editingLegendColor && (_jsx(ColorLegendEditor, { colorId: editingLegendColor, year: settings.selectedYear, initialText: colorTexts[editingLegendColor] ?? '', onSave: setColorLegendText, onClose: () => setEditingLegendColor(null) })), streakDays.length > 0 && streakColumn && isFixedColumn(streakColumn) && (_jsx(StreakEditor, { days: streakDays, column: streakColumn, onApply: handleStreakApply, onClose: handleStreakClose })), showUnsavedDialog && (_jsx(UnsavedChangesDialog, { onSave: handleDialogSave, onDiscard: handleDialogDiscard, onCancel: handleDialogCancel }))] }));
+    return (_jsxs("div", { className: "app", children: [_jsx(Toolbar, { year: settings.selectedYear, selectedShift: settings.selectedShift, onSelectYear: setYear, onPreviousYear: goToPreviousYear, onNextYear: goToNextYear, canGoPrevious: canGoToPreviousYear, canGoNext: canGoToNextYear, onSelectShift: setShift, weekdayOverDate: settings.weekdayOverDate, onToggleWeekdayOverDate: setWeekdayOverDate, showShiftCalendar: settings.showShiftCalendar, onToggleShowShiftCalendar: setShowShiftCalendar, showBirthdays: settings.showBirthdays, onToggleShowBirthdays: setShowBirthdays, showRecurringEvents: settings.showRecurringEvents, onToggleShowRecurringEvents: setShowRecurringEvents, viewMode: settings.viewMode, onToggleViewMode: (anniversaries) => setViewMode(anniversaries ? 'anniversaries' : 'shift'), onOpenPrint: () => setView('print'), theme: theme, onSaveFile: handleSaveFile, onLoadFile: handleLoadFile, collapsed: collapsed, onToggleCollapsed: handleToggleCollapsed }), view === 'screen' ? (settings.viewMode === 'anniversaries' ? (_jsx("main", { className: "screen-view screen-only", children: _jsx(AnniversaryYearCalendar, { year: settings.selectedYear, anniversaries: anniversaries, onOpenEditor: handleOpenAnniversary }) })) : (_jsxs("main", { className: "screen-view screen-only", children: [!collapsed && (_jsx("div", { className: "legend-box", id: "legend-box", children: _jsx(CalendarLegend, { year: settings.selectedYear, selectedShift: settings.selectedShift, workedShiftCount: workedShiftCount, usedColors: usedColors, colorTexts: colorTexts, onEditColor: setEditingLegendColor }) })), _jsx(YearCalendar, { calendar: calendar, annotations: annotations, weekdayOverDate: settings.weekdayOverDate, onOpenEditor: handleOpenEditor, showShiftCalendar: settings.showShiftCalendar, anniversaries: anniversaries, showBirthdays: settings.showBirthdays, showRecurringEvents: settings.showRecurringEvents, selectedKeys: streakKeySet, selectedColumn: streakColumn, extraColumns: settings.extraColumns, onAddExtraColumn: addExtraColumn, onRemoveExtraColumn: handleRemoveExtraColumn, onStreakStart: handleStreakStart, onStreakEnter: handleStreakEnter, onStreakEnd: handleStreakEnd })] }))) : (_jsx("main", { className: "screen-view", children: _jsx(PrintCalendar, { calendar: calendar, annotations: annotations, colorLegend: colorTexts, weekdayOverDate: settings.weekdayOverDate, showShiftCalendar: settings.showShiftCalendar, anniversaries: anniversaries, showBirthdays: settings.showBirthdays, showRecurringEvents: settings.showRecurringEvents, extraColumns: settings.extraColumns, onPrint: handlePrint, onBack: () => setView('screen') }) })), editingDay && (_jsx(DayEditor, { day: editingDay, selectedShift: settings.selectedShift, initialLabel: annotations[editingDay.dateKey]?.label ?? '', initialColorId: annotations[editingDay.dateKey]?.colors.info ?? null, onSave: setAnnotation, onReset: resetAnnotation, onClose: () => setEditingDay(null) })), editingExtraColumn && (_jsx(ExtraColumnEditor, { colorKey: editingExtraColumn.colorKey, columnLabel: editingExtraColumn.columnLabel, dateKeys: editingExtraColumn.dateKeys, initialColorId: annotations[editingExtraColumn.dateKeys[0]]?.extraColors?.[editingExtraColumn.colorKey] ?? null, initialText: 
+                // Der Editor bearbeitet die Spanne mit dem Anker (kleinster Tag).
+                // Innerhalb der Spalte kann es weitere unabhängige Spannen geben;
+                // gesucht wird daher gezielt der Text dieser Spanne (id aus
+                // Farbschlüssel + Anker).
+                findExtraColumnText(annotations[editingExtraColumn.dateKeys[0]]?.extraTexts?.[editingExtraColumn.colorKey], editingExtraColumn.dateKeys[0] ?? '')?.text ?? '', initialVertical: findExtraColumnText(annotations[editingExtraColumn.dateKeys[0]]?.extraTexts?.[editingExtraColumn.colorKey], editingExtraColumn.dateKeys[0] ?? '')?.vertical ?? true, onSave: handleSaveExtraColumn, onSaveText: setExtraColumnText, onClose: () => setEditingExtraColumn(null) })), editingAnniversary && (_jsx(AnniversaryEditor, { monthDay: editingAnniversary.monthDay, dateKey: editingAnniversary.dateKey, year: settings.selectedYear, initialEntries: entriesForAnniversaryEditor(anniversaries, editingAnniversary.monthDay, editingAnniversary.dateKey, settings.selectedYear), onSave: (entries) => handleSaveAnniversary(editingAnniversary.monthDay, entries), onReset: () => handleResetAnniversary(editingAnniversary.monthDay), onToggleOccurrence: handleExcludeAnniversaryOccurrence, onEndSeries: handleEndAnniversarySeries, onClose: () => setEditingAnniversary(null) })), editingLegendColor && (_jsx(ColorLegendEditor, { colorId: editingLegendColor, year: settings.selectedYear, initialText: colorTexts[editingLegendColor] ?? '', onSave: setColorLegendText, onClose: () => setEditingLegendColor(null) })), streakDays.length > 0 && streakColumn && isFixedColumn(streakColumn) && (_jsx(StreakEditor, { days: streakDays, column: streakColumn, onApply: handleStreakApply, onClose: handleStreakClose })), showUnsavedDialog && (_jsx(UnsavedChangesDialog, { onSave: handleDialogSave, onDiscard: handleDialogDiscard, onCancel: handleDialogCancel }))] }));
 }
 /**
  * Prüft, ob ein Streifen-Ziel eine feste Farbspalte benennt ('weekday', 'day'
@@ -268,6 +290,25 @@ export function App() {
  */
 function isFixedColumn(column) {
     return column === 'weekday' || column === 'day' || column === 'shift';
+}
+/**
+ * Ermittelt die Startliste für den Jahrestag-Editor eines konkreten Tages.
+ *
+ * Neben den an diesem Tag verankerten Einträgen (`anniversariesAt`) werden auch
+ * die an diesem Tag stattfindenden wiederkehrenden Vorkommen berücksichtigt.
+ * So lassen sich an einem Folgetag „nur dieses Vorkommen löschen" und „Serie ab
+ * hier beenden" direkt im Editor bedienen - die Serie bleibt dort sichtbar, wo
+ * sie tatsächlich auftritt. Geburtstage erscheinen ohnehin nur an ihrem Tag.
+ *
+ * Als Basisjahr dient das angezeigte Jahr selbst, damit das Muster stabil
+ * bleibt (vgl. `AnniversaryMonthCard`).
+ */
+function entriesForAnniversaryEditor(anniversaries, monthDay, dateKey, year) {
+    const occurring = matchesForDateKey(anniversaries, dateKey, year, year).map(({ entry }) => entry);
+    // Ausgenommene Vorkommen des Tages sind nicht Teil der Anzeige, müssen aber
+    // im Editor sichtbar bleiben, solange die Serie dort verankert ist.
+    const anchoredAndExcluded = anniversariesAt(anniversaries, monthDay).filter((entry) => !occurring.some((other) => other.id === entry.id));
+    return [...occurring, ...anchoredAndExcluded];
 }
 /**
  * Liefert den Farbschlüssel einer Zusatzspalte zu einem Zieh-Ziel - oder null,
@@ -348,21 +389,38 @@ function shiftExtraMap(map, startKey) {
     }
     return Object.keys(result).length > 0 ? result : undefined;
 }
+/**
+ * Sucht in der Liste der querliegenden Texte einer Zusatzspalte den Eintrag,
+ * dessen Spanne am Anker (`anchorKey`) beginnt. Da in derselben Spalte mehrere
+ * unabhängige Spannen existieren dürfen, ist dies der gezielte Zugriff für den
+ * Zusatzspalten-Editor.
+ */
+function findExtraColumnText(texts, anchorKey) {
+    return texts?.find((text) => text.dateKeys[0] === anchorKey);
+}
 /** Verschiebt die querliegenden Texte eines Monats um eine Position nach innen. */
 function shiftExtraTextMap(map, startKey) {
     if (!map)
         return undefined;
     const result = {};
-    for (const [key, value] of Object.entries(map)) {
+    for (const [key, list] of Object.entries(map)) {
         const index = extraColumnIndex(key);
+        if (!list || list.length === 0)
+            continue;
         if (index < startKey) {
-            result[key] = value;
+            result[key] = list;
         }
         else if (index > startKey) {
             const newKey = `extra${index - 1}`;
-            result[newKey] = { ...value, colorKey: newKey };
+            // Farbschlüssel und `id` der Texte mitführen, damit die Bindung an die
+            // (jetzt umbenannte) Spalte erhalten bleibt.
+            result[newKey] = list.map((text) => ({
+                ...text,
+                colorKey: newKey,
+                id: extraColumnTextId(newKey, text.dateKeys[0] ?? ''),
+            }));
         }
-        // index === startKey: Text der entfernten Spalte entfällt.
+        // index === startKey: Texte der entfernten Spalte entfallen.
     }
     return Object.keys(result).length > 0 ? result : undefined;
 }

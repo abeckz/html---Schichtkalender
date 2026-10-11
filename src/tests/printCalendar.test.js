@@ -150,6 +150,22 @@ describe('PrintCalendar', () => {
         expect(anniversaries.getAttribute('style')).toBeNull();
         expect(info.getAttribute('style')).toBeNull();
     });
+    it('deckelt die Schrift reiner Terminnamen über eine label-lines-Klasse', () => {
+        // Ohne persönliche Beschriftung trug die Info-Zelle zuvor keine
+        // label-lines-Klasse und erbte die ungedeckelte Standardgröße. Jetzt wird
+        // die Schrift auch für reine Termine geprüft und gedeckelt: kurze Namen
+        // höchstens mittelgroß, lange Namen in der kleinsten Stufe.
+        const container = render(_jsx(PrintCalendar, { calendar: calendar, annotations: {}, onPrint: () => undefined, onBack: () => undefined }));
+        // 01.01.2021 = Neujahr (kurz) -> höchstens mittelgroß.
+        const neujahr = container.querySelector('[data-date-key="2021-01-01"] .print-col-info');
+        expect(neujahr.textContent).toBe('Neujahr');
+        expect(neujahr.classList.contains('label-lines-2')).toBe(true);
+        expect(neujahr.classList.contains('label-lines-1')).toBe(false);
+        // 03.10.2021 = Tag der Deutschen Einheit (lang) -> kleinste Stufe.
+        const einheit = container.querySelector('[data-date-key="2021-10-03"] .print-col-info');
+        expect(einheit.textContent).toContain('Tag der Deutschen Einheit');
+        expect(einheit.classList.contains('label-lines-3')).toBe(true);
+    });
     it('zeigt die KW ausschließlich am Montag', () => {
         const container = render(_jsx(PrintCalendar, { calendar: calendar, annotations: annotations, onPrint: () => undefined, onBack: () => undefined }));
         // 04.01.2021 ist der erste Montag des Jahres 2021 (KW 1).
@@ -245,25 +261,46 @@ describe('PrintCalendar', () => {
         const container = render(_jsx(PrintCalendar, { calendar: calendar, annotations: {}, onPrint: () => undefined, onBack: () => undefined }));
         expect(container.querySelectorAll('.print-header-colors').length).toBe(0);
     });
-    it('stellt im Seitenkopf die Farblegende vor die Erklärungen der Buchstaben und Kennzahlen', () => {
-        // Anforderung: Im Kopf der Druckansicht steht die Farblegende direkt unter
-        // der Gesamtzeile; darunter erst die Erläuterungen zu T, N, Werktage,
-        // Sollschichten und F.
+    it('stellt im Seitenkopf die Farblegende direkt unter die Gesamtzeile', () => {
+        // Anforderung: In der Legendenzeile des Kopfes stehen nur die Gesamtzeile
+        // und darunter die Farblegende.
         const container = render(_jsx(PrintCalendar, { calendar: calendar, annotations: annotations, colorLegend: { yellow: 'Urlaub' }, onPrint: () => undefined, onBack: () => undefined }));
         const legend = container.querySelector('.print-header-legend');
         const children = Array.from(legend.children);
         expect(children[0].classList.contains('print-header-total')).toBe(true);
         expect(children[1].classList.contains('print-header-colors')).toBe(true);
-        const afterLegend = children.slice(2).map((child) => child.textContent ?? '');
-        expect(afterLegend).toEqual([
+        expect(children.length).toBe(2);
+    });
+    it('setzt die Erklärungen links als zwei Spalten übereinander', () => {
+        // Anforderung: Am linken Rand stehen T, N, Werktage und Sollschichten
+        // übereinander; daneben bilden F, Geburtstag und wiederkehrendes Ereignis
+        // eine eigene Spalte.
+        const container = render(_jsx(PrintCalendar, { calendar: calendar, annotations: annotations, onPrint: () => undefined, onBack: () => undefined }));
+        const explain = container.querySelector('.print-header-explain');
+        expect(explain).not.toBeNull();
+        const shifts = Array.from(explain.querySelector('.print-header-shifts').children).map((element) => element.textContent ?? '');
+        expect(shifts).toEqual([
             'T = Tagschicht von 6 bis 18 Uhr',
             'N = Nachtschicht von 18 bis 6 Uhr',
             'Werktage = Anzahl Montag bis Freitag',
             'Sollschichten = Anzahl T + N',
+        ]);
+        const marks = Array.from(explain.querySelector('.print-header-marks').children).map((element) => element.textContent ?? '');
+        expect(marks).toEqual([
             'F = Gesetzlicher Feiertag',
             '🎂 = Geburtstag (Alter in Klammern)',
             '🔁 = wiederkehrendes Ereignis',
         ]);
+        // Die Zeichen stehen als eigene Spalte neben den Schichtkennzahlen.
+        expect(explain.querySelector('.print-header-shifts').nextElementSibling).toBe(explain.querySelector('.print-header-marks'));
+    });
+    it('setzt Titel, Jahr und Schicht rechts untereinander', () => {
+        // Anforderung: Titel, Jahr und Schicht stehen übereinander am rechten Rand.
+        const container = render(_jsx(PrintCalendar, { calendar: calendar, annotations: annotations, onPrint: () => undefined, onBack: () => undefined }));
+        const titles = container.querySelector('.print-header-titles');
+        expect(titles).not.toBeNull();
+        const children = Array.from(titles.children).map((element) => element.textContent ?? '');
+        expect(children).toEqual(['BASF Schichtkalender', '2021', 'Schicht C']);
     });
     it('führt am Ende der Monatsspalte keine Feiertagskennzahlen mehr auf', () => {
         // Anforderung: Die Anzeige der bezahlten Feiertage (volle, halbe aus der
@@ -426,6 +463,7 @@ describe('PrintMonth – Zusatzspalten', () => {
         const container = render(_jsx(PrintMonth, { month: january2026, annotationLabels: {}, annotationColors: {}, extraColumns: { left: [1], right: [] }, extraTextsByDateKey: {
                 '2026-01-01': [
                     {
+                        id: 'extra0@2026-01-01',
                         colorKey: 'extra0',
                         columnLabel: 'Zusatzspalte 0',
                         vertical: true,
@@ -454,6 +492,7 @@ describe('PrintMonth – Zusatzspalten', () => {
         const container = render(_jsx(PrintMonth, { month: january2026, annotationLabels: {}, annotationColors: {}, extraColumns: { left: [1, 1], right: [] }, extraTextsByDateKey: {
                 '2026-01-10': [
                     {
+                        id: 'extra1@2026-01-10',
                         colorKey: 'extra1',
                         columnLabel: 'Zusatzspalte 1',
                         vertical: true,
@@ -473,6 +512,7 @@ describe('PrintMonth – Zusatzspalten', () => {
         const container = render(_jsx(PrintMonth, { month: january2026, annotationLabels: {}, annotationColors: {}, extraTextsByDateKey: {
                 '2026-01-01': [
                     {
+                        id: 'extra0@2026-01-01',
                         colorKey: 'extra0',
                         columnLabel: 'Zusatzspalte 0',
                         vertical: true,
@@ -498,6 +538,7 @@ describe('PrintMonth – Zusatzspalten', () => {
         render(_jsx(PrintMonth, { month: january2026, annotationLabels: {}, annotationColors: {}, extraColumns: { left: [1], right: [] }, extraTextsByDateKey: {
                 '2026-01-01': [
                     {
+                        id: 'extra0@2026-01-01',
                         colorKey: 'extra0',
                         columnLabel: 'Zusatzspalte 0',
                         vertical: true,
@@ -517,5 +558,56 @@ describe('PrintMonth – Zusatzspalten', () => {
         expect(overlayRule).toMatch(/inset:\s*0/);
         expect(overlayRule).not.toMatch(/grid-row/);
         expect(overlayRule).not.toMatch(/grid-column/);
+    });
+    /**
+     * Regression: Der querliegende Drucktext lag **hinter** dem Farbstreifen der
+     * markierten Zusatzspalte und war dadurch weder in der Vorschau noch im
+     * gedruckten PDF sichtbar.
+     *
+     * Ursache: die gefärbten Zusatzspalten-Zellen werden über
+     * `.print-row > .print-col-extra[style]` auf `z-index: 1` gehoben, damit ihr
+     * Streifen die Zeilenlinien durchgehend überdeckt. Die Textebene
+     * (`.print-month-overlay`) hatte keinen eigenen Stapelwert (`auto`) und lag
+     * damit darunter. Sie muss einen höheren `z-index` als die Zellen besitzen.
+     */
+    it('legt den querliegenden Drucktext über den Farbstreifen (sichtbar)', () => {
+        const stylesheet = readPrintStylesheet();
+        const cellRule = /\.print-row\s*>\s*\.print-col-extra\[style\]\s*\{([^}]*)\}/s.exec(stylesheet)?.[1] ?? '';
+        const overlayRule = /\.print-month-overlay\s*\{([^}]*)\}/s.exec(stylesheet)?.[1] ?? '';
+        const cellZ = Number(/z-index:\s*(-?\d+)/.exec(cellRule)?.[1] ?? 'NaN');
+        const overlayZ = Number(/z-index:\s*(-?\d+)/.exec(overlayRule)?.[1] ?? 'NaN');
+        expect(Number.isFinite(cellZ)).toBe(true);
+        expect(Number.isFinite(overlayZ)).toBe(true);
+        // Der Text muss über den gefärbten Zellen liegen.
+        expect(overlayZ).toBeGreaterThan(cellZ);
+    });
+    /**
+     * Regression: Der querliegende Drucktext wurde mit `writing-mode: vertical-rl`
+     * plus `transform: rotate(180deg)` gedreht. Ein `transform` legt das Element
+     * auf eine eigene Compositing-Ebene, die Chrome beim Drucken als Bitmap in
+     * Bildschirmauflösung rastert - der Text erschien im Ausdruck verpixelt.
+     * `writing-mode: sideways-lr` erreicht dieselbe Leserichtung rein über
+     * Textlayout und bleibt vektoriell (scharfer Druck).
+     */
+    it('dreht den querliegenden Drucktext ohne transform (scharfer Druck)', () => {
+        const stylesheet = readPrintStylesheet();
+        const base = /\.print-extra-text\.is-vertical\s*\{([^}]*)\}/s;
+        const baseBody = base.exec(stylesheet)?.[1] ?? '';
+        expect(baseBody).toContain('writing-mode: sideways-lr');
+        expect(baseBody).not.toContain('transform');
+        // Nur die Rückfallebene (ohne `sideways-lr`-Unterstützung) darf drehen.
+        expect(/@supports not \(writing-mode: sideways-lr\)/.test(stylesheet)).toBe(true);
+    });
+    /**
+     * Regression: Eine über mehrere Zellen markierte Zusatzspalte wurde an jeder
+     * Zeilengrenze von der dünnen horizontalen Zeilenlinie (`.print-row`
+     * `border-top`) durchschnitten und war dadurch schwer zu lesen. Die gefärbte
+     * Zelle wird nun um die Linienstärke über die Zeilengrenzen hinausgezogen
+     * (negatives `margin`), damit der farbige Streifen ungebrochen erscheint.
+     */
+    it('zieht gefärbte Zusatzspalten über die Zeilenlinie (ungebrochener Streifen)', () => {
+        const stylesheet = readPrintStylesheet();
+        const rule = /\.print-row\s*>\s*\.print-col-extra\[style\]\s*\{[^}]*margin:\s*-0\.25pt\s+0/s;
+        expect(rule.test(stylesheet)).toBe(true);
     });
 });

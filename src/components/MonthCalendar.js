@@ -74,36 +74,41 @@ export function collectExtraColumnTexts(month, annotations, extraColumns, showSh
         const texts = annotation.extraTexts;
         if (!texts)
             continue;
-        for (const text of Object.values(texts)) {
-            if (!text || text.text === '')
+        // Je Spalte eine Liste unabhängiger Spannen-Texte; alle sind darzustellen.
+        for (const group of Object.values(texts)) {
+            if (!group)
                 continue;
-            if (text.dateKeys[0] !== dateKey)
-                continue;
-            const column = extraColumns.find((entry) => entry.colorKey === text.colorKey);
-            // Rechts liegende Spalten sind ohne Schichtkalender ausgeblendet.
-            if (!column || (column.side === 'right' && !showShiftCalendar))
-                continue;
-            const presentRows = text.dateKeys
-                .map((key) => dayIndexByKey.get(key))
-                .filter((index) => index !== undefined)
-                .sort((a, b) => a - b);
-            if (presentRows.length === 0)
-                continue;
-            const start = presentRows[0];
-            const end = presentRows[presentRows.length - 1];
-            overlays.push({
-                id: `${dateKey}-${text.colorKey}`,
-                colorKey: text.colorKey,
-                columnLabel: text.columnLabel,
-                text: text.text,
-                vertical: text.vertical,
-                // Am Anker-Tag entscheidet die persönliche Farbe der Zusatzspalte über
-                // die Textfarbe der Überlagerung (schwarz auf gefärbtem Feld).
-                colored: (annotation.extraColors?.[text.colorKey] ?? null) !== null,
-                gridColumn: extraColumnGridColumn(text.colorKey, extraColumns, weekdayOverDate),
-                gridRowStart: start + 1,
-                gridRowSpan: end - start + 1,
-            });
+            for (const text of group) {
+                if (!text || text.text === '')
+                    continue;
+                if (text.dateKeys[0] !== dateKey)
+                    continue;
+                const column = extraColumns.find((entry) => entry.colorKey === text.colorKey);
+                // Rechts liegende Spalten sind ohne Schichtkalender ausgeblendet.
+                if (!column || (column.side === 'right' && !showShiftCalendar))
+                    continue;
+                const presentRows = text.dateKeys
+                    .map((key) => dayIndexByKey.get(key))
+                    .filter((index) => index !== undefined)
+                    .sort((a, b) => a - b);
+                if (presentRows.length === 0)
+                    continue;
+                const start = presentRows[0];
+                const end = presentRows[presentRows.length - 1];
+                overlays.push({
+                    id: text.id,
+                    colorKey: text.colorKey,
+                    columnLabel: text.columnLabel,
+                    text: text.text,
+                    vertical: text.vertical,
+                    // Am Anker-Tag entscheidet die persönliche Farbe der Zusatzspalte über
+                    // die Textfarbe der Überlagerung (schwarz auf gefärbtem Feld).
+                    colored: (annotation.extraColors?.[text.colorKey] ?? null) !== null,
+                    gridColumn: extraColumnGridColumn(text.colorKey, extraColumns, weekdayOverDate),
+                    gridRowStart: start + 1,
+                    gridRowSpan: end - start + 1,
+                });
+            }
         }
     }
     return overlays;
@@ -308,7 +313,7 @@ export function MonthCalendar({ month, annotations, weekdayOverDate = false, onO
         window.addEventListener('resize', measure);
         return () => window.removeEventListener('resize', measure);
     }, [extraColumnTexts]);
-    return (_jsxs("section", { className: showShiftCalendar ? 'month-card' : 'month-card is-shift-hidden', "aria-label": `${month.name} ${month.year}`, style: columnWidths, children: [_jsxs("header", { className: weekdayOverDate ? 'month-header is-weekday-over-date' : 'month-header', children: [showShiftCalendar ? (_jsxs("span", { className: "month-stat", title: "Werktage Montag bis Freitag", children: [statistics.weekdayCount, " Werktage"] })) : (_jsx("span", { className: "month-stat", "aria-hidden": "true" })), _jsx("h2", { className: "month-title", "aria-label": month.name, children: month.name }), showShiftCalendar ? (_jsxs("span", { className: "month-stat", title: "Sollschichten (T + N)", children: [statistics.requiredShiftCount, " Soll"] })) : (_jsx("span", { className: "month-stat", "aria-hidden": "true" })), onAddExtraColumn && (_jsx(ColumnInsertHandle, { side: "left", onActivate: handleInsertActivate })), onAddExtraColumn && showShiftCalendar && (_jsx(ColumnInsertHandle, { side: "right", onActivate: handleInsertActivate })), onRemoveExtraColumn && leftColumns.length > 0 && (_jsx(ColumnRemoveHandle, { side: "left", nearEdgeIndex: 0, onActivate: handleRemoveActivate })), onRemoveExtraColumn && showShiftCalendar && rightColumns.length > 0 && (_jsx(ColumnRemoveHandle, { side: "right", nearEdgeIndex: 0, onActivate: handleRemoveActivate }))] }), _jsxs("div", { className: tableClassName, role: "table", "aria-label": `Tage im ${month.name}`, ref: tableRef, children: [month.days.map((day) => (_jsx(CalendarDayRow, { day: day, annotation: annotations[day.dateKey], weekdayOverDate: weekdayOverDate, onOpenEditor: onOpenEditor, showShiftCalendar: showShiftCalendar, anniversaries: anniversaries, showBirthdays: showBirthdays, showRecurringEvents: showRecurringEvents, extraColumns: extraColumnsForRow, isSelected: selectedKeys?.has(day.dateKey) ?? false, selectedColumn: selectedColumn, onStreakStart: onStreakStart, onStreakEnter: onStreakEnter, onStreakEnd: onStreakEnd }, day.dateKey))), extraColumnTexts.length > 0 && (_jsx("div", { className: "day-table-overlay", "aria-hidden": "true", children: extraColumnTexts.map((overlay) => {
+    return (_jsxs("section", { className: showShiftCalendar ? 'month-card' : 'month-card is-shift-hidden', "aria-label": `${month.name} ${month.year}`, style: columnWidths, children: [_jsxs("header", { className: weekdayOverDate ? 'month-header is-weekday-over-date' : 'month-header', children: [showShiftCalendar ? (_jsxs("span", { className: "month-stat", title: "Werktage Montag bis Freitag", children: [statistics.weekdayCount, " Werktage"] })) : (_jsx("span", { className: "month-stat", "aria-hidden": "true" })), _jsx("h2", { className: "month-title", "aria-label": month.name, children: month.name }), showShiftCalendar ? (_jsxs("span", { className: "month-stat month-stat-end", title: "Sollschichten (T + N)", children: [statistics.requiredShiftCount, " Soll"] })) : (_jsx("span", { className: "month-stat month-stat-end", "aria-hidden": "true" })), onAddExtraColumn && (_jsx(ColumnInsertHandle, { side: "left", onActivate: handleInsertActivate })), onAddExtraColumn && showShiftCalendar && (_jsx(ColumnInsertHandle, { side: "right", onActivate: handleInsertActivate })), onRemoveExtraColumn && leftColumns.length > 0 && (_jsx(ColumnRemoveHandle, { side: "left", nearEdgeIndex: 0, onActivate: handleRemoveActivate })), onRemoveExtraColumn && showShiftCalendar && rightColumns.length > 0 && (_jsx(ColumnRemoveHandle, { side: "right", nearEdgeIndex: 0, onActivate: handleRemoveActivate }))] }), _jsxs("div", { className: tableClassName, role: "table", "aria-label": `Tage im ${month.name}`, ref: tableRef, children: [month.days.map((day) => (_jsx(CalendarDayRow, { day: day, annotation: annotations[day.dateKey], weekdayOverDate: weekdayOverDate, onOpenEditor: onOpenEditor, showShiftCalendar: showShiftCalendar, anniversaries: anniversaries, showBirthdays: showBirthdays, showRecurringEvents: showRecurringEvents, extraColumns: extraColumnsForRow, isSelected: selectedKeys?.has(day.dateKey) ?? false, selectedColumn: selectedColumn, onStreakStart: onStreakStart, onStreakEnter: onStreakEnter, onStreakEnd: onStreakEnd }, day.dateKey))), extraColumnTexts.length > 0 && (_jsx("div", { className: "day-table-overlay", "aria-hidden": "true", children: extraColumnTexts.map((overlay) => {
                             const placement = extraTextPlacements[overlay.id];
                             if (!placement)
                                 return null;

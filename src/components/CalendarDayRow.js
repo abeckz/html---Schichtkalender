@@ -1,9 +1,9 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { getColorHex } from '../config/annotationColors.ts';
 import { hasPublicHoliday } from '../engines/eventEngine.ts';
-import { matchesForDateKey, formatIntervalLabel } from '../engines/anniversaryEngine.ts';
+import { matchesForDateKey } from '../engines/anniversaryEngine.ts';
 import { PUBLIC_HOLIDAY_MARK, PUBLIC_HOLIDAY_TITLE } from '../print/PrintMonth.tsx';
-import { cellLineClass } from '../utils/textFit.ts';
+import { informationLineClass } from '../utils/textFit.ts';
 import { ExtraColumnCell } from './ExtraColumnCell.tsx';
 /**
  * Ordnet eine Zieh-Zelle dem Spaltennamen zu.
@@ -47,7 +47,7 @@ export function CalendarDayRow({ day, annotation, weekdayOverDate = false, onOpe
     // Passende Jahrestage des Kalendertags: Geburtstag und/oder wiederkehrendes
     // Ereignis. Über die Checkboxen lassen sich beide Arten getrennt ein- und
     // ausblenden; die angezeigten Einträge werden hier danach gefiltert.
-    const anniversaryMatches = matchesForDateKey(anniversaries, day.dateKey, day.year).filter(({ entry }) => (entry.kind === 'birthday' && showBirthdays) ||
+    const anniversaryMatches = matchesForDateKey(anniversaries, day.dateKey, day.year, day.year).filter(({ entry }) => (entry.kind === 'birthday' && showBirthdays) ||
         (entry.kind === 'recurring' && showRecurringEvents));
     // Hintergrundfarben je Spalte. Der Streifen färbt Wochentag, Tagesnummer
     // oder T/N; die Info-Spalte trägt die Farbe aus dem DayEditor.
@@ -79,13 +79,13 @@ export function CalendarDayRow({ day, annotation, weekdayOverDate = false, onOpe
         ? annotationLabel
         : day.events.map((event) => event.name).join(' · ');
     // Adaptive Schrift über den gesamten Zellinhalt: Die Beschriftung folgt den
-    // DayEditor-Regeln, jeder Jahrestag belegt zusätzlich eine Zeile (siehe
-    // `cellLineClass`). Dadurch wird die Schrift kleiner, sobald zu einer
-    // einzeiligen Beschriftung noch ein Geburtstag/ereignis hinzukommt. Ohne
-    // Beschriftung und ohne Jahrestage (nur Terminnamen) bleibt die normale
-    // Zeilengröße erhalten.
-    const infoLineClass = annotationLabel !== '' || anniversaryMatches.length > 0
-        ? cellLineClass(informationText, anniversaryMatches.length)
+    // DayEditor-Regeln, jeder Jahrestag belegt zusätzlich eine Zeile. Reine
+    // Termin-/Feiertagsnamen (keine persönliche Beschriftung) werden um eine
+    // Zeile höher angesetzt (siehe `informationLineClass`), damit sie nie so
+    // groß wie eine Beschriftung erscheinen - die Schriftgröße wird geprüft und
+    // gedeckelt.
+    const infoLineClass = informationText !== ''
+        ? informationLineClass(informationText, anniversaryMatches.length, annotationLabel === '')
         : '';
     const classNames = ['day-row'];
     if (weekdayOverDate)
@@ -111,7 +111,7 @@ export function CalendarDayRow({ day, annotation, weekdayOverDate = false, onOpe
         if (entry.kind === 'birthday') {
             return `Geburtstag ${entry.name}${age !== undefined ? ` (${age})` : ''}`;
         }
-        return `wiederkehrendes Ereignis ${entry.name} (${formatIntervalLabel(entry)})`;
+        return `wiederkehrendes Ereignis ${entry.name}`;
     })
         .join(', ');
     const ariaLabel = [
@@ -168,7 +168,7 @@ export function CalendarDayRow({ day, annotation, weekdayOverDate = false, onOpe
                     .filter((name) => name !== '')
                     .join(' '), children: [anniversaryMatches.length > 0 && (_jsx("span", { className: "cell-anniversaries", children: anniversaryMatches.map(({ entry, age }, index) => (_jsxs("span", { className: entry.kind === 'birthday'
                                 ? 'anniversary-entry is-birthday'
-                                : 'anniversary-entry is-recurring', children: [index > 0 && ' · ', _jsx("span", { className: "anniversary-emoji", "aria-hidden": "true", children: entry.kind === 'birthday' ? '🎂' : '🔁' }), ' ', entry.name, entry.kind === 'birthday' && age !== undefined && (_jsxs("span", { className: "anniversary-age", children: [" (", age, ")"] })), entry.kind === 'recurring' && (_jsxs("span", { className: "anniversary-interval", children: [" (", formatIntervalLabel(entry), ")"] }))] }, entry.id))) })), informationText !== '' && (_jsx("span", { className: "cell-information-text", style: columnStyle(infoHex), children: informationText }))] }), _jsxs("span", { className: "cell cell-kw", children: [day.isoWeekday === 1 && _jsx("span", { className: "cell-week", children: day.isoWeek }), publicHoliday && (_jsx("span", { className: "holiday-mark", title: PUBLIC_HOLIDAY_TITLE, "aria-hidden": "true", children: PUBLIC_HOLIDAY_MARK }))] }), (extraColumns ?? [])
+                                : 'anniversary-entry is-recurring', children: [index > 0 && ' · ', _jsx("span", { className: "anniversary-emoji", "aria-hidden": "true", children: entry.kind === 'birthday' ? '🎂' : '🔁' }), ' ', entry.name, entry.kind === 'birthday' && age !== undefined && (_jsxs("span", { className: "anniversary-age", children: [" (", age, ")"] }))] }, entry.id))) })), informationText !== '' && (_jsx("span", { className: "cell-information-text", style: columnStyle(infoHex), children: informationText }))] }), _jsxs("span", { className: "cell cell-kw", children: [day.isoWeekday === 1 && _jsx("span", { className: "cell-week", children: day.isoWeek }), publicHoliday && (_jsx("span", { className: "holiday-mark", title: PUBLIC_HOLIDAY_TITLE, "aria-hidden": "true", children: PUBLIC_HOLIDAY_MARK }))] }), (extraColumns ?? [])
                 .filter((column) => column.side === 'right')
                 .map((column) => (_jsx(ExtraColumnCell, { column: column, annotation: annotation, selected: isColumnSelected(column.unitKey) }, `extra-right-${column.name}`))), showShiftCalendar && (_jsx("span", { className: `cell cell-shift${selectedClass('shift')}`, style: columnStyle(shiftHex), children: day.shiftLabel }))] }));
 }
