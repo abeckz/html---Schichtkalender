@@ -212,11 +212,29 @@ ungedeckelte Standardgröße - die Schrift wirkte dadurch „viel zu groß".
 Bildschirm (`CalendarDayRow`) und Druck (`PrintMonth`) nutzen dieselbe Funktion
 `informationLineClass(label, extraLines, eventOnly)`.
 
-**Färbung.** Die persönliche Farbe der Info-Spalte sitzt auf dem Textblock
-`.cell-information-text` bzw. `.print-col-info-text` (nur so breit wie sein
-Inhalt) und färbt damit **ausschließlich den Tageseditor-Eintrag** ein, nicht die
-Jahrestage. Fällt ein eingefärbtes DayEditor-Ereignis mit einem
-Geburtstag/wiederkehrenden Ereignis zusammen, bleiben die Jahrestage unfarbig.
+**Färbung.** Die persönliche Farbe der Info-Spalte liegt auf der **Zelle**
+selbst: Bildschirm `.cell-information` (`style` setzt ausschließlich
+`backgroundColor`), Druck `.print-col-info`. Der Textblock
+(`.cell-information-text` / `.print-col-info-text`) ist **transparent**.
+
+Damit deckt die Farbe die **gesamte Zellenfläche** ab (volle Zeilenhöhe über
+`align-self: stretch`, inklusive des Bereichs unter einem kurzen oder
+mehrzeiligen Text) und ist **auch ohne Text** sichtbar: Ein Tag, an dem nur die
+Info-Spalte eingefärbt ist (keine Beschriftung, kein Termin, kein Jahrestag),
+zeigt trotzdem ein volles Farbfeld. Zuvor saß die Farbe auf dem Textblock (nur
+so breit wie sein Inhalt): Der Hintergrund endete mit dem Text - und ein Tag
+ohne Text blieb ganz ohne Farbe.
+
+Zusätzlich wird eine eingefärbte Info-Zelle wie die übrigen gefärbten
+Tagesspalten über den Zeilenrand hinausgezogen (Bildschirm
+`.cell-information[style]` `margin: -3px 0`, Druck
+`.print-row > .print-col-info[style]` `margin: -0.25pt 0` plus `z-index: 1`),
+damit ein über mehrere Tage gezogener Farbstreifen ungebrochen erscheint.
+Die Kontrast-Textfarbe gilt seitdem für die ganze Zelle
+(`.day-row.has-color-info .cell-information`), also auch für Jahrestage, und
+geht nicht auf Nachbarspalten über. Regressionstests in
+`screenView.test.tsx` (Farbe ohne Text, Stylesheet-Regeln),
+`printCalendar.test.tsx` und `anniversary.test.tsx`.
 
 Zuvor fing die (breite) Info-Zelle den Klick immer ab und öffnete den
 Geburtstags-/Ereignis-Editor, sodass beim Anlegen eines normalen Tageseintrags

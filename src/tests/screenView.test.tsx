@@ -850,13 +850,13 @@ describe('Bildschirmdarstellung', () => {
       expect(infoRow?.className).not.toContain('has-color-weekday');
       expect(infoRow?.className).not.toContain('has-color-day');
       expect(infoRow?.className).not.toContain('has-color-shift');
-      // Nur der Tageseditor-Eintrag (Textblock) trägt den Hintergrund; die
-      // Info-Zelle selbst bleibt unfarbig, damit die Farbe nicht auf
-      // Geburtstage/wiederkehrende Ereignisse übergeht.
+      // Die persönliche Farbe liegt auf der Info-Zelle selbst (volle
+      // Zellenfläche, auch ohne Text); der Textblock darin bleibt transparent.
       const infoCell = infoRow?.querySelector('.cell-information') as HTMLElement | null;
-      expect(infoCell?.style.backgroundColor).toBe('');
+      expect(infoCell?.style.backgroundColor).not.toBe('');
+      expect(infoCell?.getAttribute('style')).toContain('rgb(');
       const infoText = infoRow?.querySelector('.cell-information .cell-information-text') as HTMLElement | null;
-      expect(infoText?.style.backgroundColor).not.toBe('');
+      expect(infoText?.style.backgroundColor).toBe('');
       const weekdayCell = infoRow?.querySelector('.cell-weekday') as HTMLElement | null;
       expect(weekdayCell?.style.backgroundColor).toBe('');
 
@@ -869,6 +869,50 @@ describe('Bildschirmdarstellung', () => {
     } finally {
       window.localStorage.removeItem('schichtkalender.state');
     }
+  });
+  it('färbt die Info-Zelle flächendeckend, auch wenn kein Text eingetragen ist', () => {
+    // Regression: Die persönliche Farbe lag früher auf dem Textblock
+    // (`.cell-information-text`). Dadurch war nur die Textfläche eingefärbt und
+    // ein Tag ohne Beschriftung/Termin blieb völlig farbig. Jetzt trägt die
+    // Zelle selbst den Hintergrund - die Farbe deckt die ganze Zellenfläche.
+    unmountAll();
+    window.localStorage.setItem(
+      'schichtkalender.state',
+      JSON.stringify({
+        version: 1,
+        settings: { selectedYear: 2022, selectedShift: 'B' },
+        annotations: {
+          // Farbe ohne Beschriftung und ohne Termin an diesem Tag.
+          '2022-05-09': { dateKey: '2022-05-09', label: '', colors: { info: 'green' } },
+        },
+      }),
+    );
+    try {
+      const container = render(<App />);
+      const infoRow = container.querySelector('.day-row[data-color-info="green"]');
+      expect(infoRow).not.toBeNull();
+      const infoCell = infoRow?.querySelector('.cell-information') as HTMLElement | null;
+      expect(infoCell).not.toBeNull();
+      // Es gibt keinen Textblock - trotzdem ist die Zelle eingefärbt.
+      expect(infoCell?.querySelector('.cell-information-text')).toBeNull();
+      expect(infoCell?.style.backgroundColor).not.toBe('');
+      // Die Farbe bleibt auf der Info-Zelle; Nachbarzellen bleiben unfarbig.
+      expect((infoRow?.querySelector('.cell-weekday') as HTMLElement).style.backgroundColor).toBe('');
+      expect((infoRow?.querySelector('.cell-kw') as HTMLElement).style.backgroundColor).toBe('');
+    } finally {
+      window.localStorage.removeItem('schichtkalender.state');
+    }
+  });
+
+  it('setzt die Kontrast-Textfarbe für die gesamte eingefärbte Info-Zelle', () => {
+    // Die frühere Regel färbte nur den Textblock bzw. die Feiertagsmarkierung
+    // schwarz; Jahrestage blieben in der hellen Textfarbe. Jetzt gilt die
+    // Kontrastfarbe für die ganze (eingefärbte) Zelle.
+    const css = readStylesheet();
+    expect(css).toMatch(/\.day-row\.has-color-info \.cell-information \{/);
+    expect(css).not.toMatch(/\.day-row\.has-color-info \.cell-information \.cell-information-text/);
+    // Eingefärbte Zellen werden über den Zeilenrand hinausgezogen.
+    expect(css).toMatch(/\.cell-information\[style\] \{/);
   });
 });
 

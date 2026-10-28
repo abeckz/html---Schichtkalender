@@ -341,6 +341,10 @@ export function CalendarDayRow({
             selected={isColumnSelected(column.unitKey)}
           />
         ))}
+      {/* Die persönliche Farbe der Info-Spalte liegt auf der **Zelle**, nicht
+          auf einem Textblock: So füllt sie den gesamten Zellenbereich (auch
+          unterhalb eines kurzen oder mehrzeiligen Textes) und bleibt sichtbar,
+          wenn der Tag weder Beschriftung noch Termin trägt. */}
       <span
         className={[
           'cell',
@@ -348,9 +352,11 @@ export function CalendarDayRow({
           selectedClass('info'),
           infoLineClass,
           annotationLabel !== '' ? 'has-annotation-entry' : '',
+          infoHex ? 'has-color' : '',
         ]
           .filter((name) => name !== '')
           .join(' ')}
+        style={columnStyle(infoHex)}
       >
         {anniversaryMatches.length > 0 && (
           <span className="cell-anniversaries">
@@ -376,9 +382,7 @@ export function CalendarDayRow({
           </span>
         )}
         {informationText !== '' && (
-          <span className="cell-information-text" style={columnStyle(infoHex)}>
-            {informationText}
-          </span>
+          <span className="cell-information-text">{informationText}</span>
         )}
       </span>
       <span className="cell cell-kw">

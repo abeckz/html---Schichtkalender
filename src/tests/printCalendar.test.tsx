@@ -136,11 +136,13 @@ describe('PrintCalendar', () => {
     const annotatedRow = container.querySelector('[data-date-key="2021-03-15"]');
     expect(annotatedRow).not.toBeNull();
     expect(annotatedRow?.textContent).toContain('Urlaub');
-    // Die persönliche Farbe liegt auf dem Tageseditor-Textblock (nicht auf der
-    // ganzen Info-Spalte), damit sie nicht auf Jahrestage übergeht. jsdom
-    // normalisiert Hexwerte zu rgb(); #FFE000 (sattes Gelb) wird rgb(255, 224, 0).
-    const infoCell = annotatedRow?.querySelector('.print-col-info-text');
+    // Die persönliche Farbe liegt auf der ganzen Info-Zelle und deckt damit die
+    // volle Zellenfläche ab (auch unter dem Text). jsdom normalisiert Hexwerte
+    // zu rgb(); #FFE000 (sattes Gelb) wird rgb(255, 224, 0).
+    const infoCell = annotatedRow?.querySelector('.print-col-info');
     expect(infoCell?.getAttribute('style')).toContain('rgb(255, 224, 0)');
+    // Der Textblock selbst bleibt transparent (die Zelle trägt die Farbe).
+    expect(annotatedRow?.querySelector('.print-col-info-text')?.getAttribute('style')).toBeNull();
 
     const neujahrRow = container.querySelector('[data-date-key="2021-01-01"]');
     // "F" steht ausschließlich als rosa Kästchen in der KW-Spalte; die
@@ -231,12 +233,13 @@ describe('PrintCalendar', () => {
     const children = Array.from(info.children) as HTMLElement[];
     expect(children[0].classList.contains('print-col-anniversaries')).toBe(true);
     expect(children[1].classList.contains('print-col-info-text')).toBe(true);
-    // Nur der Tageseditor-Eintrag ist eingefärbt; die Jahrestage nicht.
+    // Die Farbe liegt auf der Info-Zelle (volle Zellenfläche), nicht auf einem
+    // Textblock; Jahrestage und Textblock bleiben transparent.
     const infoText = info.querySelector('.print-col-info-text') as HTMLElement;
-    expect(infoText.getAttribute('style')).toContain('rgb(255, 224, 0)');
+    expect(infoText.getAttribute('style')).toBeNull();
     const anniversaries = info.querySelector('.print-col-anniversaries') as HTMLElement;
     expect(anniversaries.getAttribute('style')).toBeNull();
-    expect(info.getAttribute('style')).toBeNull();
+    expect(info.getAttribute('style')).toContain('rgb(255, 224, 0)');
   });
 
   it('deckelt die Schrift reiner Terminnamen über eine label-lines-Klasse', () => {

@@ -1117,9 +1117,19 @@ body {
 .day-row.has-color-weekday .cell-weekday,
 .day-row.has-color-day .cell-day,
 .day-row.is-weekday-over-date.has-color-day .cell-weekday,
-.day-row.has-color-info .cell-information .cell-information-text,
-.day-row.has-color-info .cell-information .holiday-mark,
 .day-row.has-color-shift .cell-shift {
+  color: #000000;
+}
+
+/**
+ * Die Info-Zelle trägt ihre persönliche Farbe selbst (Inline-`background` nur
+ * für `backgroundColor`). Sie zeigt die Farbe damit **flächendeckend** - nicht
+ * nur hinter dem Textblock - und auch dann, wenn der Tag weder Beschriftung
+ * noch Termin hat. Deshalb gilt die Kontrastfarbe hier für die ganze Zelle
+ * (Beschriftung, Jahrestage, Terminname); die Farbe geht bewusst nicht auf die
+ * Nachbarspalten über.
+ */
+.day-row.has-color-info .cell-information {
   color: #000000;
 }
 
@@ -1408,8 +1418,15 @@ body {
  * von den Spalten Wochentag/Datum/T-N gebildet werden. `display: flex` mit
  * `align-items: center` zentriert den einzeiligen Text vertikal in der Zelle.
  *
+ * Die persönliche Farbe liegt seit der Umstellung auf der Zelle selbst
+ * (`.cell-information`, Inline-`backgroundColor`), nicht auf dem Textblock
+ * darin. Damit ist die Farbe auch ohne Beschriftung/Termin sichtbar und
+ * deckt - anders als ein Text-Hintergrund - die gesamte Zellenfläche.
+ *
  * `position: relative` dient ausschließlich dem `::before`-Andeutungsstrich an
- * der linken Zellkante (siehe oben); am Layout ändert das nichts.
+ * der linken Zellkante (siehe oben) und dem gestapelten Farbfeld einer
+ * eingefärbten Zelle (siehe `.cell-information[style]`); am Layout ändert das
+ * nichts.
  */
 .cell-information {
   position: relative;
@@ -1421,6 +1438,21 @@ body {
   white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/**
+ * Eine eingefärbte Info-Zelle dehnt ihre Fläche über den Zeilenrand hinaus, wie
+ * die übrigen gefärbten Tagesspalten (`.cell-weekday`, `.cell-day`,
+ * `.cell-shift`): Das senkrechte Innen-Padding der Zeile (`.day-row`
+ * `padding: 3px 4px`) wird je 3px nach oben und unten ausgeglichen und die
+ * untere Zeilenlinie überdeckt, damit ein über mehrere Tage gezogener Streifen
+ * ungebrochen erscheint. Das negative `margin` wirkt nur senkrecht; Breite und
+ * Trennstriche der Nachbarspalten bleiben unverändert.
+ */
+.cell-information[style] {
+  position: relative;
+  z-index: 1;
+  margin: -3px 0;
 }
 
 /**
@@ -1475,10 +1507,11 @@ body {
 /**
  * Textblock der Info-Zelle (Beschriftung aus dem Tageseditor bzw. Terminnamen).
  *
- * Der Block trägt die persönliche Farbe der Info-Spalte (Hintergrund) und ist
- * nur so breit wie sein Inhalt: So wird beim Zusammenfallen mit Geburtstagen
- * bzw. wiederkehrenden Ereignissen **nur der Tageseditor-Eintrag** eingefärbt,
- * nicht die Jahrestage.
+ * Der Block ist transparent: Die persönliche Farbe der Info-Spalte liegt auf
+ * der **Zelle** (`.cell-information`, Inline-`backgroundColor`) und deckt damit
+ * den gesamten Zellenbereich ab - unabhängig von der Textlänge und auch bei
+ * leerem Info-Text. Der Block begrenzt sich weiterhin auf seine Inhaltsbreite,
+ * damit er zusammen mit den Jahrestagen sauber umbricht.
  *
  * Er ist ein eigenes Flex-Element, damit er zusammen mit den Jahrestagen
  * sauber untereinander (mehrzeilig) erscheint, sobald die Zelle über

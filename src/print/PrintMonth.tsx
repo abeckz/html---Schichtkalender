@@ -526,16 +526,17 @@ export function PrintMonth({
                   side="left"
                 />
               ))}
-              <span className={`print-col-info ${infoLineClass}`.trim()}>
+              {/* Die persönliche Farbe der Info-Spalte liegt auf der **Zelle**,
+                  damit sie den gesamten Zellenbereich abdeckt (siehe
+                  `.print-col-info` in `print.css`). */}
+              <span className={`print-col-info ${infoLineClass}`.trim()} style={columnStyle(infoHex)}>
                 {anniversaryParts.length > 0 && (
                   <span className="print-col-anniversaries">
                     {anniversaryParts.join(' · ')}
                   </span>
                 )}
                 {baseInformation !== '' && (
-                  <span className="print-col-info-text" style={columnStyle(infoHex)}>
-                    {baseInformation}
-                  </span>
+                  <span className="print-col-info-text">{baseInformation}</span>
                 )}
               </span>
               <span className="print-col-kw">

@@ -883,12 +883,13 @@ describe('AnniversaryEditor', () => {
       expect(children[0].classList.contains('cell-anniversaries')).toBe(true);
       expect(children[1].classList.contains('cell-information-text')).toBe(true);
       expect(infoCell.querySelector('.cell-information-text')?.textContent).toBe('Frühschicht');
-      // Nur der Tageseditor-Eintrag ist eingefärbt; die Jahrestage nicht.
+      // Die persönliche Farbe liegt auf der ganzen Info-Zelle (volle Fläche),
+      // die Jahrestage und der Textblock selbst bleiben transparent.
       const infoText = infoCell.querySelector('.cell-information-text') as HTMLElement;
-      expect(infoText.style.backgroundColor).not.toBe('');
+      expect(infoText.style.backgroundColor).toBe('');
       const anniversaries = infoCell.querySelector('.cell-anniversaries') as HTMLElement;
       expect(anniversaries.style.backgroundColor).toBe('');
-      expect(infoCell.style.backgroundColor).toBe('');
+      expect(infoCell.style.backgroundColor).not.toBe('');
     } finally {
       window.localStorage.removeItem(STATE_KEY);
       unmountAll();
